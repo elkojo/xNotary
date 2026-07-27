@@ -1,0 +1,48 @@
+{
+  "name": "xnotary",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "svelte-check --tsconfig ./tsconfig.json && vite build",
+    "build:only": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "spike:ots": "vitest run --config vitest.spike.config.ts src/spikes/ots.spike.test.ts",
+    "spike:pades": "vitest run --config vitest.spike.config.ts src/spikes/pades.spike.test.ts",
+    "spike:cors": "node scripts/cdp-probe.mjs http://localhost:5173/src/spikes/cors-probe.html",
+    "e2e": "node scripts/e2e-flow-a.mjs",
+    "fixtures:pades": "bash scripts/make-pades-fixture.sh"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.5.0",
+    "@vitrified/typescript-opentimestamps": "^0.2.0",
+    "asn1js": "^3.0.5",
+    "pdf-lib": "^1.17.1",
+    "pkijs": "^3.2.4",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@signpdf/placeholder-pdf-lib": "^3.3.0",
+    "@signpdf/signer-p12": "^3.3.0",
+    "@signpdf/signpdf": "^3.3.0",
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@tsconfig/svelte": "^5.0.4",
+    "@types/qrcode": "^1.5.5",
+    "jsdom": "^25.0.1",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "tslib": "^2.7.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0",
+    "ws": "^8.21.1"
+  }
+}

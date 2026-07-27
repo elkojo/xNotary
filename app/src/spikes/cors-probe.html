@@ -1,0 +1,59 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>xNotary M0 — calendar CORS probe</title>
+<h1>M0 · OTS calendar CORS probe</h1>
+<p>
+  Proves that a browser (a real cross-origin, no backend) can complete the full
+  OpenTimestamps lifecycle: stamp against the calendars, upgrade, and verify
+  against a block explorer.
+</p>
+<pre id="out">running…</pre>
+<script type="module">
+  import {
+    read,
+    submit,
+    upgrade,
+    verifiers,
+    verify,
+    write,
+  } from '@vitrified/typescript-opentimestamps';
+
+  const out = document.getElementById('out');
+  const log = (...a) => {
+    out.textContent += '\n' + a.join(' ');
+    console.log('[cors-probe]', ...a);
+  };
+  out.textContent = `origin: ${location.origin}`;
+
+  try {
+    // 1. Stamp — the POST that must survive CORS without a preflight.
+    const payload = crypto.getRandomValues(new Uint8Array(64));
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', payload));
+    const { timestamp, errors } = await submit('sha256', digest);
+    log(`STAMP ok=${errors.length === 0} errors=${errors.length}`);
+    for (const e of errors) log('  stamp error:', e.message);
+    const ots = write(timestamp);
+    log(`STAMP .ots bytes=${ots.length}`);
+    log(`STAMP roundtrip=${write(read(ots)).length === ots.length}`);
+
+    // 2. Upgrade — GET against the calendars, on an already-anchored proof.
+    const anchored = read(new Uint8Array(await (await fetch('./fixtures/reference.ots')).arrayBuffer()));
+    const up = await upgrade(anchored);
+    log(`UPGRADE errors=${up.errors.length}`);
+    for (const e of up.errors) log('  upgrade error:', e.message);
+
+    // 3. Verify — GET against public block explorers.
+    const v = await verify(up.timestamp, {
+      blockstream: verifiers.verifyViaBlockstream,
+      blockchainInfo: verifiers.verifyViaBlockchainInfo,
+    });
+    log(`VERIFY attestations=${JSON.stringify(v.attestations)}`);
+    log(`VERIFY errors=${JSON.stringify(Object.keys(v.errors))}`);
+
+    const ok = errors.length < 4 && Object.keys(v.attestations).length > 0;
+    log(`\nRESULT: ${ok ? 'GO' : 'NO-GO'}`);
+  } catch (e) {
+    log(`\nRESULT: NO-GO — ${e.name}: ${e.message}`);
+    console.error(e);
+  }
+</script>

@@ -1,0 +1,63 @@
+name: Deploy to GitHub Pages
+
+# Tag-driven, per the brief: test → build → deploy on tag.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two deploys at once, but let a queued one finish rather than
+# cancelling it — a half-deployed static site is worse than a slow one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run check
+
+      - run: npm test
+
+      - name: Build
+        # GitHub Pages serves a project site from /<repo>/, so the bundle must
+        # be built with that base path. vite.config.ts reads BASE_PATH.
+        run: npm run build:only
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+
+      - name: Disable Jekyll processing
+        run: touch dist/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
