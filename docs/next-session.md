@@ -1,22 +1,42 @@
 # Where things stand — handoff
 
-**Last updated:** 2026-07-28 · on `main`
+**Last updated:** 2026-07-28 (end of session) · `main` · everything pushed and deployed
 
-M0 and M1 are done and verified. `pades.ts` has been hardened against the awkward shapes real
-qualified signatures take, and measured against genuine PostSignum output. M2 has a working first
-cut: Certificate 2 is generated from a signed PDF behind a per-signature consent gate.
+M0, M1 and M2 are done. Both certificates work end to end, the app is public and live, and
+`pades.ts` has been measured against real qualified signatures rather than only synthetic ones.
+What is left before a real release is not code: two reviews, and documents only a human can obtain.
 
 ## State
 
 | | |
 |---|---|
-| Flow A — Certificate 1 | Working end to end, verified in a real browser against dev and production builds |
+| Live app | <https://elkojo.github.io/xNotary/> — `v0.2.3`, verified working against real OpenTimestamps calendars |
+| Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 6 releases, all marked pre-release |
+| Flow A — Certificate 1 | Working end to end, verified in a real browser against dev, production *and* the deployed site |
 | Verify-integrity screen | Working, including tamper rejection |
 | Certificate library | Working, with pending → confirmed upgrade |
-| PAdES parsing | Hardened; verified against one real PostSignum signature (`docs/qtsp-findings.md`) |
-| Certificate 2 | First cut working — `Attest` tab, consent gate, one-page A4, document attached |
-| Tests | 125 offline, all passing; type-check clean |
-| Repo on GitHub | `elkojo/xNotary`, **private**, `main` pushed; CI runs on push |
+| PAdES parsing | Hardened; measured against real PostSignum output (`docs/qtsp-findings.md`) |
+| Certificate 2 | Working — `Attest` tab, consent gate, one-page A4, sequential *and* parallel signing |
+| Tests | 125 offline, all passing; type-check clean; CI green |
+
+**Deploying:** commit → push → tag `v*`. The tag fires `deploy.yml`; a plain push does not. The
+`github-pages` environment has a `v*` tag policy so tags are allowed to deploy — do not remove it.
+After deploying, `gh release create` publishes the release notes; that step is manual.
+
+## If you are picking this up cold
+
+Read this file, then `CLAUDE.md` (loaded automatically) for the invariants and gotchas, then
+`docs/qtsp-findings.md` for what real qualified signatures actually contain — that one exists
+because reasoning about the spec was repeatedly wrong and measurement was repeatedly right.
+
+Then `cd app && npm test` (125, offline, ~5s). Green means the tree is sound.
+
+**Nothing is half-finished.** There is no in-progress branch, no failing test, no partial feature.
+Pick any item under *Next up*; none blocks another.
+
+The pattern worth keeping, because it caught things tests did not: for anything that produces a
+document or a page, **render it and look at it**. Overflowing text off the bottom of a page, a
+digest hidden behind a QR code, and "Certified by <the signer themselves>" all passed their tests.
 
 ## Decisions already made — don't relitigate
 
@@ -31,11 +51,14 @@ cut: Certificate 2 is generated from a signed PDF behind a per-signature consent
 
 ## Next up
 
-### 1. Get real signed-PDF fixtures — highest residual risk, do this first
+### 1. Real signed-PDF evidence — mostly closed, and still the highest-value input
 
-Obtain one real **I.CA** (or PostSignum/eIdentity) signed PDF and one **Bank iD**–signed PDF and
-add them as fixtures. This is a data-availability problem, not a technical unknown — it needs a
-request to a QTSP or a signing run, so start it early.
+Every real document supplied so far has found a defect that reasoning did not, so this stays at
+the top even though the urgent gaps are shut. What is still unseen is listed at the end of this
+section.
+
+Original framing: obtain real QTSP-signed PDFs, because `pades.ts` had only synthetic fixtures
+behind it. That has largely happened.
 
 Four risks were identified when `pades.ts` had only the single M0 fixture behind it. Three have
 since been closed with generated fixtures that reproduce the shape deliberately
@@ -167,21 +190,19 @@ the same code that ships at 1.0. Each certificate already states its own limits 
 
 ### 4. M3 — Release
 
-GitHub Pages deploy, PWA polish, onboarding/help, disclaimers, security review.
+Done: GitHub Pages deploy, public repo. Left: PWA polish, onboarding, a disclaimer pass, and the
+two reviews below. None of the remainder is blocked on code.
 
 ## Open items
 
-- **GitHub repo not created.** `gh` is authenticated as `elkojo`. One command:
-  `gh repo create elkojo/xNotary --public --source=. --remote=origin --push`.
-  **Decide public vs private first** — the brief wants public AGPL, but the security review and
-  eIDAS counsel review are both scheduled for M3. Private now, public at M3, costs nothing.
-- **GitHub Pages needs enabling once** in Settings → Pages → Source: *GitHub Actions*, or
-  `deploy.yml` will fail. It only fires on `v*` tags, so nothing deploys on a plain push.
+- **Security review** — not started. Note for whoever does it: `npm audit --omit=dev` is **0**;
+  nothing vulnerable ships.
+- **Legal review** by Czech eIDAS counsel — not started, and required before this stops being
+  labelled pre-release.
 - **Full `ots verify` never completed end to end.** The reference client requires a local
   Bitcoin node and won't trust a block explorer. The proof parses and commits to the right
   digest, and the Bitcoin attestation was confirmed against two explorers — but one run against
   a real node before M3 would close this properly.
-- **Legal review** by Czech eIDAS counsel before public launch (not before MVP).
 - **Dev-toolchain advisories for the M3 security review.** `npm audit --omit=dev` reports **0**
   — nothing vulnerable ships. `npm audit` reports 7 dev-only, of which two matter: Vite (path
   traversal in optimized-deps `.map` handling, dev server only) and `@vitest/mocker` via vitest.
