@@ -85,6 +85,15 @@ describe('Certificate 1', () => {
     expect(text).not.toMatch(/Anchored in Bitcoin block/);
   });
 
+  it('tells the reader how to get the proof out of the PDF', async () => {
+    const text = (await pdfText(await build(CONFIRMED))).replace(/\s+/g, ' ');
+
+    expect(text).toContain('"proof.ots"');
+    expect(text).toMatch(/paperclip or Attachments panel/);
+    expect(text).toMatch(/Chrome's built-in viewer does not show attachments/);
+    expect(text).toContain('pdfdetach -saveall');
+  });
+
   it('returns null for a PDF with no proof attached', async () => {
     const notACertificate = new TextEncoder().encode('%PDF-1.7\nnothing here\n%%EOF');
     expect(await extractOtsAttachment(notACertificate)).toBeNull();

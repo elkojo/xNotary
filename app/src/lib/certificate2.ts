@@ -512,7 +512,8 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
   // ---- Signatories ------------------------------------------------------
   // Reserve what the closing sections need, then spend what is left on
   // signers at the highest detail that fits.
-  const closingHeight = measureClosing(c, sources.length);
+  const attachmentNames = sources.map((s) => ascii(s.fileName));
+  const closingHeight = measureClosing(c, attachmentNames);
   // 26 for the rule that precedes the closing, 16 for the section heading.
   const budget = c.remaining - closingHeight - 26 - 16;
   const detail = chooseDetail(c, input.signers, budget, ascii);
@@ -561,7 +562,7 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
 
   if (c.remaining < closingHeight) spill();
   else c.rule();
-  drawClosing(c, fonts, sources.length);
+  drawClosing(c, fonts, attachmentNames);
 
   for (const [i, p] of pages.entries()) {
     const footer =
@@ -590,57 +591,6 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
   }
 
   return pdf.save();
-}
-
-/** Text of the closing sections, so it can be measured and drawn identically. */
-function closingText(sourceCount: number): { verify: string[]; disclaimer: string } {
-  const what =
-    sourceCount > 1
-      ? `the ${sourceCount} attached files from this PDF. They are the signed documents, byte ` +
-        `for byte — this certificate never modified them.`
-      : `the attached file from this PDF. It is the signed document, byte for byte — this ` +
-        `certificate never modified it.`;
-
-  return {
-    verify: [
-      `1. Detach ${what}`,
-      sourceCount > 1
-        ? `2. Upload each of them to the EU DSS validator for an authoritative result:`
-        : `2. Upload it to the EU DSS validator for an authoritative result:`,
-      VALIDATOR_URL,
-      `3. The validator checks each signing certificate against the EU Trusted Lists and ` +
-        `reports whether the signature is a qualified electronic signature. That determination ` +
-        `is its own, not xNotary's.`,
-    ],
-    disclaimer: DISCLAIMER_2,
-  };
-}
-
-function measureClosing(c: Cursor, sourceCount: number): number {
-  const { verify, disclaimer } = closingText(sourceCount);
-  let h = 26 + 16; // rule + heading
-  for (const line of verify) h += c.measureParagraph(line, { size: 9 }) + 4;
-  h += 26 + 16; // rule + heading
-  h += c.measureParagraph(disclaimer, { size: 9 });
-  return h + 8;
-}
-
-function drawClosing(
-  c: Cursor,
-  fonts: Awaited<ReturnType<typeof loadFonts>>,
-  sourceCount: number,
-) {
-  const { verify, disclaimer } = closingText(sourceCount);
-
-  c.heading('How to verify this without xNotary');
-  for (const line of verify) {
-    c.paragraph(line, { size: 9, font: line === VALIDATOR_URL ? fonts.mono : fonts.regular });
-    c.gap(4);
-  }
-
-  c.rule();
-  c.heading('What this certificate does not prove');
-  c.paragraph(disclaimer, { color: MUTED });
 }
 
 /**
@@ -691,6 +641,95 @@ function entryHeight(c: Cursor, lines: readonly EntryLine[]): number {
   );
   // +1 for the gap after the bold name, +7 for the gap between entries.
   return text + 1 + 7;
+}
+
+/** One line of the closing sections. `mono` marks a command to be typed. */
+interface ClosingLine {
+  readonly text: string;
+  readonly mono?: boolean;
+}
+
+/**
+ * The closing sections, measured and drawn from one list.
+ *
+ * Someone reading this has the certificate and nothing else — no xNotary, and
+ * quite possibly no idea that a PDF can carry files inside it. The attachments
+ * are the whole basis of the verification, and they are invisible on the page,
+ * so the instruction has to name them and say where to look. Not every viewer
+ * exposes attachments at all, hence the command-line route as well.
+ *
+ * @param names attachment file names, already transliterated for the fonts
+ */
+function closingText(names: readonly string[]): {
+  verify: ClosingLine[];
+  disclaimer: string;
+} {
+  const many = names.length > 1;
+  const listed = names.map((n) => `"${n}"`).join(', ');
+
+  return {
+    verify: [
+      {
+        text:
+          `1. Detach the attached ${many ? `${names.length} files` : 'file'} from this PDF: ` +
+          `${listed}. ${many ? 'They are' : 'It is'} the signed ` +
+          `${many ? 'documents' : 'document'}, byte for byte — this certificate never modified ` +
+          `${many ? 'them' : 'it'}.`,
+      },
+      {
+        text:
+          `${many ? 'They are' : 'It is'} inside this PDF, not on the page: open the paperclip ` +
+          `or Attachments panel (Acrobat, Firefox, most readers). Chrome's built-in viewer does ` +
+          `not show attachments; if yours does not either, run:`,
+      },
+      { text: `   pdfdetach -saveall "this-certificate.pdf"`, mono: true },
+      {
+        text:
+          `2. Upload ${many ? 'each of them' : 'it'} to the EU DSS validator for an ` +
+          `authoritative result:`,
+      },
+      { text: VALIDATOR_URL, mono: true },
+      {
+        text:
+          `3. The validator checks each signing certificate against the EU Trusted Lists and ` +
+          `reports whether the signature is a qualified electronic signature. That determination ` +
+          `is its own, not xNotary's.`,
+      },
+    ],
+    disclaimer: DISCLAIMER_2,
+  };
+}
+
+function measureClosing(c: Cursor, names: readonly string[]): number {
+  const { verify, disclaimer } = closingText(names);
+  let h = 26 + 16; // rule + heading
+  for (const line of verify) {
+    h += c.measureParagraph(line.text, { size: line.mono ? 8.5 : 9 }) + 4;
+  }
+  h += 26 + 16; // rule + heading
+  h += c.measureParagraph(disclaimer, { size: 9 });
+  return h + 8;
+}
+
+function drawClosing(
+  c: Cursor,
+  fonts: Awaited<ReturnType<typeof loadFonts>>,
+  names: readonly string[],
+) {
+  const { verify, disclaimer } = closingText(names);
+
+  c.heading('How to verify this without xNotary');
+  for (const line of verify) {
+    c.paragraph(line.text, {
+      size: line.mono ? 8.5 : 9,
+      font: line.mono ? fonts.mono : fonts.regular,
+    });
+    c.gap(4);
+  }
+
+  c.rule();
+  c.heading('What this certificate does not prove');
+  c.paragraph(disclaimer, { color: MUTED });
 }
 
 /**

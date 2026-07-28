@@ -15,7 +15,7 @@ cut: Certificate 2 is generated from a signed PDF behind a per-signature consent
 | Certificate library | Working, with pending → confirmed upgrade |
 | PAdES parsing | Hardened; verified against one real PostSignum signature (`docs/qtsp-findings.md`) |
 | Certificate 2 | First cut working — `Attest` tab, consent gate, one-page A4, document attached |
-| Tests | 122 offline, all passing; type-check clean |
+| Tests | 125 offline, all passing; type-check clean |
 | Repo on GitHub | `elkojo/xNotary`, **private**, `main` pushed; CI runs on push |
 
 ## Decisions already made — don't relitigate
@@ -96,8 +96,10 @@ Design decisions worth not relitigating:
   document; naming them would defeat the consent gate.
 - **Self-signed certificates say so.** "Certified by X" for a certificate X issued to itself
   implies an assurance nobody gave.
-- **Layout spills to page 2 rather than dropping a signatory.** Full detail fits ~6 signers on one
-  page, compact ~7; beyond that it spills. Detail is sacrificed, people are not.
+- **Layout spills to page 2 rather than dropping a signatory.** Five signatories fit on one page;
+  beyond that it spills. Detail is sacrificed, people are not. The threshold dropped from six when
+  the attachment guidance was added — deliberately: a reader who cannot find the attachments
+  cannot verify anything at all, so the guidance is worth more than a sixth slot.
 
 **Parallel signing is now supported.** The Attest tab accepts several signed PDFs — one signing
 round, one file per signer — pools their signatures and attaches every file. Sequential

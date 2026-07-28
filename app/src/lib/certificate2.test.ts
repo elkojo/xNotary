@@ -449,6 +449,46 @@ describe('consent', () => {
   });
 });
 
+describe('telling the reader how to get at the attachments', () => {
+  // The attachments are the entire basis of the verification and are invisible
+  // on the page. Someone holding only this PDF has to be told they exist, what
+  // they are called, and how to get them out.
+  it('names every attached file', async () => {
+    const draft = await analyzeSignedDocuments([
+      { fileName: 'copy-a.pdf', bytes: fixture('cert1-signed-once.pdf') },
+      { fileName: 'copy-b.pdf', bytes: fixture('cert1-parallel-b.pdf') },
+    ]);
+    const text = (
+      await pdfText(
+        await buildCertificate2({
+          sources: draft.sources.map((s) => ({ fileName: s.fileName, bytes: s.bytes })),
+          signers: draft.signers,
+          withheldCount: 0,
+          generatedAt: GENERATED_AT,
+        }),
+      )
+    ).replace(/\s+/g, ' ');
+
+    expect(text).toContain('"copy-a.pdf", "copy-b.pdf"');
+  });
+
+  it('says where they are and how to open them', async () => {
+    const text = (await pdfText(await build())).replace(/\s+/g, ' ');
+
+    expect(text).toMatch(/inside this PDF, not on the page/);
+    expect(text).toMatch(/paperclip or Attachments panel/);
+  });
+
+  // The common default viewer shows no sign the attachments exist, so a
+  // reader following the instructions would otherwise conclude there are none.
+  it('warns that some viewers hide attachments, and gives a way round it', async () => {
+    const text = (await pdfText(await build())).replace(/\s+/g, ' ');
+
+    expect(text).toMatch(/Chrome's built-in viewer does not show attachments/);
+    expect(text).toContain('pdfdetach -saveall');
+  });
+});
+
 describe('claims are never presented as verdicts', () => {
   it('marks the certificate assertions as unverified by xNotary', async () => {
     const text = await pdfText(await build());
@@ -538,7 +578,10 @@ describe('self-signed certificates', () => {
 });
 
 describe('one A4 page', () => {
-  it.each([1, 2, 3, 4, 5, 6])('fits %i signatories on a single page', async (n) => {
+  // Five, not more: naming the attachments and explaining how to detach them
+  // costs vertical space, and that guidance is worth more than a sixth slot —
+  // a reader who cannot find the attachments cannot verify anything at all.
+  it.each([1, 2, 3, 4, 5])('fits %i signatories on a single page', async (n) => {
     const signers = Array.from({ length: n }, (_, i) =>
       signer({ name: `Signatory Number ${i + 1}` }),
     );

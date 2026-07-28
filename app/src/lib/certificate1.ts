@@ -179,9 +179,12 @@ export async function buildCertificate1(input: Certificate1Input): Promise<Uint8
 
   c.heading('How to verify this without xNotary');
   c.paragraph(
-    '1. Detach the attached file "proof.ots" from this PDF. Any PDF reader that shows ' +
-      'attachments can do this (in Acrobat and most readers: the paperclip / Attachments panel).',
+    '1. Detach the attached file "proof.ots" from this PDF. It is inside the file, not on the ' +
+      'page: open the paperclip or Attachments panel (Acrobat, Firefox, most readers). ' +
+      "Chrome's built-in viewer does not show attachments; if yours does not either, run:",
   );
+  c.gap(4);
+  c.paragraph('   pdfdetach -saveall "this-certificate.pdf"', { font: fonts.mono, size: 8.5 });
   c.gap(4);
   c.paragraph(
     '2. Install the reference OpenTimestamps client:  pip install opentimestamps-client',
