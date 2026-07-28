@@ -56,17 +56,24 @@ gaps and is written up in `docs/qtsp-findings.md`; the short version is that rea
 carries *no* `signingTime` attribute, so the signing time now comes from the RFC 3161 token,
 which `pades.ts` parses and checks against the signature bytes.
 
+**A real Certificate 1 has also been signed and countersigned** and is committed as a fixture —
+both signers used self-signed throwaway certificates, so it carries no personal data. It settled
+the two questions that were blocking M2:
+
+- **Invariant 4 survives signing.** The embedded `.ots` still extracts byte-identically from the
+  signed and countersigned certificates and still commits to the source digest.
+- **Countersigning is not tampering.** Coverage moved out of `parseOne` into a cross-signature
+  pass; `supersededBy` names the signature covering an earlier revision, and the appended-bytes
+  warning now fires only when nothing covers the trailing bytes.
+
 **Still open, and genuinely needing more real documents:**
 
-1. **Multi-signature documents** — the one real sample has a single signature. Two or more mean
-   successive incremental updates, where every signature but the last legitimately does *not*
-   cover the whole file. `pades.ts` currently calls that "bytes appended after signing", which
-   would be alarming and wrong wording for a second signer. **This is the next real-document
-   priority**, and it blocks getting Certificate 2's wording right.
+1. **A qualified countersignature** — the committed countersigned fixture uses self-signed
+   certificates, so two *qualified* signatures on one document remain unseen.
 2. **Bank iD** — a different QTSP with a different profile. Nothing measured so far speaks for it.
 3. **I.CA / eIdentity** — likewise.
-4. **PAdES-LTA** with DSS/VRI dictionaries and archive timestamps. The PostSignum sample is
-   PAdES-T only.
+4. **PAdES-LTA** with DSS/VRI dictionaries and archive timestamps. Everything measured is
+   PAdES-T at most.
 
 Never commit a real document — they carry personal data, usually of people other than the
 signer. `/*.pdf` at the repo root is gitignored so testing against one is safe. Reproduce what it

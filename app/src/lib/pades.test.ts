@@ -88,7 +88,7 @@ describe('/Contents parsing', () => {
 });
 
 describe('document coverage', () => {
-  it('flags bytes appended after signing', async () => {
+  it('flags bytes appended after the last signature', async () => {
     const signed = fixture('chain-ski.pdf');
     const appended = new Uint8Array(signed.length + 32);
     appended.set(signed, 0);
@@ -96,11 +96,62 @@ describe('document coverage', () => {
 
     const sig = (await parsePades(appended)).signatures[0]!;
 
-    // The original revision is intact, so integrity still holds — but the
-    // signature no longer covers the whole file, and that must be said.
+    // The original revision is intact, so integrity still holds — but nothing
+    // covers the trailing bytes, and that must be said.
     expect(sig.documentIntegrity).toBe(true);
     expect(sig.coversWholeDocument).toBe(false);
-    expect(sig.warnings.join(' ')).toMatch(/appended after signing/);
+    expect(sig.supersededBy).toBeNull();
+    expect(sig.warnings.join(' ')).toMatch(/covered by no signature/);
+  });
+
+  // Real countersigned documents, produced by signing an actual xNotary
+  // Certificate 1 twice. Each signer signs the revision in front of them, so
+  // every signature but the last stops short of the end of the file — that is
+  // ordinary countersigning, not tampering, and must not be reported as if it
+  // were. See `docs/qtsp-findings.md`.
+  describe('countersigned documents', () => {
+    it('reads both signatures and attributes them separately', async () => {
+      const { signatures, errors } = await parsePades(fixture('cert1-countersigned.pdf'));
+
+      expect(errors).toEqual([]);
+      expect(signatures).toHaveLength(2);
+      expect(signatures.map((s) => s.signerName)).toEqual(['Max Svoboda', 'Jan Novak']);
+      // Both revisions are intact; neither signer's bytes were altered.
+      expect(signatures.every((s) => s.documentIntegrity)).toBe(true);
+    });
+
+    it('does not call an earlier revision tampered with', async () => {
+      const [first, second] = (await parsePades(fixture('cert1-countersigned.pdf'))).signatures;
+
+      // The first signer signed an earlier, shorter revision.
+      expect(first!.coversWholeDocument).toBe(false);
+      expect(first!.supersededBy).toBe(2);
+      expect(first!.warnings).toEqual([]);
+
+      expect(second!.coversWholeDocument).toBe(true);
+      expect(second!.supersededBy).toBeNull();
+      expect(second!.warnings).toEqual([]);
+    });
+
+    it('reports a single signature over the whole document as complete', async () => {
+      const sig = await onlySignature('cert1-signed-once.pdf');
+
+      expect(sig.coversWholeDocument).toBe(true);
+      expect(sig.supersededBy).toBeNull();
+      expect(sig.warnings).toEqual([]);
+    });
+
+    // The signature the first signer applied is byte-identical in both files;
+    // countersigning must not disturb it.
+    it('reports the first signature identically before and after countersigning', async () => {
+      const once = await onlySignature('cert1-signed-once.pdf');
+      const [first] = (await parsePades(fixture('cert1-countersigned.pdf'))).signatures;
+
+      expect(first!.signerName).toBe(once.signerName);
+      expect(first!.byteRange).toEqual(once.byteRange);
+      expect(first!.signatureTimestamp!.time).toEqual(once.signatureTimestamp!.time);
+      expect(first!.signatureTimestamp!.matchesSignature).toBe(true);
+    });
   });
 });
 

@@ -16,3 +16,5 @@ coverage/
 # a generated fixture instead (see app/src/lib/fixtures/README.md). Fixtures
 # live under app/, so this rule cannot catch them by accident.
 /*.pdf
+/*.odt
+/*.ots

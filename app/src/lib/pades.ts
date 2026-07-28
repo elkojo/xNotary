@@ -109,11 +109,24 @@ export interface PadesSignature {
   /** The `/ByteRange` array as written in the PDF. */
   readonly byteRange: readonly number[];
   /**
-   * True when the ByteRange spans the whole file except the signature hole,
-   * i.e. the signature covers the entire revision. A `false` here on the last
-   * signature means bytes were appended after signing.
+   * True when the ByteRange spans the whole file except the signature hole.
+   *
+   * `false` is *normal* for every signature but the last in a countersigned
+   * document: each signer signs the revision in front of them, and the next
+   * signature is appended after it. Read this together with `supersededBy`
+   * before saying anything alarming — only `false` with `supersededBy === null`
+   * means bytes nobody signed were appended.
    */
   readonly coversWholeDocument: boolean;
+  /**
+   * The 1-based index of the next signature, when this one signed an earlier
+   * revision that a later signature then covered. `null` when this signature
+   * covers the whole document.
+   *
+   * What it means for the signer: they saw the document as it stood at their
+   * revision, and did not see anything added afterwards.
+   */
+  readonly supersededBy: number | null;
   /** The signed bytes hash to the value in the CMS messageDigest attribute. */
   readonly documentIntegrity: boolean;
   /** Signer name, best-effort from the certificate subject. */
@@ -303,25 +316,86 @@ function displayName(subject: DistinguishedName): string {
 }
 
 export async function parsePades(pdf: Uint8Array): Promise<PadesParseResult> {
-  const signatures: PadesSignature[] = [];
+  const drafts: SignatureDraft[] = [];
   const errors: string[] = [];
 
   const slots = findSignatureSlots(pdf);
   for (const [i, slot] of slots.entries()) {
     try {
-      signatures.push(await parseOne(pdf, slot, i + 1));
+      drafts.push(await parseOne(pdf, slot, i + 1));
     } catch (e) {
       errors.push(`Signature ${i + 1}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
-  return { signatures, errors };
+
+  return { signatures: resolveCoverage(drafts, pdf.length), errors };
+}
+
+/** A parsed signature before the cross-signature coverage pass. */
+type SignatureDraft = Omit<PadesSignature, 'warnings' | 'supersededBy'> & {
+  warnings: string[];
+  supersededBy: number | null;
+};
+
+/**
+ * Decide what each signature's coverage *means*, which cannot be known from one
+ * signature alone.
+ *
+ * In a countersigned PDF every signer signs the revision in front of them, then
+ * the next signature is appended. So all but the last signature legitimately
+ * stop short of the end of the file. Calling that "bytes were appended after
+ * signing" would describe ordinary countersigning as if it were tampering —
+ * and a document where every normal case raises an alarm teaches people to
+ * ignore alarms.
+ *
+ * The genuinely suspicious case is bytes past the *furthest* signature: those
+ * were added after everybody signed, and nobody has attested to them.
+ */
+function resolveCoverage(drafts: SignatureDraft[], fileLength: number): PadesSignature[] {
+  const endOf = (s: SignatureDraft) => s.byteRange[2]! + s.byteRange[3]!;
+  const furthest = drafts.reduce((max, s) => Math.max(max, endOf(s)), 0);
+
+  for (const draft of drafts) {
+    if (draft.coversWholeDocument) continue;
+
+    // The next revision is the signature that covers the least while still
+    // covering more than this one.
+    const next = drafts
+      .filter((other) => endOf(other) > endOf(draft))
+      .sort((a, b) => endOf(a) - endOf(b))[0];
+
+    if (next) {
+      draft.supersededBy = next.index;
+      continue;
+    }
+
+    // Nothing covers further, so these trailing bytes are unsigned.
+    draft.warnings.push(
+      `Signature covers bytes 0–${endOf(draft)} of a ${fileLength}-byte file; ` +
+        `${fileLength - endOf(draft)} byte(s) were appended afterwards and are covered by no ` +
+        `signature.`,
+    );
+  }
+
+  // A trailing edit after the last signature shows up on that signature above;
+  // this catches the case where it is not the furthest one for some reason.
+  if (drafts.length > 0 && furthest < fileLength) {
+    const last = drafts[drafts.length - 1]!;
+    if (endOf(last) === furthest && last.warnings.length === 0) {
+      last.warnings.push(
+        `${fileLength - furthest} byte(s) at the end of the file are covered by no signature.`,
+      );
+    }
+  }
+
+  return drafts;
 }
 
 async function parseOne(
   pdf: Uint8Array,
   slot: { byteRange: number[]; contents: Uint8Array },
   index: number,
-): Promise<PadesSignature> {
+): Promise<SignatureDraft> {
   const warnings: string[] = [];
 
   const asn1 = asn1js.fromBER(slot.contents);
@@ -390,14 +464,9 @@ async function parseOne(
     }
   }
 
-  const last = slot.byteRange[2]! + slot.byteRange[3]!;
-  const coversWholeDocument = last === pdf.length;
-  if (!coversWholeDocument) {
-    warnings.push(
-      `Signature covers bytes 0–${last} of a ${pdf.length}-byte file; ` +
-        `${pdf.length - last} byte(s) were appended after signing.`,
-    );
-  }
+  // Whether falling short of the end of the file is benign depends on the other
+  // signatures, so the judgement is left to `parsePades`.
+  const coversWholeDocument = slot.byteRange[2]! + slot.byteRange[3]! === pdf.length;
   // A signing-certificate attribute binds the signature to one specific
   // certificate. EN 319 142 baseline asks for v2, but v1 (RFC 2634) is still
   // what several QTSPs emit — PostSignum among them — so both count.
@@ -421,6 +490,7 @@ async function parseOne(
     issuer: readDn(signerCert.issuer),
     signingTime,
     signatureTimestamp,
+    supersededBy: null,
     qualifiedClaim: readQualifiedClaim(signerCert),
     certificateSerial: toHex(new Uint8Array(signerCert.serialNumber.valueBlock.valueHexView)),
     certificateNotBefore: signerCert.notBefore.value,

@@ -35,13 +35,40 @@ awkward shapes are built deliberately rather than discovered later.
 | `qtsp-shape.pdf` | The structure of a **real** PostSignum qualified signature, measured feature by feature: SHA-512, ESS `signing-certificate` v1, no `signingTime` attribute at all, a single certificate in the CMS, an RFC 3161 token from a third-party TSA, and QCStatements without QcSSCD. See `docs/qtsp-findings.md`. |
 | `timestamp-foreign.pdf` | The same, except the TSA timestamped unrelated bytes. A well-formed token proves a time only if its message imprint covers *this* signature. |
 
-## What they do not cover
+## The three that are *not* generated
 
-Real multi-signature PDFs append a new revision rather than rewriting the file.
-Producing a genuine second revision needs `@signpdf/placeholder-plain`, which is
-not a dependency here, so `pades.test.ts` covers only the security-relevant
-half — detecting bytes appended after signing. True multi-revision parsing stays
-open until real signed documents are available; see `docs/next-session.md`.
+`cert1-source-document.pdf`, `cert1-signed-once.pdf` and
+`cert1-countersigned.pdf` are the exception, and `make-pades-fixtures.mjs` does
+not produce them. They are a real xNotary Certificate 1, really signed — once,
+then countersigned by a second party — because a genuine second revision cannot
+be built offline here (it needs `@signpdf/placeholder-plain`, which is not a
+dependency).
+
+They are safe to keep in the repository, and that is a property to preserve if
+they are ever regenerated:
+
+- Both signing certificates are **self-signed and disposable**, created minutes
+  before signing, with invented identities (`Max Svoboda` of `LongRiver.cz`,
+  `Jan Novak` of `Novak Enterprise`). Neither is a qualified certificate and
+  neither belongs to a real person.
+- The notarized document is a throwaway sample whose own text says so.
+
+Because the certificates are self-signed, these fixtures say nothing about QTSP
+identity handling — `qtsp-shape.pdf` covers that. What they cover is structure:
+two signatures across three revisions, and an embedded attachment that has to
+survive both.
+
+They also pin **invariant 4** in `certificate1.test.ts`: the `.ots` still
+extracts, byte-identical, from the signed and countersigned certificates. If
+signing ever stopped preserving it, Certificate 1 would cease to stand on its
+own at the exact moment it starts being used.
+
+## What they still do not cover
+
+- **PAdES-LTA** — DSS/VRI dictionaries and archive timestamps.
+- **A qualified countersignature** — the countersigned fixture uses self-signed
+  certificates, so a real two-QTSP document is still unseen.
+- **Bank iD, I.CA, eIdentity** profiles.
 
 These fixtures also say nothing about whether a signature is a *qualified*
 electronic signature. That needs EUTL validation, which the MVP delegates to an

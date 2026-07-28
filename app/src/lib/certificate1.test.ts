@@ -91,3 +91,34 @@ describe('Certificate 1', () => {
     expect(await extractOtsAttachment(pdf)).not.toBeNull();
   });
 });
+
+/**
+ * Invariant 4: Certificate 1 must verify without xNotary. Signing appends a new
+ * revision to the PDF, and if that disturbed the embedded proof the certificate
+ * would stop standing on its own at exactly the moment it starts being useful.
+ *
+ * These fixtures are a real Certificate 1 that was really signed — once, then
+ * countersigned — so this is measured behaviour, not a simulation of it.
+ */
+describe('Certificate 1 after it has been signed', () => {
+  const fixture = (name: string) =>
+    new Uint8Array(readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url))));
+
+  const SOURCE_DIGEST = 'e3748becd853b5cc7d80d277db47208ce54b298ee4350a61f12ddcebe1a04ae9';
+
+  it('the source document still hashes to what the certificate was issued for', async () => {
+    expect(toHex(await sha256Bytes(fixture('cert1-source-document.pdf')))).toBe(SOURCE_DIGEST);
+  });
+
+  it.each(['cert1-signed-once.pdf', 'cert1-countersigned.pdf'])(
+    'still yields the embedded proof from %s',
+    async (name) => {
+      const ots = await extractOtsAttachment(fixture(name));
+
+      expect(ots).not.toBeNull();
+      // Byte-identical to the proof in the unsigned certificate: signing appends
+      // a revision, it does not rewrite what came before.
+      expect(toHex(ots!)).toBe(toHex((await extractOtsAttachment(fixture('cert1-signed-once.pdf')))!));
+    },
+  );
+});

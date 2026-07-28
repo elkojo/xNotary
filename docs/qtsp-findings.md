@@ -62,14 +62,59 @@ these as read-outs and link to an official validator for the actual determinatio
 had to resolve on its own. It did. Note this cuts the other way from the fixtures built the week
 before: `chain-ski.pdf` bundles the chain because other QTSPs do. Both shapes occur.
 
+---
+
+# A real Certificate 1, signed and countersigned
+
+Measured the same day, on the product's own output: a Certificate 1 issued by xNotary, signed by
+one party and then countersigned by a second. Unlike the PostSignum document above, both signing
+certificates are self-signed throwaways with invented identities, so these files carry no personal
+data and **are** committed — as `cert1-signed-once.pdf` and `cert1-countersigned.pdf`.
+
+| | signed once | countersigned |
+|---|---|---|
+| Size | 64,608 bytes | 87,576 bytes |
+| Signatures | 1 | 2 |
+| Revisions (`%%EOF`) | 2 | 3 |
+| Signature 1 ByteRange | `[0 11094 30034 34574]` → covers 64,608 | **unchanged** → covers 64,608 of 87,576 |
+| Signature 2 ByteRange | — | `[0 68347 87167 409]` → covers 87,576 |
+
+## Invariant 4 survives signing
+
+The embedded `.ots` still extracts from both files, **byte-identical** to the proof in the
+unsigned certificate, and still commits to the source document's digest
+(`e3748bec…04ae9`). This was the open risk: signing appends a revision, and had it disturbed the
+`/EF` structure, Certificate 1 would have stopped standing on its own at the moment it starts
+being useful. It does not. Pinned in `certificate1.test.ts`.
+
+The first signature is also bit-for-bit untouched by countersigning — same ByteRange, same
+timestamp, imprint still matching. Countersigning appends; it does not rewrite.
+
+## What it changed: coverage is not a per-signature question
+
+Signature 1 covers 64,608 bytes of an 87,576-byte file, and `pades.ts` said:
+
+> Signature covers bytes 0–64608 of a 87576-byte file; 22968 byte(s) were appended after signing.
+
+That is ordinary countersigning described as if it were tampering. Every countersigned document
+would have raised it, on every signature but the last — and a tool that cries wolf on the normal
+case teaches people to ignore it, which is worse than saying nothing.
+
+The fix is structural rather than cosmetic: whether falling short of the end of the file is benign
+cannot be known from one signature alone, so the judgement moved out of `parseOne` into a
+cross-signature pass in `parsePades`. `PadesSignature.supersededBy` now names the signature that
+covers this one's revision, and the warning fires only when *nothing* covers the trailing bytes —
+the genuinely suspicious case, where content was added after everybody had signed.
+
+For Certificate 2 this is the difference between "Max Svoboda signed revision 1 of 2" and an
+alarm. The first is true and useful; the second was neither.
+
 ## What is still unverified
 
-- **Multi-signature documents.** This document has one signature. Two or more signatures mean
-  successive incremental updates, where each earlier signature covers only its own revision and
-  `coversWholeDocument` is legitimately `false` for all but the last. `pades.ts` reports appended
-  bytes as a warning, which would be *wrong wording* for that case. Needs a real two-signer PDF.
-- **PAdES-LTA.** No DSS/VRI dictionaries or document timestamps here.
+- **A qualified countersignature.** The countersigned fixture uses self-signed certificates. A
+  document signed by two *qualified* certificates has still not been seen.
+- **PAdES-LTA.** No DSS/VRI dictionaries or document timestamps in anything measured so far.
 - **Bank iD.** A different QTSP with a different profile; nothing here speaks for it.
 - **I.CA and eIdentity.** Likewise.
 
-One real document closed three defects and left the list above. It is worth collecting more.
+Two real artifacts closed four defects between them. It is worth collecting more.
