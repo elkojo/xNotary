@@ -1,13 +1,15 @@
 <script lang="ts">
+  import Attest from './views/Attest.svelte';
   import Help from './views/Help.svelte';
   import Library from './views/Library.svelte';
   import Notarize from './views/Notarize.svelte';
   import Verify from './views/Verify.svelte';
 
-  type Tab = 'notarize' | 'verify' | 'library' | 'help';
+  type Tab = 'notarize' | 'attest' | 'verify' | 'library' | 'help';
 
   const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
     { id: 'notarize', label: 'Notarize' },
+    { id: 'attest', label: 'Attest signatures' },
     { id: 'verify', label: 'Verify integrity' },
     { id: 'library', label: 'My certificates' },
     { id: 'help', label: 'How it works' },
@@ -68,6 +70,8 @@
   <main>
     {#if tab === 'notarize'}
       <Notarize onstored={() => libraryRevision++} />
+    {:else if tab === 'attest'}
+      <Attest />
     {:else if tab === 'verify'}
       <Verify />
     {:else if tab === 'library'}

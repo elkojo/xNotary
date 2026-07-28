@@ -12,7 +12,7 @@ they are, `docs/qtsp-findings.md` for what real qualified signatures actually co
 Everything runs from `app/`.
 
 ```bash
-npm test          # offline suite (52 tests) — this is what CI runs
+npm test          # offline suite (86 tests) — this is what CI runs
 npm run check     # svelte-check; must be 0 errors before committing
 npm run dev       # http://localhost:5173
 npm run build     # check + production build
@@ -46,7 +46,12 @@ These are the product, not preferences. Each has tests behind it.
 5. **`pades.ts` reports claims, never verdicts.** It cannot say a signature is a valid QES —
    that needs EUTL validation, which the MVP delegates to an external validator. `QualifiedClaim`
    is named that way on purpose.
-6. **A signature is attributed only on evidence.** `matchSignerCert` resolves the signer's
+6. **Certificate 2 never modifies the document it attests to.** It embeds the signed PDF as an
+   attachment rather than appending a page — appending would push the last signature's ByteRange
+   short of the file end, which is precisely the "bytes nobody signed" condition. Nor may it
+   name a signer who did not consent, or drop one to save space: it spills to a second page
+   instead. See `src/lib/certificate2.ts` and its tests.
+7. **A signature is attributed only on evidence.** `matchSignerCert` resolves the signer's
    certificate by issuer *and* serial, or by key identifier — never by picking one out of the
    bundle. Whose name it returns is whose name goes on Certificate 2, so an unresolvable
    SignerInfo is reported as an error. This is invariant 3 applied to identity.
@@ -55,7 +60,7 @@ These are the product, not preferences. Each has tests behind it.
 
 ```
 app/src/lib/       logic that would still matter if the UI were thrown away
-app/src/views/     Notarize · Verify · Library · Help
+app/src/views/     Notarize · Attest · Verify · Library · Help
 app/src/spikes/    M0 risk spikes + fixtures
 app/scripts/       fixture generation, CDP browser drivers
 docs/              m0-spike.md + qtsp-findings.md (evidence), next-session.md (handoff)
@@ -77,6 +82,11 @@ docs/              m0-spike.md + qtsp-findings.md (evidence), next-session.md (h
   `der-trailing-zero.pdf` pins this.
 - **Calendar list is pinned deliberately** in `src/lib/ots.ts` — `catallaxy` is excluded because
   it serves no CORS header. Don't "fix" it back to the library default.
+- **PDF layout must measure what it draws.** `Cursor` happily draws below the bottom margin:
+  the text lands in the content stream, so extracting it still finds everything, while the page
+  shows nothing. Certificate 2 builds one `EntryLine[]` and both measures and draws from it for
+  exactly this reason. A test that only greps extracted text will not catch overflow — assert the
+  page count too.
 - **`coversWholeDocument: false` is normal, not suspicious.** In a countersigned PDF every
   signature but the last legitimately stops short of the end of the file. Check `supersededBy`
   before saying anything alarming — only `false` with `supersededBy === null` means bytes nobody

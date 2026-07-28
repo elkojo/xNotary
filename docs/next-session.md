@@ -3,7 +3,8 @@
 **Last updated:** 2026-07-28 · on `main`
 
 M0 and M1 are done and verified. `pades.ts` has been hardened against the awkward shapes real
-qualified signatures take. M2 (Certificate 2) has not been started.
+qualified signatures take, and measured against genuine PostSignum output. M2 has a working first
+cut: Certificate 2 is generated from a signed PDF behind a per-signature consent gate.
 
 ## State
 
@@ -13,8 +14,8 @@ qualified signatures take. M2 (Certificate 2) has not been started.
 | Verify-integrity screen | Working, including tamper rejection |
 | Certificate library | Working, with pending → confirmed upgrade |
 | PAdES parsing | Hardened; verified against one real PostSignum signature (`docs/qtsp-findings.md`) |
-| Certificate 2 | **Not started** |
-| Tests | 45 offline, all passing; type-check clean |
+| Certificate 2 | First cut working — `Attest` tab, consent gate, one-page A4, document attached |
+| Tests | 86 offline, all passing; type-check clean |
 | Repo on GitHub | **Not created** — local only, nothing pushed |
 
 ## Decisions already made — don't relitigate
@@ -79,16 +80,35 @@ Never commit a real document — they carry personal data, usually of people oth
 signer. `/*.pdf` at the repo root is gitignored so testing against one is safe. Reproduce what it
 teaches as a generated fixture and record the measurement in `docs/qtsp-findings.md`.
 
-### 2. M2 — Certificate 2
+### 2. M2 — Certificate 2 — **first cut done**
 
-Per the brief: signed-PDF ingestion → parse each PAdES signature → **consent checkbox before a
-signer's data is included** (GDPR: name, QTSP, signature time only) → assemble Certificate 2 =
-Certificate 1 + collected signatures + summary page. Parallel signing is the default; sequential
-countersigning is a configurable option. On-demand assembly — generate at any time with whatever
-signatures exist, listing who signed; no expiry, no complete/incomplete state.
+`src/lib/certificate2.ts` + the **Attest** tab. Signed-PDF ingestion → per-signature consent gate
+(every box starts unticked) → a one-page A4 certificate naming only those who consented, with the
+signed document embedded as an attachment. On-demand: no expiry, no complete/incomplete state.
+Links out to the EU DSS validator; makes no qualified/not-qualified verdict of its own.
 
-Link out to an official validator (EU DSS demo validator, czech.gov) for authoritative QES
-validation. Do **not** attempt an in-browser qualified/not-qualified verdict — that is post-MVP.
+Design decisions worth not relitigating:
+
+- **It attaches the signed PDF, it does not append a page to it.** Appending would push the last
+  signature's ByteRange short of the file end — the "bytes nobody signed" condition. Attaching
+  keeps the signed bytes bit-identical, which is also what the EU validator needs.
+- **Withheld signers are counted, never named.** Silently omitting them would misrepresent the
+  document; naming them would defeat the consent gate.
+- **Self-signed certificates say so.** "Certified by X" for a certificate X issued to itself
+  implies an assurance nobody gave.
+- **Layout spills to page 2 rather than dropping a signatory.** Full detail fits ~6 signers on one
+  page, compact ~7; beyond that it spills. Detail is sacrificed, people are not.
+
+Still to do on Certificate 2:
+
+1. **Sequential vs parallel signing** is not modelled yet. The brief wants parallel as default with
+   sequential countersigning configurable; today the certificate simply reports the revision each
+   signature covers, which is the honest description of whatever the document happens to be.
+2. **Library integration** — Certificate 2 is not stored in IndexedDB the way Certificate 1 is.
+3. **E2E coverage** — `npm run e2e` drives Flow A only.
+4. **The underlying OTS status is not shown.** `Certificate2Input.underlying` carries an optional
+   `otsStatus` that nothing populates yet; the certificate names the notarized document's digest
+   but does not say whether that timestamp is confirmed.
 
 ### 3. M3 — Release
 
@@ -99,8 +119,7 @@ GitHub Pages deploy, PWA polish, onboarding/help, disclaimers, security review.
 - **GitHub repo not created.** `gh` is authenticated as `elkojo`. One command:
   `gh repo create elkojo/xNotary --public --source=. --remote=origin --push`.
   **Decide public vs private first** — the brief wants public AGPL, but the security review and
-  eIDAS counsel review are both scheduled for M3, and Certificate 2 doesn't exist yet. Private
-  now, public at M3, costs nothing.
+  eIDAS counsel review are both scheduled for M3. Private now, public at M3, costs nothing.
 - **GitHub Pages needs enabling once** in Settings → Pages → Source: *GitHub Actions*, or
   `deploy.yml` will fail. It only fires on `v*` tags, so nothing deploys on a plain push.
 - **Full `ots verify` never completed end to end.** The reference client requires a local

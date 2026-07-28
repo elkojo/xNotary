@@ -13,21 +13,21 @@
  * `ots verify -f <document> certificate.ots`, and be done. The page text tells
  * them how.
  */
-import {
-  PDFDict,
-  PDFDocument,
-  PDFFont,
-  PDFName,
-  PDFPage,
-  PDFRawStream,
-  StandardFonts,
-  decodePDFRawStream,
-  rgb,
-} from 'pdf-lib';
+import { PDFDict, PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from 'pdf-lib';
 import QRCode from 'qrcode';
 
 import { groupHex, toHex } from './hash';
 import type { OtsStatus } from './ots';
+import {
+  Cursor,
+  INK,
+  MARGIN,
+  MUTED,
+  PAGE_H,
+  PAGE_W,
+  endSentence,
+  loadFonts,
+} from './pdf-layout';
 
 export interface Certificate1Input {
   readonly fileName: string;
@@ -40,127 +40,11 @@ export interface Certificate1Input {
   readonly note?: string;
 }
 
-const INK = rgb(0.06, 0.09, 0.16);
-const MUTED = rgb(0.42, 0.45, 0.52);
-const RULE = rgb(0.85, 0.87, 0.9);
-
-const MARGIN = 56;
-const PAGE_W = 595.28;
-const PAGE_H = 841.89;
-
 export const DISCLAIMER =
   'This certificate attests that the digest above existed at the attested time. ' +
   'It says nothing about who created the document, what it means, or whether ' +
   'anyone agreed to it. It is not an electronic signature and not a qualified ' +
   'electronic timestamp within the meaning of eIDAS.';
-
-interface Fonts {
-  readonly regular: PDFFont;
-  readonly bold: PDFFont;
-  readonly mono: PDFFont;
-}
-
-/** Minimal downward-flowing text cursor. */
-class Cursor {
-  y: number;
-  constructor(
-    private readonly page: PDFPage,
-    private readonly fonts: Fonts,
-    startY: number,
-  ) {
-    this.y = startY;
-  }
-
-  gap(px: number) {
-    this.y -= px;
-  }
-
-  rule() {
-    this.y -= 10;
-    this.page.drawLine({
-      start: { x: MARGIN, y: this.y },
-      end: { x: PAGE_W - MARGIN, y: this.y },
-      thickness: 0.75,
-      color: RULE,
-    });
-    this.y -= 16;
-  }
-
-  heading(text: string) {
-    this.page.drawText(text.toUpperCase(), {
-      x: MARGIN,
-      y: this.y,
-      size: 8,
-      font: this.fonts.bold,
-      color: MUTED,
-    });
-    this.y -= 16;
-  }
-
-  /** Label in the left column, value in the right. Returns height consumed. */
-  field(label: string, value: string, opts: { mono?: boolean; width?: number } = {}) {
-    const font = opts.mono ? this.fonts.mono : this.fonts.regular;
-    const size = opts.mono ? 8.5 : 10;
-    const valueX = MARGIN + 118;
-    const maxWidth = opts.width ?? PAGE_W - MARGIN - valueX;
-
-    this.page.drawText(label, {
-      x: MARGIN,
-      y: this.y,
-      size: 9,
-      font: this.fonts.regular,
-      color: MUTED,
-    });
-
-    const lines = wrap(value, font, size, maxWidth);
-    for (const line of lines) {
-      this.page.drawText(line, { x: valueX, y: this.y, size, font, color: INK });
-      this.y -= size + 3.5;
-    }
-    this.y -= 7;
-  }
-
-  paragraph(text: string, opts: { size?: number; color?: typeof INK; font?: PDFFont } = {}) {
-    const size = opts.size ?? 9;
-    const font = opts.font ?? this.fonts.regular;
-    for (const line of wrap(text, font, size, PAGE_W - 2 * MARGIN)) {
-      this.page.drawText(line, { x: MARGIN, y: this.y, size, font, color: opts.color ?? INK });
-      this.y -= size + 3.5;
-    }
-  }
-}
-
-function wrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const lines: string[] = [];
-  for (const paragraph of text.split('\n')) {
-    let line = '';
-    for (const word of paragraph.split(' ')) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
-        line = candidate;
-        continue;
-      }
-      if (line) lines.push(line);
-      // A single token wider than the column (a hex digest) is hard-split.
-      let rest = word;
-      while (font.widthOfTextAtSize(rest, size) > maxWidth) {
-        let cut = rest.length;
-        while (cut > 1 && font.widthOfTextAtSize(rest.slice(0, cut), size) > maxWidth) cut--;
-        lines.push(rest.slice(0, cut));
-        rest = rest.slice(cut);
-      }
-      line = rest;
-    }
-    lines.push(line);
-  }
-  return lines;
-}
-
-/** `reason` values come from varied sources; make them safe to splice mid-paragraph. */
-function endSentence(text: string): string {
-  const trimmed = text.trim();
-  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
-}
 
 function statusLine(status: OtsStatus): { text: string; detail: string } {
   switch (status.kind) {
@@ -198,11 +82,7 @@ function statusLine(status: OtsStatus): { text: string; detail: string } {
 
 export async function buildCertificate1(input: Certificate1Input): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
-  const fonts: Fonts = {
-    regular: await pdf.embedFont(StandardFonts.Helvetica),
-    bold: await pdf.embedFont(StandardFonts.HelveticaBold),
-    mono: await pdf.embedFont(StandardFonts.Courier),
-  };
+  const fonts = await loadFonts(pdf);
 
   pdf.setTitle(`xNotary Certificate 1 — ${input.fileName}`);
   pdf.setSubject('Proof of integrity and existence at a point in time');
@@ -333,7 +213,9 @@ export async function extractOtsAttachment(pdfBytes: Uint8Array): Promise<Uint8A
 }
 
 /** Decode every embedded file stream in a PDF. */
-async function readEmbeddedFiles(pdfBytes: Uint8Array): Promise<Uint8Array[]> {
+/** Every embedded file in a PDF, decompressed. Attachments are the payload of
+ * both certificates, so reading them back is part of the public surface. */
+export async function readEmbeddedFiles(pdfBytes: Uint8Array): Promise<Uint8Array[]> {
   const pdf = await PDFDocument.load(pdfBytes, {
     throwOnInvalidObject: false,
     updateMetadata: false,
