@@ -13,13 +13,14 @@
   import { downloadBytes, formatBytes } from '../lib/download';
   import { groupHex, toHex } from '../lib/hash';
   import {
+    AgreementError,
     VALIDATOR_URL,
-    analyzeSignedDocument,
+    analyzeSignedDocuments,
     buildCertificate2,
     type Certificate2Draft,
   } from '../lib/certificate2';
 
-  let file = $state<File | null>(null);
+  let files = $state<File[]>([]);
   let draft = $state<Certificate2Draft | null>(null);
   let consented = $state<boolean[]>([]);
   let busy = $state(false);
@@ -29,19 +30,28 @@
   const chosen = $derived(consented.filter(Boolean).length);
   const withheld = $derived((draft?.signers.length ?? 0) - chosen);
 
-  async function inspect(f: File) {
-    file = f;
+  async function inspect(picked: File[]) {
+    files = picked;
     draft = null;
     built = null;
     error = '';
     busy = true;
     try {
-      const bytes = new Uint8Array(await f.arrayBuffer());
-      const result = await analyzeSignedDocument(f.name, bytes);
-      if (result.signatures.length === 0 && result.errors.length === 0) {
+      const result = await analyzeSignedDocuments(
+        await Promise.all(
+          picked.map(async (f) => ({
+            fileName: f.name,
+            bytes: new Uint8Array(await f.arrayBuffer()),
+          })),
+        ),
+      );
+      if (result.signers.length === 0 && result.errors.length === 0) {
         throw new Error(
-          'This PDF carries no signatures. Certificate 2 attests to signatures, so there is ' +
-            'nothing yet to attest to — have the document signed first.',
+          picked.length === 1
+            ? 'This PDF carries no signatures. Certificate 2 attests to signatures, so there is ' +
+              'nothing yet to attest to — have the document signed first.'
+            : 'None of these PDFs carries a signature. Certificate 2 attests to signatures, so ' +
+              'there is nothing yet to attest to.',
         );
       }
       draft = result;
@@ -60,22 +70,26 @@
     error = '';
     try {
       built = await buildCertificate2({
-        sourceFileName: draft.sourceFileName,
-        sourceBytes: draft.sourceBytes,
+        sources: draft.sources.map((s) => ({ fileName: s.fileName, bytes: s.bytes })),
         signers: draft.signers.filter((_, i) => consented[i]),
         withheldCount: withheld,
         generatedAt: new Date(),
         underlying: draft.underlying ?? undefined,
       });
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error =
+        e instanceof AgreementError
+          ? `${e.message} Create a separate Certificate 2 for each document.`
+          : e instanceof Error
+            ? e.message
+            : String(e);
     } finally {
       busy = false;
     }
   }
 
   function reset() {
-    file = null;
+    files = [];
     draft = null;
     built = null;
     error = '';
@@ -93,19 +107,31 @@
 <div class="card">
   <h2>Create Certificate 2</h2>
   <p class="hint">
-    Certificate 1 shows a document existed. Certificate 2 shows who put their name to it. Drop a
-    signed PDF — normally a Certificate 1 that has since been signed — and choose who may be named.
-    Everything is read on this device; nothing is uploaded.
+    Certificate 1 shows a document existed. Certificate 2 shows who put their name to it. Drop the
+    signed PDFs — normally a Certificate 1 that has since been signed — and choose who may be
+    named. Everything is read on this device; nothing is uploaded.
+  </p>
+  <p class="hint">
+    Signing in parallel gives each signer their own copy to sign; drop all of them together and
+    their signatures are pooled onto one certificate. Signing in sequence produces a single file
+    carrying every signature — drop just that. Either way, xNotary first checks the files really
+    are signatures over the same document, and refuses to combine them if they are not.
   </p>
 
   <div style="margin-top:1rem">
     <FileDrop
-      label="Signed PDF"
-      hint="A Certificate 1 with one or more eIDAS signatures applied"
+      label="Signed PDFs"
+      hint="One Certificate 1 signed by everyone, or one copy per signer"
       accept=".pdf"
-      {file}
-      onselect={inspect}
+      multiple
+      onselect={(f) => inspect([f])}
+      onselectmany={inspect}
     />
+    {#if files.length > 0}
+      <p class="hint">
+        {files.length} file{files.length === 1 ? '' : 's'}: {files.map((f) => f.name).join(', ')}
+      </p>
+    {/if}
   </div>
 
   {#if busy && !draft}
@@ -119,16 +145,17 @@
 
 {#if draft}
   <div class="card">
-    <h2>Document</h2>
+    <h2>{draft.sources.length > 1 ? 'Documents' : 'Document'}</h2>
     <div class="rows">
-      <div class="row">
-        <span>File</span>
-        <span class="value">{draft.sourceFileName} · {formatBytes(draft.sourceBytes.length)}</span>
-      </div>
-      <div class="row">
-        <span>SHA-256</span>
-        <span class="value mono">{groupHex(toHex(draft.sourceDigest))}</span>
-      </div>
+      {#each draft.sources as s}
+        <div class="row">
+          <span>{s.fileName}</span>
+          <span class="value">
+            {formatBytes(s.bytes.length)} ·
+            <span class="mono">{groupHex(toHex(s.digest))}</span>
+          </span>
+        </div>
+      {/each}
       {#if draft.underlying}
         <div class="row">
           <span>Notarized document</span>
@@ -136,6 +163,21 @@
         </div>
       {/if}
     </div>
+
+    {#if draft.agreement.kind === 'differs'}
+      <div class="notice bad">
+        <strong>These are not signatures over the same document.</strong>
+        {draft.agreement.detail} Listing them together would say they signed the same thing, so no
+        certificate can be created from this set.
+      </div>
+    {:else if draft.agreement.kind === 'agree'}
+      <div class="notice ok">
+        All {draft.sources.length} files are signatures over the same document, established from
+        {draft.agreement.evidence === 'notarized-digest'
+          ? 'the OpenTimestamps proof each one carries'
+          : 'the bytes preceding the first signature, which are identical'}.
+      </div>
+    {/if}
     {#if draft.underlying}
       <div class="notice ok">
         This is an xNotary Certificate 1. The digest above is the document it was issued for, read
@@ -204,7 +246,11 @@
     {/if}
 
     <div class="actions">
-      <button class="primary" disabled={busy} onclick={create}>
+      <button
+        class="primary"
+        disabled={busy || draft.agreement.kind === 'differs'}
+        onclick={create}
+      >
         {#if busy}<span class="spinner"></span>{/if}
         Create Certificate 2
       </button>
@@ -229,7 +275,11 @@
       <button
         class="primary"
         onclick={() =>
-          downloadBytes(built!, `${draft?.sourceFileName ?? 'document'} — Certificate 2.pdf`, 'application/pdf')}
+          downloadBytes(
+            built!,
+            `${draft?.sources[0]?.fileName ?? 'document'} — Certificate 2.pdf`,
+            'application/pdf',
+          )}
         >Save Certificate 2 (PDF)</button
       >
     </div>

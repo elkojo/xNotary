@@ -12,7 +12,7 @@ they are, `docs/qtsp-findings.md` for what real qualified signatures actually co
 Everything runs from `app/`.
 
 ```bash
-npm test          # offline suite (86 tests) — this is what CI runs
+npm test          # offline suite (96 tests) — this is what CI runs
 npm run check     # svelte-check; must be 0 errors before committing
 npm run dev       # http://localhost:5173
 npm run build     # check + production build
@@ -46,12 +46,17 @@ These are the product, not preferences. Each has tests behind it.
 5. **`pades.ts` reports claims, never verdicts.** It cannot say a signature is a valid QES —
    that needs EUTL validation, which the MVP delegates to an external validator. `QualifiedClaim`
    is named that way on purpose.
-6. **Certificate 2 never modifies the document it attests to.** It embeds the signed PDF as an
+6. **Signatures from different documents are never pooled.** Parallel signing means one round
+   arrives as several files, and listing their signers together asserts they signed the same
+   thing. `checkAgreement` establishes that first — from the shared OpenTimestamps proof, or
+   failing that the byte-identical base revision — and `buildCertificate2` throws
+   `AgreementError` rather than emit a false statement that looks like a true one.
+7. **Certificate 2 never modifies the document it attests to.** It embeds the signed PDF as an
    attachment rather than appending a page — appending would push the last signature's ByteRange
    short of the file end, which is precisely the "bytes nobody signed" condition. Nor may it
    name a signer who did not consent, or drop one to save space: it spills to a second page
    instead. See `src/lib/certificate2.ts` and its tests.
-7. **A signature is attributed only on evidence.** `matchSignerCert` resolves the signer's
+8. **A signature is attributed only on evidence.** `matchSignerCert` resolves the signer's
    certificate by issuer *and* serial, or by key identifier — never by picking one out of the
    bundle. Whose name it returns is whose name goes on Certificate 2, so an unresolvable
    SignerInfo is reported as an error. This is invariant 3 applied to identity.

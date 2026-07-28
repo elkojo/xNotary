@@ -6,17 +6,31 @@
     hint?: string;
     accept?: string;
     file?: File | null;
+    /** Accept several files at once — parallel signing produces one per signer. */
+    multiple?: boolean;
     onselect: (file: File) => void;
+    /** Called instead of `onselect` when `multiple` is set. */
+    onselectmany?: (files: File[]) => void;
   }
 
-  let { label, hint = '', accept = '', file = null, onselect }: Props = $props();
+  let {
+    label,
+    hint = '',
+    accept = '',
+    file = null,
+    multiple = false,
+    onselect,
+    onselectmany,
+  }: Props = $props();
 
   let over = $state(false);
   let input: HTMLInputElement;
 
   function take(list: FileList | null | undefined) {
-    const picked = list?.[0];
-    if (picked) onselect(picked);
+    const picked = [...(list ?? [])];
+    if (picked.length === 0) return;
+    if (multiple && onselectmany) onselectmany(picked);
+    else onselect(picked[0]!);
   }
 </script>
 
@@ -43,7 +57,13 @@
     }
   }}
 >
-  <input bind:this={input} type="file" {accept} onchange={(e) => take(e.currentTarget.files)} />
+  <input
+    bind:this={input}
+    type="file"
+    {accept}
+    {multiple}
+    onchange={(e) => take(e.currentTarget.files)}
+  />
 
   {#if file}
     <strong>{file.name}</strong>

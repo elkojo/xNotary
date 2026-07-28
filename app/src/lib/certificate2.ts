@@ -27,7 +27,7 @@
 import { PDFDocument } from 'pdf-lib';
 
 import { extractOtsAttachment } from './certificate1';
-import { groupHex, sha256Bytes, toHex } from './hash';
+import { bytesEqual, groupHex, sha256Bytes, toHex } from './hash';
 import { parseOts, digestOf, type OtsStatus } from './ots';
 import { parsePades, type PadesSignature, type QualifiedClaim } from './pades';
 import {
@@ -45,7 +45,7 @@ import {
 export const VALIDATOR_URL = 'https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/validation';
 
 export const DISCLAIMER_2 =
-  'This certificate lists the signatures found in the attached document and what their ' +
+  'This certificate lists the signatures found in what is attached to it and what their ' +
   'certificates claim. It is not a validation result: xNotary does not check the signing ' +
   'certificates against the EU Trusted Lists, so it cannot and does not state that any ' +
   'signature is a qualified electronic signature. Use the official validator above for that. ' +
@@ -55,6 +55,8 @@ export const DISCLAIMER_2 =
 export interface Certificate2Signer {
   /** As read from the signing certificate's subject. */
   readonly name: string;
+  /** Which of the attached documents this signature is in. */
+  readonly sourceFileName: string;
   /** The issuing CA — for a qualified signature, the QTSP. */
   readonly qtsp: string;
   /**
@@ -78,11 +80,16 @@ export interface Certificate2Signer {
 }
 
 export interface Certificate2Input {
-  /** File name of the signed document being attested. */
-  readonly sourceFileName: string;
-  /** The signed document, embedded verbatim. Never modified. */
-  readonly sourceBytes: Uint8Array;
-  /** Signers who consented to appear. Order is the document's signature order. */
+  /**
+   * The signed documents, embedded verbatim and never modified.
+   *
+   * Parallel signing — the brief's default — gives each signer their own copy
+   * to sign, so several files can describe one signing round. They are only
+   * pooled onto one certificate when `checkAgreement` says they are signatures
+   * over the same document; see `AgreementError`.
+   */
+  readonly sources: readonly SignedSourceRef[];
+  /** Signers who consented to appear, in source then signature order. */
   readonly signers: readonly Certificate2Signer[];
   /** Signatures present in the document whose signer withheld consent. */
   readonly withheldCount: number;
@@ -98,35 +105,70 @@ export interface Certificate2Input {
   };
 }
 
+/** A signed document to embed. */
+export interface SignedSourceRef {
+  readonly fileName: string;
+  readonly bytes: Uint8Array;
+}
+
+/** One signed document, read. */
+export interface SignedSource extends SignedSourceRef {
+  readonly digest: Uint8Array;
+  /** Every signature found in this file, consented or not. */
+  readonly signatures: readonly PadesSignature[];
+  readonly signers: readonly Certificate2Signer[];
+  /** Parse failures — signatures that could not be read at all. */
+  readonly errors: readonly string[];
+  /** Present when this file is an xNotary Certificate 1. */
+  readonly underlying: { readonly digest: Uint8Array } | null;
+}
+
 /**
- * What a signed PDF contains, before any consent decision has been made.
+ * Whether several signed files are signatures over the *same* document.
+ *
+ * This is the question parallel signing forces. Listing Alice and Bob together
+ * on one certificate asserts they signed the same thing; if they signed
+ * different documents, pooling them produces a false statement that looks
+ * exactly like a true one. So agreement is established before anything is
+ * pooled, and a certificate is refused when it cannot be.
+ */
+export type DocumentAgreement =
+  | { readonly kind: 'single' }
+  /** All files carry the same OpenTimestamps proof — the strongest evidence. */
+  | { readonly kind: 'agree'; readonly evidence: 'notarized-digest' | 'base-revision' }
+  | { readonly kind: 'differs'; readonly detail: string };
+
+/**
+ * What the supplied PDFs contain, before any consent decision has been made.
  *
  * The UI shows this, collects a consent choice per signature, and only then
  * calls `buildCertificate2` with the subset that consented.
  */
 export interface Certificate2Draft {
-  readonly sourceFileName: string;
-  readonly sourceBytes: Uint8Array;
-  readonly sourceDigest: Uint8Array;
-  /** Every signature found, consented or not. */
-  readonly signatures: readonly PadesSignature[];
-  /** Per-signature view reduced to what Certificate 2 may print. */
+  readonly sources: readonly SignedSource[];
+  /** Whether the sources may be pooled onto one certificate. */
+  readonly agreement: DocumentAgreement;
+  /** Every signer across every source, in source then signature order. */
   readonly signers: readonly Certificate2Signer[];
-  /** Parse failures — signatures that could not be read at all. */
+  /** Parse failures across all sources. */
   readonly errors: readonly string[];
-  /** Present when the signed document is an xNotary Certificate 1. */
+  /** The notarized document all sources agree on, when there is one. */
   readonly underlying: { readonly digest: Uint8Array } | null;
 }
 
-/** Read a signed PDF and reduce it to what Certificate 2 is allowed to show. */
+/** Raised rather than emit a certificate implying a shared signing that did not happen. */
+export class AgreementError extends Error {}
+
+/** Read one signed PDF and reduce it to what Certificate 2 is allowed to show. */
 export async function analyzeSignedDocument(
   fileName: string,
   pdfBytes: Uint8Array,
-): Promise<Certificate2Draft> {
+): Promise<SignedSource> {
   const { signatures, errors } = await parsePades(pdfBytes);
 
   // If this is a Certificate 1, recover the digest of the document it notarized
-  // so Certificate 2 can name the whole chain.
+  // so Certificate 2 can name the whole chain — and so parallel copies can be
+  // shown to be signatures over the same thing.
   let underlying: { digest: Uint8Array } | null = null;
   const ots = await extractOtsAttachment(pdfBytes).catch(() => null);
   if (ots) {
@@ -138,21 +180,111 @@ export async function analyzeSignedDocument(
   }
 
   return {
-    sourceFileName: fileName,
-    sourceBytes: pdfBytes,
-    sourceDigest: await sha256Bytes(pdfBytes),
+    fileName,
+    bytes: pdfBytes,
+    digest: await sha256Bytes(pdfBytes),
     signatures,
-    signers: signatures.map((s) => toSigner(s, signatures.length)),
+    signers: signatures.map((sig) => toSigner(sig, signatures.length, fileName)),
     errors,
     underlying,
   };
 }
 
+/**
+ * Read several signed PDFs — one signing round, parallel or sequential — and
+ * decide whether they may be pooled onto a single certificate.
+ */
+export async function analyzeSignedDocuments(
+  files: readonly SignedSourceRef[],
+): Promise<Certificate2Draft> {
+  const sources = await Promise.all(files.map((f) => analyzeSignedDocument(f.fileName, f.bytes)));
+  const agreement = checkAgreement(sources);
+
+  return {
+    sources,
+    agreement,
+    signers: sources.flatMap((s) => s.signers),
+    errors: sources.flatMap((s) => s.errors.map((e) => `${s.fileName}: ${e}`)),
+    underlying: agreement.kind === 'differs' ? null : (sources[0]?.underlying ?? null),
+  };
+}
+
+/**
+ * Establish whether every source is a signature over the same document.
+ *
+ * Two kinds of evidence, strongest first:
+ *
+ * 1. **The notarized digest.** When the files are xNotary Certificate 1s they
+ *    each embed an OpenTimestamps proof committing to the original document.
+ *    Equal digests mean the signers signed certificates for the same document,
+ *    which is precisely the claim Certificate 2 makes.
+ * 2. **The base revision.** Otherwise, compare the bytes up to the first
+ *    `%%EOF` — the document as it stood before anyone signed it. Signing only
+ *    appends, so parallel copies share this prefix byte for byte.
+ *
+ * Anything else is reported as a difference rather than guessed at.
+ */
+export function checkAgreement(sources: readonly SignedSource[]): DocumentAgreement {
+  if (sources.length <= 1) return { kind: 'single' };
+
+  const digests = sources.map((s) => s.underlying?.digest ?? null);
+  if (digests.every((d) => d !== null)) {
+    const first = digests[0]!;
+    const odd = sources.findIndex((_, i) => !bytesEqual(digests[i]!, first));
+    return odd === -1
+      ? { kind: 'agree', evidence: 'notarized-digest' }
+      : {
+          kind: 'differs',
+          detail:
+            `"${sources[odd]!.fileName}" is a certificate for a different document than ` +
+            `"${sources[0]!.fileName}". These are separate signing rounds and cannot share one ` +
+            `Certificate 2.`,
+        };
+  }
+
+  const bases = sources.map((s) => baseRevision(s.bytes));
+  const firstBase = bases[0]!;
+  const odd = bases.findIndex((b) => !bytesEqual(b, firstBase));
+  if (odd !== -1) {
+    return {
+      kind: 'differs',
+      detail:
+        `"${sources[odd]!.fileName}" does not start from the same document as ` +
+        `"${sources[0]!.fileName}" — the bytes before the first signature differ. Signatures ` +
+        `over different documents must not be listed on one certificate.`,
+    };
+  }
+  return { kind: 'agree', evidence: 'base-revision' };
+}
+
+/**
+ * The document as it stood before anyone signed: everything up to and including
+ * the first `%%EOF`. Signing appends a revision rather than rewriting, so
+ * parallel copies of one document share this prefix exactly.
+ */
+export function baseRevision(pdfBytes: Uint8Array): Uint8Array {
+  const marker = new TextEncoder().encode('%%EOF');
+  outer: for (let i = 0; i + marker.length <= pdfBytes.length; i++) {
+    for (let j = 0; j < marker.length; j++) {
+      if (pdfBytes[i + j] !== marker[j]) continue outer;
+    }
+    return pdfBytes.subarray(0, i + marker.length);
+  }
+  // No EOF marker at all: compare the whole file rather than pretend to know
+  // where the first revision ended.
+  return pdfBytes;
+}
+
 /** Reduce a parsed signature to the fields Certificate 2 may print. */
-export function toSigner(sig: PadesSignature, totalSignatures: number): Certificate2Signer {
+export function toSigner(
+  sig: PadesSignature,
+  totalSignatures: number,
+  sourceFileName: string,
+): Certificate2Signer {
   const timestamp = sig.signatureTimestamp;
   return {
     name: sig.signerName,
+    sourceFileName,
     qtsp: sig.issuer.attrs.CN ?? sig.issuer.attrs.O ?? sig.issuer.text,
     selfSigned: sig.subject.text === sig.issuer.text,
     signedAt: timestamp?.time ?? sig.signingTime,
@@ -232,11 +364,22 @@ function integrityLine(signer: Certificate2Signer): string {
 type Detail = 'full' | 'compact';
 
 export async function buildCertificate2(input: Certificate2Input): Promise<Uint8Array> {
+  if (input.sources.length === 0) {
+    throw new AgreementError('Certificate 2 needs at least one signed document to attest to.');
+  }
+  // Listing signers from several files together asserts they signed the same
+  // document. Refuse rather than emit a false statement that looks true.
+  const sources = await Promise.all(
+    input.sources.map((r) => analyzeSignedDocument(r.fileName, r.bytes)),
+  );
+  const agreement = checkAgreement(sources);
+  if (agreement.kind === 'differs') throw new AgreementError(agreement.detail);
+
   const pdf = await PDFDocument.create();
   const fonts = await loadFonts(pdf);
   const ascii = (s: string) => toWinAnsi(s, fonts.regular);
 
-  pdf.setTitle(`xNotary Certificate 2 — ${input.sourceFileName}`);
+  pdf.setTitle(`xNotary Certificate 2 — ${input.sources[0]?.fileName ?? 'signed documents'}`);
   pdf.setSubject('Attestation by identified signatories');
   pdf.setProducer('xNotary');
   pdf.setCreator('xNotary (AGPL-3.0) — self-custodial notarization');
@@ -270,12 +413,40 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
   c.gap(6);
   c.rule();
 
-  const sourceDigest = toHex(await sha256Bytes(input.sourceBytes));
+  const many = sources.length > 1;
+  c.heading(many ? `Signed documents (${sources.length})` : 'Signed document');
 
-  c.heading('Signed document');
-  c.field('File name', ascii(input.sourceFileName));
-  c.field('File size', `${input.sourceBytes.length.toLocaleString('en-US')} bytes`);
-  c.field('SHA-256', groupHex(sourceDigest), { mono: true, width: 330 });
+  if (many) {
+    // Each signer signed their own copy. Name every file and its digest so a
+    // verifier can tell which attachment carries which signature. File names are
+    // arbitrary length, so they get their own line rather than a label column
+    // they would overrun.
+    for (const source of sources) {
+      c.paragraph(ascii(source.fileName), { size: 9.5 });
+      c.paragraph(groupHex(toHex(source.digest)), {
+        indent: 18,
+        size: 8.5,
+        font: fonts.mono,
+        color: MUTED,
+      });
+      c.gap(5);
+    }
+    c.paragraph(
+      agreement.kind === 'agree' && agreement.evidence === 'notarized-digest'
+        ? 'These are separate copies signed in parallel. All of them carry the same ' +
+            'OpenTimestamps proof, so every signature below is over the same notarized document.'
+        : 'These are separate copies signed in parallel. They are byte-identical up to the ' +
+            'first signature, so every signature below is over the same document.',
+      { color: MUTED },
+    );
+    c.gap(4);
+  } else {
+    const only = sources[0]!;
+    c.field('File name', ascii(only.fileName));
+    c.field('File size', `${only.bytes.length.toLocaleString('en-US')} bytes`);
+    c.field('SHA-256', groupHex(toHex(only.digest)), { mono: true, width: 330 });
+  }
+
   if (input.underlying) {
     c.field('Notarized document', groupHex(toHex(input.underlying.digest)), {
       mono: true,
@@ -287,7 +458,7 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
   // ---- Signatories ------------------------------------------------------
   // Reserve what the closing sections need, then spend what is left on
   // signers at the highest detail that fits.
-  const closingHeight = measureClosing(c, input);
+  const closingHeight = measureClosing(c, sources.length);
   // 26 for the rule that precedes the closing, 16 for the section heading.
   const budget = c.remaining - closingHeight - 26 - 16;
   const detail = chooseDetail(c, input.signers, budget, ascii);
@@ -322,12 +493,13 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
   }
 
   if (input.withheldCount > 0) {
+    const one = input.withheldCount === 1;
     c.paragraph(
-      `${input.withheldCount} further signature${input.withheldCount === 1 ? ' is' : 's are'} ` +
-        `present in the attached document but ${input.withheldCount === 1 ? 'is' : 'are'} not ` +
-        `listed here, because that signatory did not consent to being named. The signature ` +
-        `${input.withheldCount === 1 ? 'itself remains' : 'themselves remain'} in the ` +
-        `attachment and can be inspected there.`,
+      `${input.withheldCount} further signature${one ? ' is' : 's are'} present in the ` +
+        `attached ${many ? 'documents' : 'document'} but ${one ? 'is' : 'are'} not listed here, ` +
+        `because that signatory did not consent to being named. The ` +
+        `signature${one ? '' : 's'} ${one ? 'itself remains' : 'themselves remain'} in the ` +
+        `${many ? 'attachments' : 'attachment'} and can be inspected there.`,
       { color: MUTED, size: 8.5 },
     );
     c.gap(6);
@@ -335,7 +507,7 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
 
   if (c.remaining < closingHeight) spill();
   else c.rule();
-  drawClosing(c, fonts, input);
+  drawClosing(c, fonts, sources.length);
 
   for (const [i, p] of pages.entries()) {
     const footer =
@@ -352,24 +524,35 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
     });
   }
 
-  // The signed document itself. This is the payload; the page is presentation.
-  await pdf.attach(input.sourceBytes, input.sourceFileName, {
-    mimeType: 'application/pdf',
-    description: `The signed document this certificate describes (SHA-256 ${sourceDigest})`,
-    creationDate: input.generatedAt,
-    modificationDate: input.generatedAt,
-  });
+  // The signed documents themselves. These are the payload; the page is
+  // presentation. Attached verbatim so a validator sees exactly what was signed.
+  for (const source of sources) {
+    await pdf.attach(source.bytes, source.fileName, {
+      mimeType: 'application/pdf',
+      description: `A signed document this certificate describes (SHA-256 ${toHex(source.digest)})`,
+      creationDate: input.generatedAt,
+      modificationDate: input.generatedAt,
+    });
+  }
 
   return pdf.save();
 }
 
 /** Text of the closing sections, so it can be measured and drawn identically. */
-function closingText(input: Certificate2Input): { verify: string[]; disclaimer: string } {
+function closingText(sourceCount: number): { verify: string[]; disclaimer: string } {
+  const what =
+    sourceCount > 1
+      ? `the ${sourceCount} attached files from this PDF. They are the signed documents, byte ` +
+        `for byte — this certificate never modified them.`
+      : `the attached file from this PDF. It is the signed document, byte for byte — this ` +
+        `certificate never modified it.`;
+
   return {
     verify: [
-      `1. Detach the attached file "${input.sourceFileName}" from this PDF. It is the signed ` +
-        `document, byte for byte — this certificate never modified it.`,
-      `2. Upload it to the EU DSS validator for an authoritative result:`,
+      `1. Detach ${what}`,
+      sourceCount > 1
+        ? `2. Upload each of them to the EU DSS validator for an authoritative result:`
+        : `2. Upload it to the EU DSS validator for an authoritative result:`,
       VALIDATOR_URL,
       `3. The validator checks each signing certificate against the EU Trusted Lists and ` +
         `reports whether the signature is a qualified electronic signature. That determination ` +
@@ -379,8 +562,8 @@ function closingText(input: Certificate2Input): { verify: string[]; disclaimer: 
   };
 }
 
-function measureClosing(c: Cursor, input: Certificate2Input): number {
-  const { verify, disclaimer } = closingText(input);
+function measureClosing(c: Cursor, sourceCount: number): number {
+  const { verify, disclaimer } = closingText(sourceCount);
   let h = 26 + 16; // rule + heading
   for (const line of verify) h += c.measureParagraph(line, { size: 9 }) + 4;
   h += 26 + 16; // rule + heading
@@ -388,8 +571,12 @@ function measureClosing(c: Cursor, input: Certificate2Input): number {
   return h + 8;
 }
 
-function drawClosing(c: Cursor, fonts: Awaited<ReturnType<typeof loadFonts>>, input: Certificate2Input) {
-  const { verify, disclaimer } = closingText(input);
+function drawClosing(
+  c: Cursor,
+  fonts: Awaited<ReturnType<typeof loadFonts>>,
+  sourceCount: number,
+) {
+  const { verify, disclaimer } = closingText(sourceCount);
 
   c.heading('How to verify this without xNotary');
   for (const line of verify) {

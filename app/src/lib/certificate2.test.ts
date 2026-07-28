@@ -16,7 +16,10 @@ import { describe, expect, it } from 'vitest';
 import {
   DISCLAIMER_2,
   VALIDATOR_URL,
+  AgreementError,
   analyzeSignedDocument,
+  analyzeSignedDocuments,
+  baseRevision,
   buildCertificate2,
   type Certificate2Signer,
 } from './certificate2';
@@ -33,6 +36,7 @@ const GENERATED_AT = new Date('2026-07-28T12:00:00.000Z');
 function signer(over: Partial<Certificate2Signer> = {}): Certificate2Signer {
   return {
     name: 'Jana Dvořáková',
+    sourceFileName: 'certificate-1-signed.pdf',
     qtsp: 'PostSignum Qualified CA 4',
     selfSigned: false,
     signedAt: new Date('2026-07-28T08:20:40.000Z'),
@@ -55,8 +59,7 @@ function signer(over: Partial<Certificate2Signer> = {}): Certificate2Signer {
 async function build(over: Partial<Parameters<typeof buildCertificate2>[0]> = {}) {
   const source = fixture('cert1-countersigned.pdf');
   return buildCertificate2({
-    sourceFileName: 'certificate-1-signed.pdf',
-    sourceBytes: source,
+    sources: [{ fileName: 'certificate-1-signed.pdf', bytes: source }],
     signers: [signer()],
     withheldCount: 0,
     generatedAt: GENERATED_AT,
@@ -109,6 +112,139 @@ describe('reading a signed document', () => {
   it('falls back to the claimed time when there is no timestamp', async () => {
     const draft = await analyzeSignedDocument('x.pdf', fixture('chain-ski.pdf'));
     expect(draft.signers[0]!.timeSource).toBe('claimed');
+  });
+});
+
+/**
+ * Parallel signing — the brief's default — gives each signer their own copy, so
+ * one signing round arrives as several files. Pooling them onto one certificate
+ * asserts they signed the same document, which is a claim that has to be
+ * established rather than assumed.
+ *
+ * Fixture limitation: a genuine parallel pair (one base document, two files
+ * each carrying one signature) needs two independent signing runs and is not
+ * something this repo can manufacture. The `notarized-digest` path is covered
+ * with two real signed copies of the same Certificate 1; the `base-revision`
+ * fallback is covered at the unit level on `baseRevision`. See
+ * `docs/next-session.md`.
+ */
+describe('pooling several signed files', () => {
+  const twoCopies = () =>
+    analyzeSignedDocuments([
+      { fileName: 'copy-a.pdf', bytes: fixture('cert1-signed-once.pdf') },
+      { fileName: 'copy-b.pdf', bytes: fixture('cert1-countersigned.pdf') },
+    ]);
+
+  it('treats a lone file as needing no agreement', async () => {
+    const draft = await analyzeSignedDocuments([
+      { fileName: 'only.pdf', bytes: fixture('cert1-signed-once.pdf') },
+    ]);
+    expect(draft.agreement).toEqual({ kind: 'single' });
+  });
+
+  it('establishes agreement from the OpenTimestamps proof each copy carries', async () => {
+    const draft = await twoCopies();
+    expect(draft.agreement).toEqual({ kind: 'agree', evidence: 'notarized-digest' });
+    expect(toHex(draft.underlying!.digest)).toBe(
+      'e3748becd853b5cc7d80d277db47208ce54b298ee4350a61f12ddcebe1a04ae9',
+    );
+  });
+
+  it('pools every signature and records which file each came from', async () => {
+    const draft = await twoCopies();
+
+    expect(draft.signers.map((s) => [s.name, s.sourceFileName])).toEqual([
+      ['Max Svoboda', 'copy-a.pdf'],
+      ['Max Svoboda', 'copy-b.pdf'],
+      ['Jan Novak', 'copy-b.pdf'],
+    ]);
+  });
+
+  it('refuses to pool signatures over different documents', async () => {
+    const draft = await analyzeSignedDocuments([
+      { fileName: 'certificate.pdf', bytes: fixture('cert1-signed-once.pdf') },
+      { fileName: 'unrelated.pdf', bytes: fixture('chain-ski.pdf') },
+    ]);
+
+    expect(draft.agreement.kind).toBe('differs');
+    // With no shared document there is nothing to name as the notarized one.
+    expect(draft.underlying).toBeNull();
+  });
+
+  // The failure this guards against is silent: a certificate listing people who
+  // signed different documents looks exactly like one where they did not.
+  it('throws rather than build a certificate over documents that disagree', async () => {
+    await expect(
+      buildCertificate2({
+        sources: [
+          { fileName: 'certificate.pdf', bytes: fixture('cert1-signed-once.pdf') },
+          { fileName: 'unrelated.pdf', bytes: fixture('chain-ski.pdf') },
+        ],
+        signers: [signer()],
+        withheldCount: 0,
+        generatedAt: GENERATED_AT,
+      }),
+    ).rejects.toBeInstanceOf(AgreementError);
+  });
+
+  it('refuses to build from no documents at all', async () => {
+    await expect(
+      buildCertificate2({
+        sources: [],
+        signers: [],
+        withheldCount: 0,
+        generatedAt: GENERATED_AT,
+      }),
+    ).rejects.toBeInstanceOf(AgreementError);
+  });
+
+  it('attaches every source and names them all on the page', async () => {
+    const draft = await twoCopies();
+    const built = await buildCertificate2({
+      sources: draft.sources.map((s) => ({ fileName: s.fileName, bytes: s.bytes })),
+      // One signature from each copy: the parallel case.
+      signers: [draft.signers[0]!, draft.signers[2]!],
+      withheldCount: 1,
+      generatedAt: GENERATED_AT,
+      underlying: draft.underlying ?? undefined,
+    });
+
+    const attached = await readEmbeddedFiles(built);
+    expect(attached).toHaveLength(2);
+    expect(bytesEqual(attached[0]!, fixture('cert1-signed-once.pdf'))).toBe(true);
+    expect(bytesEqual(attached[1]!, fixture('cert1-countersigned.pdf'))).toBe(true);
+
+    const text = await pdfText(built);
+    expect(text).toContain('copy-a.pdf');
+    expect(text).toContain('copy-b.pdf');
+    expect(text).toContain('Max Svoboda');
+    expect(text).toContain('Jan Novak');
+    expect(text).toMatch(/signed in parallel/);
+    expect((await PDFDocument.load(built)).getPageCount()).toBe(1);
+  });
+});
+
+describe('baseRevision', () => {
+  // Signing appends a revision rather than rewriting, so copies of one document
+  // signed independently share every byte up to the first %%EOF.
+  it('returns the bytes up to and including the first %%EOF', () => {
+    const pdf = new TextEncoder().encode('%PDF-1.7\nbody\n%%EOF\nappended revision\n%%EOF\n');
+    expect(new TextDecoder().decode(baseRevision(pdf))).toBe('%PDF-1.7\nbody\n%%EOF');
+  });
+
+  it('agrees across the signed and countersigned copies of one certificate', () => {
+    // The countersigned file is the signed-once file plus another revision.
+    expect(
+      bytesEqual(
+        baseRevision(fixture('cert1-signed-once.pdf')),
+        baseRevision(fixture('cert1-countersigned.pdf')),
+      ),
+    ).toBe(true);
+  });
+
+  it('falls back to the whole file when there is no EOF marker', () => {
+    const bytes = new TextEncoder().encode('not a pdf at all');
+    expect(bytesEqual(baseRevision(bytes), bytes)).toBe(true);
   });
 });
 
@@ -310,12 +446,12 @@ describe('one A4 page', () => {
 
 describe('end to end from a real countersigned certificate', () => {
   it('builds a one-page certificate naming both real signers', async () => {
-    const source = fixture('cert1-countersigned.pdf');
-    const draft = await analyzeSignedDocument('cert1-countersigned.pdf', source);
+    const draft = await analyzeSignedDocuments([
+      { fileName: 'cert1-countersigned.pdf', bytes: fixture('cert1-countersigned.pdf') },
+    ]);
 
     const cert2 = await buildCertificate2({
-      sourceFileName: draft.sourceFileName,
-      sourceBytes: draft.sourceBytes,
+      sources: draft.sources.map((s) => ({ fileName: s.fileName, bytes: s.bytes })),
       signers: draft.signers,
       withheldCount: 0,
       generatedAt: GENERATED_AT,

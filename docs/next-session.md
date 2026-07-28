@@ -15,8 +15,8 @@ cut: Certificate 2 is generated from a signed PDF behind a per-signature consent
 | Certificate library | Working, with pending → confirmed upgrade |
 | PAdES parsing | Hardened; verified against one real PostSignum signature (`docs/qtsp-findings.md`) |
 | Certificate 2 | First cut working — `Attest` tab, consent gate, one-page A4, document attached |
-| Tests | 86 offline, all passing; type-check clean |
-| Repo on GitHub | **Not created** — local only, nothing pushed |
+| Tests | 96 offline, all passing; type-check clean |
+| Repo on GitHub | `elkojo/xNotary`, **private**, `main` pushed; CI runs on push |
 
 ## Decisions already made — don't relitigate
 
@@ -99,12 +99,28 @@ Design decisions worth not relitigating:
 - **Layout spills to page 2 rather than dropping a signatory.** Full detail fits ~6 signers on one
   page, compact ~7; beyond that it spills. Detail is sacrificed, people are not.
 
+**Parallel signing is now supported.** The Attest tab accepts several signed PDFs — one signing
+round, one file per signer — pools their signatures and attaches every file. Sequential
+countersigning (one file, several signatures) works as before; no mode switch is needed, because
+the shape of the input already says which it is.
+
+Before pooling, `checkAgreement` establishes that the files really are signatures over the same
+document: equal notarized digests from the embedded OpenTimestamps proofs, or failing that a
+byte-identical base revision (everything up to the first `%%EOF`, since signing appends). If they
+disagree, `buildCertificate2` throws `AgreementError` and the UI refuses. Listing people who
+signed different documents would produce a false certificate indistinguishable from a true one.
+
 Still to do on Certificate 2:
 
-1. **Sequential vs parallel signing** is not modelled yet. The brief wants parallel as default with
-   sequential countersigning configurable; today the certificate simply reports the revision each
-   signature covers, which is the honest description of whatever the document happens to be.
-2. **Library integration** — Certificate 2 is not stored in IndexedDB the way Certificate 1 is.
+1. **A genuine parallel fixture.** The `notarized-digest` agreement path is tested with two real
+   signed copies of one Certificate 1, and `base-revision` is tested at the unit level — but no
+   fixture is a true parallel pair (one base, two files with one signature each), because that
+   needs two independent signing runs. Producing one is a five-minute job for someone with a
+   signing setup: take the *unsigned* Certificate 1, sign it twice separately.
+2. **Library integration.** Deliberately not done — and probably should not be. The brief
+   specifies on-demand assembly with no stored state, and Certificate 2 is a *view* of the signed
+   PDFs rather than an artifact with its own identity. Storing the signed PDFs might make sense;
+   storing the certificate reintroduces the state the design avoids. Decide before implementing.
 3. **E2E coverage** — `npm run e2e` drives Flow A only.
 4. **The underlying OTS status is not shown.** `Certificate2Input.underlying` carries an optional
    `otsStatus` that nothing populates yet; the certificate names the notarized document's digest
