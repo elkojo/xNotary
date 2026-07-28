@@ -21,6 +21,7 @@ import {
   analyzeSignedDocuments,
   baseRevision,
   buildCertificate2,
+  checkAgreement,
   type Certificate2Signer,
 } from './certificate2';
 import { readEmbeddedFiles } from './certificate1';
@@ -121,12 +122,11 @@ describe('reading a signed document', () => {
  * asserts they signed the same document, which is a claim that has to be
  * established rather than assumed.
  *
- * Fixture limitation: a genuine parallel pair (one base document, two files
- * each carrying one signature) needs two independent signing runs and is not
- * something this repo can manufacture. The `notarized-digest` path is covered
- * with two real signed copies of the same Certificate 1; the `base-revision`
- * fallback is covered at the unit level on `baseRevision`. See
- * `docs/next-session.md`.
+ * `cert1-signed-once.pdf` and `cert1-parallel-b.pdf` are a genuine parallel
+ * pair: one unsigned Certificate 1, signed twice independently — each signature
+ * applied to the original, neither on top of the other. Both agreement paths
+ * are exercised against them, including the `base-revision` fallback with the
+ * OpenTimestamps evidence deliberately removed.
  */
 describe('pooling several signed files', () => {
   const twoCopies = () =>
@@ -140,6 +140,92 @@ describe('pooling several signed files', () => {
       { fileName: 'only.pdf', bytes: fixture('cert1-signed-once.pdf') },
     ]);
     expect(draft.agreement).toEqual({ kind: 'single' });
+  });
+
+  // The real parallel pair: two independent signing runs over one unsigned
+  // Certificate 1. This is the brief's default signing mode.
+  describe('a genuinely parallel pair', () => {
+    const pair = () =>
+      analyzeSignedDocuments([
+        { fileName: 'signed-by-max.pdf', bytes: fixture('cert1-signed-once.pdf') },
+        { fileName: 'signed-by-jan.pdf', bytes: fixture('cert1-parallel-b.pdf') },
+      ]);
+
+    it('carries one signature each, over the same unsigned certificate', async () => {
+      const draft = await pair();
+
+      expect(draft.errors).toEqual([]);
+      expect(draft.sources.map((s) => s.signatures.length)).toEqual([1, 1]);
+      expect(draft.signers.map((s) => [s.name, s.sourceFileName])).toEqual([
+        ['Max Svoboda', 'signed-by-max.pdf'],
+        ['Jan Novak', 'signed-by-jan.pdf'],
+      ]);
+      // Neither signer signed the other's copy, so neither covers a revision
+      // of a multi-signature document.
+      expect(draft.signers.every((s) => s.revision === null)).toBe(true);
+      expect(draft.signers.every((s) => s.documentIntegrity)).toBe(true);
+    });
+
+    it('agrees via the OpenTimestamps proof both copies carry', async () => {
+      expect((await pair()).agreement).toEqual({
+        kind: 'agree',
+        evidence: 'notarized-digest',
+      });
+    });
+
+    // The fallback for signed documents that are not xNotary certificates. The
+    // measured fact behind it: real signing appended a revision and left the
+    // original 8,080 bytes untouched in both files.
+    it('agrees on the base revision alone, without the proof', async () => {
+      const { sources } = await pair();
+      const withoutProof = sources.map((s) => ({ ...s, underlying: null }));
+
+      expect(checkAgreement(withoutProof)).toEqual({
+        kind: 'agree',
+        evidence: 'base-revision',
+      });
+    });
+
+    it('shares a base revision identical to the unsigned certificate', async () => {
+      const a = baseRevision(fixture('cert1-signed-once.pdf'));
+      const b = baseRevision(fixture('cert1-parallel-b.pdf'));
+
+      expect(bytesEqual(a, b)).toBe(true);
+      // Signing appends; it does not rewrite what came before.
+      expect(a.length).toBe(8080);
+    });
+
+    it('builds one certificate naming both, with both copies attached', async () => {
+      const draft = await pair();
+      const built = await buildCertificate2({
+        sources: draft.sources.map((s) => ({ fileName: s.fileName, bytes: s.bytes })),
+        signers: draft.signers,
+        withheldCount: 0,
+        generatedAt: GENERATED_AT,
+        underlying: draft.underlying ?? undefined,
+      });
+
+      const attached = await readEmbeddedFiles(built);
+      expect(attached).toHaveLength(2);
+      expect(bytesEqual(attached[0]!, fixture('cert1-signed-once.pdf'))).toBe(true);
+      expect(bytesEqual(attached[1]!, fixture('cert1-parallel-b.pdf'))).toBe(true);
+
+      const text = await pdfText(built);
+      expect(text).toContain('Max Svoboda');
+      expect(text).toContain('Jan Novak');
+      expect(text).toMatch(/signed in parallel/);
+      // Nobody countersigned anyone, so no revision wording belongs here.
+      expect(text).not.toMatch(/covers revision/);
+      expect((await PDFDocument.load(built)).getPageCount()).toBe(1);
+    });
+
+    it('refuses to pool a parallel copy with an unrelated signed document', async () => {
+      const draft = await analyzeSignedDocuments([
+        { fileName: 'signed-by-jan.pdf', bytes: fixture('cert1-parallel-b.pdf') },
+        { fileName: 'unrelated.pdf', bytes: fixture('qtsp-shape.pdf') },
+      ]);
+      expect(draft.agreement.kind).toBe('differs');
+    });
   });
 
   it('establishes agreement from the OpenTimestamps proof each copy carries', async () => {

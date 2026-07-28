@@ -12,7 +12,7 @@ they are, `docs/qtsp-findings.md` for what real qualified signatures actually co
 Everything runs from `app/`.
 
 ```bash
-npm test          # offline suite (96 tests) — this is what CI runs
+npm test          # offline suite (103 tests) — this is what CI runs
 npm run check     # svelte-check; must be 0 errors before committing
 npm run dev       # http://localhost:5173
 npm run build     # check + production build
@@ -81,6 +81,9 @@ docs/              m0-spike.md + qtsp-findings.md (evidence), next-session.md (h
   fixture bytes. The `cert1-*.pdf` trio is real product output that was really signed, because a
   genuine second revision cannot be produced offline. See the README there before touching any of
   it. Never commit a `.p12`.
+- **Signing appends; it does not rewrite.** Measured on real output: two independent signing runs
+  over one Certificate 1 both left the original 8,080 bytes byte-identical. `checkAgreement`'s
+  `base-revision` fallback depends on this, and `cert1-parallel-b.pdf` pins it.
 - **Never strip trailing `00` bytes from a signature's `/Contents`.** They look like placeholder
   padding, but the last byte of a CMS is effectively random — trimming truncates roughly one
   signature in 256. DER is self-delimiting; leave the padding and let `fromBER` stop on its own.

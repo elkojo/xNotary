@@ -15,7 +15,7 @@ cut: Certificate 2 is generated from a signed PDF behind a per-signature consent
 | Certificate library | Working, with pending → confirmed upgrade |
 | PAdES parsing | Hardened; verified against one real PostSignum signature (`docs/qtsp-findings.md`) |
 | Certificate 2 | First cut working — `Attest` tab, consent gate, one-page A4, document attached |
-| Tests | 96 offline, all passing; type-check clean |
+| Tests | 103 offline, all passing; type-check clean |
 | Repo on GitHub | `elkojo/xNotary`, **private**, `main` pushed; CI runs on push |
 
 ## Decisions already made — don't relitigate
@@ -112,19 +112,20 @@ signed different documents would produce a false certificate indistinguishable f
 
 Still to do on Certificate 2:
 
-1. **A genuine parallel fixture.** The `notarized-digest` agreement path is tested with two real
-   signed copies of one Certificate 1, and `base-revision` is tested at the unit level — but no
-   fixture is a true parallel pair (one base, two files with one signature each).
+1. ~~**A genuine parallel fixture.**~~ **Done.** `cert1-signed-once.pdf` and
+   `cert1-parallel-b.pdf` are a real pair: one unsigned Certificate 1, signed twice
+   independently. Both agreement paths are now tested against real files, including
+   `base-revision` with the OpenTimestamps evidence stripped.
 
-   **Do not solve this with `@signpdf/placeholder-plain`.** It was tried and reverted: generating
-   the pair synthetically needs a placeholder appended as an incremental update, and that package
-   drags in `pdfkit`, `crypto-js` and ~1,560 lines of lockfile, adding **four critical**
-   dev-dependency advisories — to produce one test fixture, in a project whose premise is
-   minimising trust. Not worth it.
+   The measured fact it established: both signing runs left the original **8,080 bytes
+   untouched** and appended a revision, so the base revisions are byte-identical. That is the
+   assumption `checkAgreement` rests on, and it now has evidence rather than reasoning behind it.
 
-   The cheap route is a real signing run: take the *unsigned* Certificate 1 and sign it twice
-   **independently** — each signature applied to the original, not one on top of the other.
-   Self-signed throwaway certificates are fine and keep the fixture committable.
+   **If you ever need another such fixture, do not reach for `@signpdf/placeholder-plain`.** It
+   was tried and reverted: it drags in `pdfkit`, `crypto-js` and ~1,560 lines of lockfile, adding
+   **four critical** dev-dependency advisories, to generate one test fixture. A real signing run
+   is cheaper and gives better evidence — sign the *unsigned* Certificate 1 twice, each signature
+   applied to the original rather than to the other's output.
 2. **Library integration.** Deliberately not done — and probably should not be. The brief
    specifies on-demand assembly with no stored state, and Certificate 2 is a *view* of the signed
    PDFs rather than an artifact with its own identity. Storing the signed PDFs might make sense;

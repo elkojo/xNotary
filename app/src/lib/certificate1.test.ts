@@ -98,7 +98,8 @@ describe('Certificate 1', () => {
  * would stop standing on its own at exactly the moment it starts being useful.
  *
  * These fixtures are a real Certificate 1 that was really signed — once, then
- * countersigned — so this is measured behaviour, not a simulation of it.
+ * countersigned, and separately signed again by a second party in parallel — so
+ * this is measured behaviour, not a simulation of it.
  */
 describe('Certificate 1 after it has been signed', () => {
   const fixture = (name: string) =>
@@ -110,7 +111,7 @@ describe('Certificate 1 after it has been signed', () => {
     expect(toHex(await sha256Bytes(fixture('cert1-source-document.pdf')))).toBe(SOURCE_DIGEST);
   });
 
-  it.each(['cert1-signed-once.pdf', 'cert1-countersigned.pdf'])(
+  it.each(['cert1-signed-once.pdf', 'cert1-countersigned.pdf', 'cert1-parallel-b.pdf'])(
     'still yields the embedded proof from %s',
     async (name) => {
       const ots = await extractOtsAttachment(fixture(name));
