@@ -8,7 +8,14 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { buildCertificate1, extractOtsAttachment } from './certificate1';
+import {
+  DOC_VALUE_WIDTH,
+  QR_SIZE,
+  VALUE_COLUMN_X,
+  buildCertificate1,
+  extractOtsAttachment,
+} from './certificate1';
+import { MARGIN, PAGE_W } from './pdf-layout';
 import { sha256Bytes, toHex } from './hash';
 import { pdfText } from './pdf-text.test-helper';
 import type { OtsStatus } from './ots';
@@ -89,6 +96,89 @@ describe('Certificate 1', () => {
       note: 'A note that is also quite long, to make sure wrapping does not throw.',
     });
     expect(await extractOtsAttachment(pdf)).not.toBeNull();
+  });
+});
+
+/**
+ * The standard PDF fonts are WinAnsi-encoded. Czech splits across that boundary:
+ * "á é í ó ú ý š ž" are in CP1252, "ř ě č ů ť ň ď" are not — so a document
+ * called "dílo.pdf" built fine while "balíčky.pdf" threw
+ * `WinAnsi cannot encode "č"`, which looks arbitrary to whoever hit it.
+ */
+// The QR sits beside the Document rows, and the value column used to run under
+// it: the digest — the one thing on the page that actually binds — overlapped by
+// 31pt and was partly unreadable on every certificate.
+describe('the Document block does not collide with the QR', () => {
+  it('leaves the value column clear of the QR', () => {
+    const valueEnd = VALUE_COLUMN_X + DOC_VALUE_WIDTH;
+    const qrLeft = PAGE_W - MARGIN - QR_SIZE;
+
+    expect(valueEnd).toBeLessThanOrEqual(qrLeft);
+    // And not so narrow that the digest needs a third line.
+    expect(qrLeft - valueEnd).toBeLessThan(40);
+  });
+});
+
+describe('file names the standard fonts cannot render', () => {
+  const NAMES = [
+    'Smlouva o dílo.pdf',
+    'Příloha č. 1.pdf',
+    'CryptoNight 2026 - partnerské balíčky.pdf',
+    'Žluťoučký kůň úpěl ďábelské ódy.pdf',
+    'Ισμήνη.pdf',
+    '合同.pdf',
+  ];
+
+  it.each(NAMES)('builds a certificate for %s', async (fileName) => {
+    const pdf = await build(CONFIRMED, { fileName });
+    expect(new TextDecoder().decode(pdf.subarray(0, 5))).toBe('%PDF-');
+    expect(await extractOtsAttachment(pdf)).not.toBeNull();
+  });
+
+  it('builds a certificate when the note has diacritics', async () => {
+    const pdf = await build(CONFIRMED, { note: 'Účetní závěrka za rok 2026 — příloha č. 3' });
+    expect(await extractOtsAttachment(pdf)).not.toBeNull();
+  });
+
+  // The printed commands are how someone verifies without xNotary. A
+  // transliterated name inside one is a command that fails with "file not
+  // found" — worse than not printing a name at all, because it looks right.
+  it('never prints a name in a command that would not work when typed', async () => {
+    const text = await pdfText(await build(CONFIRMED, { fileName: 'Příloha č. 1.pdf' }));
+
+    expect(text).not.toContain('Priloha');
+    expect(text).toContain('ots verify -f "<your document>" proof.ots');
+    expect(text).toContain('sha256sum "<your document>"');
+  });
+
+  it('quotes the exact name when it survives encoding', async () => {
+    const text = await pdfText(await build(CONFIRMED, { fileName: 'Smlouva o dílo.pdf' }));
+
+    expect(text).toContain('ots verify -f "Smlouva o dílo.pdf" proof.ots');
+    expect(text).not.toContain('<your document>');
+  });
+
+  it('says the displayed name was changed, and where the real one is', async () => {
+    const text = await pdfText(await build(CONFIRMED, { fileName: 'balíčky.pdf' }));
+
+    expect(text).toMatch(/shown without accents/);
+    expect(text).toMatch(/stored unaltered/);
+  });
+
+  it('does not add that note when nothing was changed', async () => {
+    const text = await pdfText(await build(CONFIRMED, { fileName: 'contract.pdf' }));
+    expect(text).not.toMatch(/shown without accents/);
+  });
+
+  // Drawn text is constrained; PDF strings are not. The exact name has to
+  // survive somewhere, because Certificate 2 reads it back from the title.
+  it('keeps the exact name in the PDF title, accents and all', async () => {
+    const fileName = 'CryptoNight 2026 - partnerské balíčky.pdf';
+    const pdf = await build(CONFIRMED, { fileName });
+
+    const { PDFDocument } = await import('pdf-lib');
+    const loaded = await PDFDocument.load(pdf, { updateMetadata: false });
+    expect(loaded.getTitle()).toBe(`xNotary Certificate 1 — ${fileName}`);
   });
 });
 

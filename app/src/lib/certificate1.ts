@@ -27,6 +27,7 @@ import {
   PAGE_W,
   endSentence,
   loadFonts,
+  toWinAnsi,
 } from './pdf-layout';
 
 export interface Certificate1Input {
@@ -39,6 +40,22 @@ export interface Certificate1Input {
   /** Optional note the creator attached when stamping. */
   readonly note?: string;
 }
+
+/**
+ * Width of the value column in the Document block.
+ *
+ * The QR code sits to the right of these rows, so the default full-width value
+ * column runs underneath it: at 300 the digest overlapped the QR by 31pt and
+ * was partly unreadable — on every certificate, not just long names. Keep this
+ * in step with the QR geometry below.
+ */
+export const DOC_VALUE_WIDTH = 250;
+
+/** Side of the QR square, and how far its left edge sits from the page edge. */
+export const QR_SIZE = 96;
+
+/** Where `Cursor.field` starts drawing values — mirrors `pdf-layout`. */
+export const VALUE_COLUMN_X = MARGIN + 118;
 
 export const DISCLAIMER =
   'This certificate attests that the digest above existed at the attested time. ' +
@@ -107,11 +124,25 @@ export async function buildCertificate1(input: Certificate1Input): Promise<Uint8
 
   const digestHex = toHex(input.digest);
 
+  // The standard PDF fonts are WinAnsi-encoded and throw on anything outside it,
+  // which includes most Czech letters — "ř", "ě", "č", "ů" — while "á", "é" and
+  // "í" pass. A file called "balíčky.pdf" therefore used to fail outright while
+  // "dílo.pdf" worked, which looks arbitrary from the outside.
+  //
+  // Only *drawn* text has this constraint. PDF strings do not, so the exact name
+  // still travels losslessly in the title and the attachment description below.
+  const shownName = toWinAnsi(input.fileName, fonts.regular);
+  const nameWasChanged = shownName !== input.fileName;
+  // A name that survived encoding is quoted verbatim, so the reader can paste
+  // the command as printed. One that did not gets a placeholder they must fill
+  // in — an accurate instruction rather than a broken literal.
+  const commandName = nameWasChanged ? '<your document>' : input.fileName;
+
   c.heading('Document');
-  c.field('File name', input.fileName);
+  c.field('File name', shownName, { width: DOC_VALUE_WIDTH });
   c.field('File size', `${input.fileSize.toLocaleString('en-US')} bytes`);
-  if (input.note) c.field('Note', input.note);
-  c.field('SHA-256', groupHex(digestHex), { mono: true, width: 300 });
+  if (input.note) c.field('Note', toWinAnsi(input.note, fonts.regular), { width: DOC_VALUE_WIDTH });
+  c.field('SHA-256', groupHex(digestHex), { mono: true, width: DOC_VALUE_WIDTH });
 
   // QR of the digest, so the hash can be moved to another device by camera.
   const qrDataUrl = await QRCode.toDataURL(digestHex, {
@@ -121,10 +152,14 @@ export async function buildCertificate1(input: Certificate1Input): Promise<Uint8
     color: { dark: '#0f172a', light: '#ffffff' },
   });
   const qr = await pdf.embedPng(qrDataUrl);
-  const qrSize = 96;
-  page.drawImage(qr, { x: PAGE_W - MARGIN - qrSize, y: c.y + 24, width: qrSize, height: qrSize });
+  page.drawImage(qr, {
+    x: PAGE_W - MARGIN - QR_SIZE,
+    y: c.y + 24,
+    width: QR_SIZE,
+    height: QR_SIZE,
+  });
   page.drawText('SHA-256 of the document', {
-    x: PAGE_W - MARGIN - qrSize,
+    x: PAGE_W - MARGIN - QR_SIZE,
     y: c.y + 12,
     size: 6.5,
     font: fonts.regular,
@@ -155,7 +190,9 @@ export async function buildCertificate1(input: Certificate1Input): Promise<Uint8
   c.gap(4);
   c.paragraph('3. Run, in the folder holding the original document:');
   c.gap(4);
-  c.paragraph(`   ots verify -f "${input.fileName}" proof.ots`, { font: fonts.mono, size: 8.5 });
+  // Never print a transliterated name inside a command: it would be a command
+  // that fails with "file not found", which is worse than not printing one.
+  c.paragraph(`   ots verify -f "${commandName}" proof.ots`, { font: fonts.mono, size: 8.5 });
   c.gap(4);
   c.paragraph(
     'The client independently recomputes the digest, walks the proof down to a Bitcoin ' +
@@ -165,9 +202,18 @@ export async function buildCertificate1(input: Certificate1Input): Promise<Uint8
   );
   c.gap(6);
   c.paragraph(
-    `4. To check the digest alone: sha256sum "${input.fileName}" must print ${digestHex}`,
+    `4. To check the digest alone: sha256sum "${commandName}" must print ${digestHex}`,
     { color: MUTED },
   );
+  if (nameWasChanged) {
+    c.gap(4);
+    c.paragraph(
+      `The file name above is shown without accents, because the standard PDF fonts cannot ` +
+        `render them. Substitute the real name — it is stored unaltered in this PDF's title and ` +
+        `in the description of the attached proof, and the digest is what actually binds.`,
+      { color: MUTED },
+    );
+  }
 
   c.rule();
   c.heading('What this certificate does not prove');

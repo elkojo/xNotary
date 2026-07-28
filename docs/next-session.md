@@ -15,7 +15,7 @@ cut: Certificate 2 is generated from a signed PDF behind a per-signature consent
 | Certificate library | Working, with pending → confirmed upgrade |
 | PAdES parsing | Hardened; verified against one real PostSignum signature (`docs/qtsp-findings.md`) |
 | Certificate 2 | First cut working — `Attest` tab, consent gate, one-page A4, document attached |
-| Tests | 109 offline, all passing; type-check clean |
+| Tests | 122 offline, all passing; type-check clean |
 | Repo on GitHub | `elkojo/xNotary`, **private**, `main` pushed; CI runs on push |
 
 ## Decisions already made — don't relitigate
@@ -188,6 +188,13 @@ GitHub Pages deploy, PWA polish, onboarding/help, disclaimers, security review.
   a reader.
 
 ## Post-MVP backlog, in priority order
+
+0. **Embed a Unicode font in the PDFs.** Today non-WinAnsi characters are transliterated —
+   "balíčky" is drawn as "balícky" — which is honest but lossy, and the certificate has to say so.
+   The complete fix is `@pdf-lib/fontkit` plus a TTF with Czech coverage. Deferred because it is a
+   new dependency (4.3 MB unpacked) plus a font asset on an offline-first PWA, to render metadata
+   that is not part of the cryptographic claim. Worth doing once bundle size is being looked at
+   anyway.
 
 1. Qualified RFC 3161 timestamp (e.g. I.CA) + PAdES-LTA/LTV embedding.
 2. Full in-browser QES validation against EUTL trusted lists.
