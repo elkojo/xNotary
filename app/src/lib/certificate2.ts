@@ -113,6 +113,13 @@ export interface SignedSourceRef {
 
 /** One signed document, read. */
 export interface SignedSource extends SignedSourceRef {
+  /**
+   * The document this is ultimately about, without extension — what a
+   * Certificate 1 was issued *for*, not the name of the signed copy. Signers
+   * rename their copies (`… — Certificate 1_sign2.pdf`), so this is read from
+   * the certificate's own metadata rather than inferred from the file name.
+   */
+  readonly originalName: string;
   readonly digest: Uint8Array;
   /** Every signature found in this file, consented or not. */
   readonly signatures: readonly PadesSignature[];
@@ -154,6 +161,8 @@ export interface Certificate2Draft {
   readonly errors: readonly string[];
   /** The notarized document all sources agree on, when there is one. */
   readonly underlying: { readonly digest: Uint8Array } | null;
+  /** What to call the Certificate 2 built from these sources. */
+  readonly suggestedFileName: string;
 }
 
 /** Raised rather than emit a certificate implying a shared signing that did not happen. */
@@ -181,6 +190,7 @@ export async function analyzeSignedDocument(
 
   return {
     fileName,
+    originalName: await originalDocumentName(pdfBytes, fileName),
     bytes: pdfBytes,
     digest: await sha256Bytes(pdfBytes),
     signatures,
@@ -206,7 +216,51 @@ export async function analyzeSignedDocuments(
     signers: sources.flatMap((s) => s.signers),
     errors: sources.flatMap((s) => s.errors.map((e) => `${s.fileName}: ${e}`)),
     underlying: agreement.kind === 'differs' ? null : (sources[0]?.underlying ?? null),
+    suggestedFileName: certificate2FileName(sources[0]?.originalName ?? 'document'),
   };
+}
+
+/** Certificate 2 is named after the document, not after the copy that was signed. */
+export function certificate2FileName(originalName: string): string {
+  return `${originalName} — Certificate 2.pdf`;
+}
+
+/**
+ * Recover the name of the document a signed PDF is ultimately about.
+ *
+ * A Certificate 1 records it in its PDF Title, and signing appends a revision
+ * without touching that — verified across singly signed, countersigned and
+ * parallel-signed copies. So the metadata is authoritative, where the file name
+ * is not: signers rename their copies freely.
+ *
+ * Falls back to the file name for signed PDFs that are not Certificate 1s, where
+ * the signed document simply is the document.
+ */
+export async function originalDocumentName(
+  pdfBytes: Uint8Array,
+  sourceFileName: string,
+): Promise<string> {
+  try {
+    const title = (await PDFDocument.load(pdfBytes, { updateMetadata: false })).getTitle();
+    const match = title?.match(/^xNotary Certificate 1 [—-] (.+)$/);
+    if (match?.[1]) return stripExtension(match[1].trim());
+  } catch {
+    // Unreadable metadata is not a reason to fail; fall through to the name.
+  }
+
+  // No usable metadata: drop a "— Certificate 1…" suffix if the signer's copy
+  // carries one, so we do not end up with "X — Certificate 1 — Certificate 2".
+  const base = stripExtension(sourceFileName);
+  // `(?!\d)` rather than `\b`: signers append things like "_sign2", and `_` is a
+  // word character, so `\b` would not fire after the "1". The lookahead still
+  // stops this matching a hypothetical "Certificate 10".
+  const withoutSuffix = base.replace(/\s*[—-]\s*Certificate\s*1(?!\d).*$/i, '').trim();
+  return withoutSuffix || base;
+}
+
+function stripExtension(fileName: string): string {
+  const dot = fileName.lastIndexOf('.');
+  return dot > 0 ? fileName.slice(0, dot) : fileName;
 }
 
 /**
@@ -379,7 +433,7 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
   const fonts = await loadFonts(pdf);
   const ascii = (s: string) => toWinAnsi(s, fonts.regular);
 
-  pdf.setTitle(`xNotary Certificate 2 — ${input.sources[0]?.fileName ?? 'signed documents'}`);
+  pdf.setTitle(`xNotary Certificate 2 — ${sources[0]!.originalName}`);
   pdf.setSubject('Attestation by identified signatories');
   pdf.setProducer('xNotary');
   pdf.setCreator('xNotary (AGPL-3.0) — self-custodial notarization');

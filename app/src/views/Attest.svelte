@@ -295,11 +295,7 @@
       <button
         class="primary"
         onclick={() => {
-          downloadBytes(
-            built!,
-            `${draft?.sources[0]?.fileName ?? 'document'} — Certificate 2.pdf`,
-            'application/pdf',
-          );
+          downloadBytes(built!, draft!.suggestedFileName, 'application/pdf');
           saved = true;
         }}>Save Certificate 2 (PDF)</button
       >

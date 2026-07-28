@@ -15,7 +15,7 @@ cut: Certificate 2 is generated from a signed PDF behind a per-signature consent
 | Certificate library | Working, with pending → confirmed upgrade |
 | PAdES parsing | Hardened; verified against one real PostSignum signature (`docs/qtsp-findings.md`) |
 | Certificate 2 | First cut working — `Attest` tab, consent gate, one-page A4, document attached |
-| Tests | 103 offline, all passing; type-check clean |
+| Tests | 109 offline, all passing; type-check clean |
 | Repo on GitHub | `elkojo/xNotary`, **private**, `main` pushed; CI runs on push |
 
 ## Decisions already made — don't relitigate

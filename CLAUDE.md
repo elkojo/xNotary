@@ -12,7 +12,7 @@ they are, `docs/qtsp-findings.md` for what real qualified signatures actually co
 Everything runs from `app/`.
 
 ```bash
-npm test          # offline suite (103 tests) — this is what CI runs
+npm test          # offline suite (109 tests) — this is what CI runs
 npm run check     # svelte-check; must be 0 errors before committing
 npm run dev       # http://localhost:5173
 npm run build     # check + production build
@@ -81,6 +81,10 @@ docs/              m0-spike.md + qtsp-findings.md (evidence), next-session.md (h
   fixture bytes. The `cert1-*.pdf` trio is real product output that was really signed, because a
   genuine second revision cannot be produced offline. See the README there before touching any of
   it. Never commit a `.p12`.
+- **A certificate is named after the document, not after the file it was built from.**
+  `X — Certificate 1.pdf` signed and renamed `X — Certificate 1_sign2.pdf` still yields
+  `X — Certificate 2.pdf`. The original name is read from the Certificate 1 PDF's Title metadata,
+  which survives signing; the file name is only a fallback. See `originalDocumentName`.
 - **Signing appends; it does not rewrite.** Measured on real output: two independent signing runs
   over one Certificate 1 both left the original 8,080 bytes byte-identical. `checkAgreement`'s
   `base-revision` fallback depends on this, and `cert1-parallel-b.pdf` pins it.

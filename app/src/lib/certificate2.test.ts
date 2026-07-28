@@ -334,6 +334,66 @@ describe('baseRevision', () => {
   });
 });
 
+describe('naming', () => {
+  // Certificate 2 is named after the *document*, not after the copy that was
+  // signed. Signers rename their copies — "… — Certificate 1_sign2.pdf" — and
+  // naming from that gives "X — Certificate 1_sign2 — Certificate 2.pdf".
+  it('names the certificate after the original document', async () => {
+    const draft = await analyzeSignedDocuments([
+      {
+        fileName: 'sample_document_R00 — Certificate 1_sign1.pdf',
+        bytes: fixture('cert1-signed-once.pdf'),
+      },
+    ]);
+    expect(draft.suggestedFileName).toBe('sample_document_R00 — Certificate 2.pdf');
+  });
+
+  it('reads the name from the certificate, not from what the signer called the file', async () => {
+    // Deliberately unhelpful file name; the metadata still knows the truth.
+    const draft = await analyzeSignedDocuments([
+      { fileName: 'scan_0042 FINAL (2) signed.pdf', bytes: fixture('cert1-parallel-b.pdf') },
+    ]);
+    expect(draft.sources[0]!.originalName).toBe('sample_document_R00');
+    expect(draft.suggestedFileName).toBe('sample_document_R00 — Certificate 2.pdf');
+  });
+
+  it('agrees on one name across a parallel pair', async () => {
+    const draft = await analyzeSignedDocuments([
+      { fileName: 'copy-a.pdf', bytes: fixture('cert1-signed-once.pdf') },
+      { fileName: 'copy-b.pdf', bytes: fixture('cert1-parallel-b.pdf') },
+    ]);
+    expect(draft.sources.map((s) => s.originalName)).toEqual([
+      'sample_document_R00',
+      'sample_document_R00',
+    ]);
+    expect(draft.suggestedFileName).toBe('sample_document_R00 — Certificate 2.pdf');
+  });
+
+  // A signed PDF that is not a Certificate 1 has no "original document" behind
+  // it — the signed document simply is the document.
+  it('falls back to the file name for a signed PDF that is not a Certificate 1', async () => {
+    const draft = await analyzeSignedDocuments([
+      { fileName: 'lease agreement.pdf', bytes: fixture('qtsp-shape.pdf') },
+    ]);
+    expect(draft.suggestedFileName).toBe('lease agreement — Certificate 2.pdf');
+  });
+
+  it('does not stack "Certificate 1" into the name when metadata is unavailable', async () => {
+    // qtsp-shape.pdf carries no title, so only the file name is available.
+    const draft = await analyzeSignedDocuments([
+      { fileName: 'contract — Certificate 1_sign3.pdf', bytes: fixture('qtsp-shape.pdf') },
+    ]);
+    expect(draft.suggestedFileName).toBe('contract — Certificate 2.pdf');
+  });
+
+  it('titles the PDF after the document too', async () => {
+    const built = await build();
+    expect((await PDFDocument.load(built)).getTitle()).toBe(
+      'xNotary Certificate 2 — sample_document_R00',
+    );
+  });
+});
+
 describe('the signed document is never modified', () => {
   it('embeds it byte-for-byte as an attachment', async () => {
     const source = fixture('cert1-countersigned.pdf');
