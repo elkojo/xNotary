@@ -26,6 +26,8 @@
   let busy = $state(false);
   let error = $state('');
   let built = $state<Uint8Array | null>(null);
+  /** Flips once the user has actually downloaded, so the warning can stand down. */
+  let saved = $state(false);
 
   const chosen = $derived(consented.filter(Boolean).length);
   const withheld = $derived((draft?.signers.length ?? 0) - chosen);
@@ -34,6 +36,7 @@
     files = picked;
     draft = null;
     built = null;
+    saved = false;
     error = '';
     busy = true;
     try {
@@ -68,6 +71,7 @@
     if (!draft) return;
     busy = true;
     error = '';
+    saved = false;
     try {
       built = await buildCertificate2({
         sources: draft.sources.map((s) => ({ fileName: s.fileName, bytes: s.bytes })),
@@ -89,6 +93,7 @@
   }
 
   function reset() {
+    saved = false;
     files = [];
     draft = null;
     built = null;
@@ -267,20 +272,36 @@
   <div class="card">
     <h2><span class="badge ok">Certificate 2 created</span></h2>
     <p class="hint">
-      One A4 page naming {chosen} signator{chosen === 1 ? 'y' : 'ies'}, with the signed document
-      attached inside it, byte for byte. The attachment is what a validator needs — this certificate
-      never altered it.
+      One A4 page naming {chosen} signator{chosen === 1 ? 'y' : 'ies'}, with the signed
+      document{draft && draft.sources.length > 1 ? 's' : ''} attached inside it, byte for byte. The
+      attachment is what a validator needs — this certificate never altered it.
     </p>
+
+    <div class="notice warn">
+      <strong>Save it now — xNotary is not keeping a copy.</strong>
+      This certificate exists only in this browser tab. It is not stored on any server, because there
+      is no server, and it is not written to this device either. Close the tab or navigate away and
+      it is gone.
+      {#if saved}
+        <br /><br />Saved. Keep it somewhere you back up — it is your copy and the only one.
+      {:else}
+        <br /><br />Nothing is lost if you do: you can rebuild an identical certificate at any time
+        from the same signed {draft && draft.sources.length > 1 ? 'files' : 'file'}, which is why
+        xNotary sees no reason to hold one for you.
+      {/if}
+    </div>
+
     <div class="actions">
       <button
         class="primary"
-        onclick={() =>
+        onclick={() => {
           downloadBytes(
             built!,
             `${draft?.sources[0]?.fileName ?? 'document'} — Certificate 2.pdf`,
             'application/pdf',
-          )}
-        >Save Certificate 2 (PDF)</button
+          );
+          saved = true;
+        }}>Save Certificate 2 (PDF)</button
       >
     </div>
   </div>

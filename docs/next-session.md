@@ -126,10 +126,19 @@ Still to do on Certificate 2:
    **four critical** dev-dependency advisories, to generate one test fixture. A real signing run
    is cheaper and gives better evidence — sign the *unsigned* Certificate 1 twice, each signature
    applied to the original rather than to the other's output.
-2. **Library integration.** Deliberately not done — and probably should not be. The brief
-   specifies on-demand assembly with no stored state, and Certificate 2 is a *view* of the signed
-   PDFs rather than an artifact with its own identity. Storing the signed PDFs might make sense;
-   storing the certificate reintroduces the state the design avoids. Decide before implementing.
+2. ~~**Library integration.**~~ **Decided: never store Certificate 2.** It is issued for download
+   and nothing keeps a copy — not a server (there is none), not IndexedDB, not the tab once it is
+   closed. The screen says so and tells the user to save it.
+
+   This is a product decision, not a technical one: retaining nothing is what xNotary is *for*.
+   A service that never holds a document cannot leak it, be compelled to produce it, or lose it.
+   Certificate 2 costs nothing to discard because it is reproducible from the signed files at any
+   time, which is why the warning can honestly say nothing is lost.
+
+   Certificate 1 remains the deliberate exception, in the user's own browser storage on their own
+   device, and only because a pending Bitcoin timestamp has to be upgraded to confirmed later —
+   a lifecycle Certificate 2 does not have. Do not "unify" the two by adding a Certificate 2
+   library; that would be consistency at the cost of the thing being sold.
 3. **E2E coverage** — `npm run e2e` drives Flow A only.
 4. **The underlying OTS status is not shown.** `Certificate2Input.underlying` carries an optional
    `otsStatus` that nothing populates yet; the certificate names the notarized document's digest

@@ -52,10 +52,17 @@ These are constraints, not aspirations. Each one is enforced somewhere in the co
    to calendar servers.
 2. **No backend.** A pure static SPA. No accounts, no database, no server state. *(Proven
    against real browser CORS behaviour — see [docs/m0-spike.md](docs/m0-spike.md).)*
-3. **Open verification.** Certificates must be verifiable with standard open tools **without
+3. **Nothing is retained.** xNotary keeps no copy of anything, anywhere — not your documents, not
+   your certificates. There is no server to keep them on. Certificate 2 is built in the tab and
+   handed to you to save; close the tab and it is gone. That is not a limitation to work around,
+   it is the product: a notarization service that cannot leak, subpoena or lose what it never
+   held. Certificate 1 is the one thing kept, in your own browser's storage on your own device,
+   and only because its Bitcoin timestamp has to be upgraded from pending to confirmed later.
+   You can delete it whenever you like.
+4. **Open verification.** Certificates must be verifiable with standard open tools **without
    this project existing**. The `.ots` proof is embedded in every Certificate 1 PDF, and the PDF
    prints the `ots verify` command needed to check it.
-4. **Open source.** AGPL-3.0.
+5. **Open source.** AGPL-3.0.
 
 ## Verifying without xNotary
 

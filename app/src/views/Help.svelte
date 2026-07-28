@@ -136,6 +136,33 @@
 </div>
 
 <div class="card">
+  <h2>What xNotary keeps</h2>
+  <p>
+    Nothing, on any server — because there is no server. xNotary is a static page that runs
+    entirely in your browser; there is nowhere for it to put your documents even if it wanted to.
+  </p>
+  <ul>
+    <li>
+      <strong>Your files</strong> are never uploaded. They are hashed on this device and only the
+      32-byte digest is sent, to the public OpenTimestamps calendars.
+    </li>
+    <li>
+      <strong>Certificate 2</strong> is not stored at all, not even here. It is built in the tab
+      and handed to you to save. Close the tab and it is gone — so save it somewhere you back up.
+      Nothing is lost if you forget: it can be rebuilt at any time from the same signed files.
+    </li>
+    <li>
+      <strong>Certificate 1</strong> is the one exception, kept in this browser's own storage on
+      this device, so that a pending Bitcoin timestamp can be upgraded to confirmed later. It is
+      not sent anywhere, and you can delete it from <em>My certificates</em> whenever you like.
+      Clearing your browser data removes it too — keep the downloaded PDF as your real copy.
+    </li>
+  </ul>
+  <p>
+    This is the point of the design rather than a gap in it. A service that never holds your
+    documents cannot leak them, cannot be compelled to hand them over, and cannot lose them.
+  </p>
+
   <h2>Limits you should know about</h2>
   <div class="rows">
     <div class="row">
