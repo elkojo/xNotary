@@ -126,7 +126,26 @@ Still to do on Certificate 2:
    `otsStatus` that nothing populates yet; the certificate names the notarized document's digest
    but does not say whether that timestamp is confirmed.
 
-### 3. M3 — Release
+### 3. Remove the pre-release warnings — **do this at M3, not before**
+
+Two warnings say this build has had no security review and no legal review. They are accurate
+today and must come out the moment they stop being:
+
+1. `app/src/App.svelte` — the `.prerelease` notice above the tabs.
+2. `README.md` — the "⚠️ Pre-release" block at the top.
+
+Both carry a comment pointing here. Remove them **only** once the security review and the Czech
+eIDAS counsel review are actually done — not when the code merely feels finished. A warning that
+outlives its accuracy trains people to ignore the next one; a warning removed early is worse
+still.
+
+Deliberately **not** printed on the certificates themselves. A certificate is meant to outlive
+this period and to verify without xNotary existing (invariant 4), so attaching a claim about the
+tool's maturity to it would age into confusion — a reader in 2028 could not tell whether it meant
+the proof was suspect. It isn't: the digest, the OpenTimestamps proof and the PAdES parsing are
+the same code that ships at 1.0. Each certificate already states its own limits precisely.
+
+### 4. M3 — Release
 
 GitHub Pages deploy, PWA polish, onboarding/help, disclaimers, security review.
 

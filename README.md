@@ -4,8 +4,21 @@
 qualified electronic signatures over the result. No accounts, no database, no backend — and no
 copy of your documents anywhere but your own device.
 
-> **Status: MVP in progress.** Flow A (Certificate 1) works end to end. Certificate 2 —
-> collecting eIDAS qualified signatures — is the next milestone. See [Milestones](#milestones).
+> ### ⚠️ Pre-release — not for real use yet
+>
+> **This build has not had a security review, and its wording has not been reviewed by a
+> lawyer.** The Czech eIDAS counsel review is a release milestone and has not happened.
+>
+> What it produces is nonetheless real: the digests are genuinely anchored in Bitcoin and the
+> certificates verify with the reference OpenTimestamps client, with or without this app. So
+> treat the *software* as unfinished rather than the output as fake — and don't rely on it for
+> anything that matters.
+
+> **Status.** Certificate 1 and Certificate 2 both work end to end. Remaining before release:
+> security review, legal review, onboarding and disclaimer pass. See [Milestones](#milestones).
+
+**Try it:** <https://elkojo.github.io/xNotary/> — or run it locally, see
+[Getting started](#getting-started). Nothing you do there is uploaded.
 
 ---
 
@@ -16,9 +29,20 @@ later than a particular Bitcoin block. The file is hashed in your browser; only 
 SHA-256 digest is ever sent, to public [OpenTimestamps](https://opentimestamps.org) calendar
 servers.
 
-**Certificate 2 — attestation.** *(next milestone)* Certificate 1 plus the qualified electronic
-signatures (eIDAS QES) of one or more identified people, with a summary page naming each signer,
-their QTSP, and when they signed.
+**Certificate 2 — attestation.** A one-page A4 certificate naming the people who signed a
+Certificate 1 with their eIDAS signatures — each with their issuing authority and when they
+signed — with the signed documents embedded inside it, byte for byte.
+
+Nobody is named without ticking a box for them first, and signatures whose signer withheld
+consent are disclosed as a count rather than silently dropped. Signing in sequence (one file,
+several signatures) and in parallel (one copy per signer) are both accepted; in the parallel case
+xNotary first establishes that the copies really are signatures over the same document, and
+refuses to combine them if they are not.
+
+It reports what each signing certificate *claims* and links to the
+[EU DSS validator](https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/validation) for
+the authoritative determination. It never decides for itself whether a signature is a qualified
+electronic signature — that needs the EU Trusted Lists.
 
 ## Principles
 
@@ -136,10 +160,11 @@ Stack: Svelte 5 + Vite 5 + TypeScript, offline-first via a hand-written service 
       both.**
 - [x] **M1 — Certificate 1.** Hash → OTS → PDF certificate → local library; "Verify integrity"
       screen; pending→confirmed upgrade lifecycle.
-- [ ] **M2 — Certificate 2.** Signed-PDF ingestion, consent step, multi-signer assembly
-      (parallel + sequential), summary page, external-validator links.
-- [ ] **M3 — Release.** GitHub Pages deploy, PWA polish, onboarding, disclaimers, public repo,
-      security review.
+- [x] **M2 — Certificate 2.** Signed-PDF ingestion, per-signature consent step, multi-signer
+      assembly (parallel + sequential, with agreement checked before pooling), one-page summary,
+      external-validator links.
+- [ ] **M3 — Release.** GitHub Pages deploy ✅ · public repo ✅ · PWA polish · onboarding ·
+      disclaimer pass · **security review** · **Czech eIDAS counsel review**.
 
 Deferred post-MVP, in priority order: qualified RFC 3161 timestamp + PAdES-LTA/LTV · full
 in-browser EUTL validation · Nostr/Blossom sharing (Flow B) · nsite hosting · Bank iD Sign

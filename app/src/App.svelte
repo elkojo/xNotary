@@ -60,6 +60,20 @@
     {/each}
   </nav>
 
+  <!--
+    Maturity of the software, which is a different claim from what the
+    certificates say about themselves. Each certificate already states its own
+    limits precisely; nothing there tells a visitor that the app producing them
+    has not been reviewed. Deliberately not printed on the certificates: those
+    are meant to outlive this period and to verify without xNotary existing.
+    Remove at M3, once both reviews are done — see docs/next-session.md.
+  -->
+  <div class="notice warn prerelease">
+    <strong>Pre-release.</strong> This build has not had a security review, and its wording has not
+    been reviewed by a lawyer. The timestamps it produces are real and independently verifiable —
+    but treat the app itself as unfinished, and don't rely on it for anything that matters yet.
+  </div>
+
   {#if !online}
     <div class="notice warn">
       You are offline. Verifying a document against a certificate still works for the hash check,
@@ -89,3 +103,12 @@
     >. It is not a law firm and this is not legal advice.
   </footer>
 </div>
+
+<style>
+  /* The pre-release notice sits above the offline notice and must not be
+     mistaken for a transient status message, so it is a touch quieter than a
+     warning but always present. */
+  .prerelease {
+    margin-top: 0.75rem;
+  }
+</style>
