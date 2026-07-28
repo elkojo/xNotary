@@ -12,9 +12,9 @@ qualified signatures take. M2 (Certificate 2) has not been started.
 | Flow A — Certificate 1 | Working end to end, verified in a real browser against dev and production builds |
 | Verify-integrity screen | Working, including tamper rejection |
 | Certificate library | Working, with pending → confirmed upgrade |
-| PAdES parsing | Hardened against synthetic edge cases; still unproven against real QTSP output |
+| PAdES parsing | Hardened; verified against one real PostSignum signature (`docs/qtsp-findings.md`) |
 | Certificate 2 | **Not started** |
-| Tests | 39 offline, all passing; type-check clean |
+| Tests | 45 offline, all passing; type-check clean |
 | Repo on GitHub | **Not created** — local only, nothing pushed |
 
 ## Decisions already made — don't relitigate
@@ -51,17 +51,26 @@ since been closed with generated fixtures that reproduce the shape deliberately
 Also fixed along the way: stripping the `/Contents` NUL padding truncated any CMS whose DER
 legitimately ended in `0x00`, roughly one signature in 256.
 
-**Still open, and genuinely needing real documents:**
+**One real document has since been measured** — a PostSignum-signed PDF. It closed three more
+gaps and is written up in `docs/qtsp-findings.md`; the short version is that real QTSP output
+carries *no* `signingTime` attribute, so the signing time now comes from the RFC 3161 token,
+which `pades.ts` parses and checks against the signature bytes.
 
-1. Incremental-update revisions — real multi-signature PDFs append rather than rewrite.
-   `coversWholeDocument` is tested against appended bytes, but a genuine second revision is not,
-   because building one offline needs `@signpdf/placeholder-plain` (not a dependency).
-2. PAdES-LTA documents with DSS/VRI dictionaries and archive timestamps.
-3. Whether real QTSP certificates encode anything else unexpectedly — the generated fixtures
-   are only as imaginative as the person who wrote them.
+**Still open, and genuinely needing more real documents:**
 
-Scrub any personal data before committing a fixture, or keep it out of the repo and document
-how to regenerate.
+1. **Multi-signature documents** — the one real sample has a single signature. Two or more mean
+   successive incremental updates, where every signature but the last legitimately does *not*
+   cover the whole file. `pades.ts` currently calls that "bytes appended after signing", which
+   would be alarming and wrong wording for a second signer. **This is the next real-document
+   priority**, and it blocks getting Certificate 2's wording right.
+2. **Bank iD** — a different QTSP with a different profile. Nothing measured so far speaks for it.
+3. **I.CA / eIdentity** — likewise.
+4. **PAdES-LTA** with DSS/VRI dictionaries and archive timestamps. The PostSignum sample is
+   PAdES-T only.
+
+Never commit a real document — they carry personal data, usually of people other than the
+signer. `/*.pdf` at the repo root is gitignored so testing against one is safe. Reproduce what it
+teaches as a generated fixture and record the measurement in `docs/qtsp-findings.md`.
 
 ### 2. M2 — Certificate 2
 

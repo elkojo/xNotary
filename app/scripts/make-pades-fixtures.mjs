@@ -32,7 +32,10 @@ const OID = {
   contentType: '1.2.840.113549.1.9.3',
   messageDigest: '1.2.840.113549.1.9.4',
   signingTime: '1.2.840.113549.1.9.5',
+  signingCertificateV1: '1.2.840.113549.1.9.16.2.12',
   signingCertificateV2: '1.2.840.113549.1.9.16.2.47',
+  signatureTimeStampToken: '1.2.840.113549.1.9.16.2.14',
+  tstInfo: '1.2.840.113549.1.9.16.1.4',
   data: '1.2.840.113549.1.7.1',
   signedData: '1.2.840.113549.1.7.2',
   qcStatements: '1.3.6.1.5.5.7.1.3',
@@ -41,21 +44,27 @@ const OID = {
   basicConstraints: '2.5.29.19',
 };
 
-/**
- * ETSI EN 319 412-5 QCStatements — QcCompliance, QcSSCD, QcType=esign.
- * Same DER as the M0 shell fixture; see `make-pades-fixture.sh` for the
- * annotated structure.
- */
-const QC_STATEMENTS = hexToBytes(
-  '30293008060604008E4601013008060604008E4601043013060604008E460106300906070' +
-    '4008E46010601',
-);
+const QC = {
+  compliance: '0.4.0.1862.1.1',
+  sscd: '0.4.0.1862.1.4',
+  type: '0.4.0.1862.1.6',
+  typeEsign: '0.4.0.1862.1.6.1',
+};
 
 const KEY_ALG = {
   name: 'RSASSA-PKCS1-v1_5',
   modulusLength: 2048,
   publicExponent: new Uint8Array([1, 0, 1]),
   hash: 'SHA-256',
+};
+
+/** WebCrypto binds an RSA key to one hash, so the digest choice starts here. */
+const makeKeys = (hash = 'SHA-256') =>
+  webcrypto.subtle.generateKey({ ...KEY_ALG, hash }, true, ['sign', 'verify']);
+
+const DIGEST_OID = {
+  'SHA-256': '2.16.840.1.101.3.4.2.1',
+  'SHA-512': '2.16.840.1.101.3.4.2.3',
 };
 
 // ---------------------------------------------------------------------------
@@ -116,14 +125,30 @@ function nonRepudiationKeyUsage() {
   );
 }
 
-function qcStatementsExtension() {
+/**
+ * ETSI EN 319 412-5 QCStatements.
+ *
+ * `sscd: false` mirrors what PostSignum actually issues: a genuinely qualified
+ * certificate that asserts QcCompliance and QcType=esign but *not* QcSSCD. The
+ * absence must not be read as "not qualified" — see `docs/qtsp-findings.md`.
+ */
+function qcStatementsExtension({ sscd = true } = {}) {
+  const statement = (oid, ...extra) =>
+    new asn1js.Sequence({ value: [new asn1js.ObjectIdentifier({ value: oid }), ...extra] });
+
+  const statements = [statement(QC.compliance)];
+  if (sscd) statements.push(statement(QC.sscd));
+  statements.push(
+    statement(
+      QC.type,
+      new asn1js.Sequence({ value: [new asn1js.ObjectIdentifier({ value: QC.typeEsign })] }),
+    ),
+  );
+
   return new pkijs.Extension({
     extnID: OID.qcStatements,
     critical: false,
-    extnValue: QC_STATEMENTS.buffer.slice(
-      QC_STATEMENTS.byteOffset,
-      QC_STATEMENTS.byteOffset + QC_STATEMENTS.byteLength,
-    ),
+    extnValue: new asn1js.Sequence({ value: statements }).toBER(false),
   });
 }
 
@@ -162,9 +187,18 @@ class PkijsSigner extends Signer {
   }
 
   async sign(pdfBuffer, signingTime = new Date()) {
-    const { signerCert, privateKey, bundle, sid, withSigningCertificateV2 = true } = this.o;
+    const {
+      signerCert,
+      privateKey,
+      bundle,
+      sid,
+      signingCertificateAttr = 'v2',
+      withSigningTime = true,
+      digest: digestName = 'SHA-256',
+      timestamp = null,
+    } = this.o;
 
-    const digest = await webcrypto.subtle.digest('SHA-256', pdfBuffer);
+    const digest = await webcrypto.subtle.digest(digestName, pdfBuffer);
 
     const attributes = [
       new pkijs.Attribute({
@@ -172,35 +206,40 @@ class PkijsSigner extends Signer {
         values: [new asn1js.ObjectIdentifier({ value: OID.data })],
       }),
       new pkijs.Attribute({
-        type: OID.signingTime,
-        values: [new asn1js.UTCTime({ valueDate: signingTime })],
-      }),
-      new pkijs.Attribute({
         type: OID.messageDigest,
         values: [new asn1js.OctetString({ valueHex: digest })],
       }),
     ];
 
-    if (withSigningCertificateV2) {
+    // Optional per RFC 5652, and genuinely absent from real QTSP output when an
+    // RFC 3161 token is attached — the token is the better time.
+    if (withSigningTime) {
+      attributes.push(
+        new pkijs.Attribute({
+          type: OID.signingTime,
+          values: [new asn1js.UTCTime({ valueDate: signingTime })],
+        }),
+      );
+    }
+
+    if (signingCertificateAttr === 'v2') {
       const certHash = await webcrypto.subtle.digest('SHA-256', signerCert.toSchema().toBER(false));
       attributes.push(
         new pkijs.Attribute({
           type: OID.signingCertificateV2,
           // SigningCertificateV2 ::= SEQUENCE { certs SEQUENCE OF ESSCertIDv2 }
           // ESSCertIDv2 ::= SEQUENCE { hashAlgorithm DEFAULT sha256, certHash }
-          values: [
-            new asn1js.Sequence({
-              value: [
-                new asn1js.Sequence({
-                  value: [
-                    new asn1js.Sequence({
-                      value: [new asn1js.OctetString({ valueHex: certHash })],
-                    }),
-                  ],
-                }),
-              ],
-            }),
-          ],
+          values: [essCertsAttribute(certHash)],
+        }),
+      );
+    } else if (signingCertificateAttr === 'v1') {
+      // RFC 2634 ESSCertID — SHA-1 certHash, no algorithm identifier. Still
+      // emitted by PostSignum, so the parser must accept it as binding.
+      const certHash = await webcrypto.subtle.digest('SHA-1', signerCert.toSchema().toBER(false));
+      attributes.push(
+        new pkijs.Attribute({
+          type: OID.signingCertificateV1,
+          values: [essCertsAttribute(certHash)],
         }),
       );
     }
@@ -231,7 +270,23 @@ class PkijsSigner extends Signer {
       signerInfos: [signerInfo],
       certificates: bundle,
     });
-    await signedData.sign(privateKey, 0, 'SHA-256');
+    await signedData.sign(privateKey, 0, digestName);
+
+    // PAdES-T. The token is issued over the signature value, so it can only be
+    // built after signing — which is fine, because unsigned attributes are by
+    // definition outside what the signature covers.
+    if (timestamp) {
+      const token = await timestampToken(
+        new Uint8Array(signerInfo.signature.valueBlock.valueHexView),
+        timestamp,
+      );
+      signerInfo.unsignedAttrs = new pkijs.SignedAndUnsignedAttributes({
+        type: 1,
+        attributes: [
+          new pkijs.Attribute({ type: OID.signatureTimeStampToken, values: [token] }),
+        ],
+      });
+    }
 
     const cms = new pkijs.ContentInfo({
       contentType: OID.signedData,
@@ -240,6 +295,89 @@ class PkijsSigner extends Signer {
     this.lastCms = Buffer.from(cms.toSchema().toBER(false));
     return this.lastCms;
   }
+}
+
+/** ESS `certs SEQUENCE OF ESSCertID[v2]`, with every optional field omitted. */
+function essCertsAttribute(certHash) {
+  return new asn1js.Sequence({
+    value: [
+      new asn1js.Sequence({
+        value: [new asn1js.Sequence({ value: [new asn1js.OctetString({ valueHex: certHash })] })],
+      }),
+    ],
+  });
+}
+
+/**
+ * An RFC 3161 timestamp token over `signatureBytes`, as a TSA would issue it:
+ * CMS SignedData whose encapsulated content is a TSTInfo, signed by a separate
+ * timestamping certificate that travels inside the token.
+ *
+ * @param {Uint8Array} signatureBytes  the signature value being timestamped
+ * @param {{ tsaCert: import('pkijs').Certificate, tsaKey: CryptoKey,
+ *           digest?: string, genTime?: Date, imprintOver?: Uint8Array }} o
+ */
+async function timestampToken(signatureBytes, o) {
+  const { tsaCert, tsaKey, digest = 'SHA-256', genTime = new Date() } = o;
+
+  // `imprintOver` lets a fixture timestamp the wrong bytes on purpose.
+  const imprint = await webcrypto.subtle.digest(digest, o.imprintOver ?? signatureBytes);
+
+  const tstInfo = new pkijs.TSTInfo({
+    version: 1,
+    policy: '1.3.6.1.4.1.99999.1.1',
+    messageImprint: new pkijs.MessageImprint({
+      hashAlgorithm: new pkijs.AlgorithmIdentifier({
+        algorithmId: DIGEST_OID[digest],
+        algorithmParams: new asn1js.Null(),
+      }),
+      hashedMessage: new asn1js.OctetString({ valueHex: imprint }),
+    }),
+    serialNumber: new asn1js.Integer({ value: Math.floor(Math.random() * 1e9) }),
+    genTime,
+  });
+
+  const eContent = tstInfo.toSchema().toBER(false);
+  const signerInfo = new pkijs.SignerInfo({
+    version: 1,
+    sid: new pkijs.IssuerAndSerialNumber({
+      issuer: tsaCert.issuer,
+      serialNumber: tsaCert.serialNumber,
+    }),
+    signedAttrs: new pkijs.SignedAndUnsignedAttributes({
+      type: 0,
+      attributes: [
+        new pkijs.Attribute({
+          type: OID.contentType,
+          values: [new asn1js.ObjectIdentifier({ value: OID.tstInfo })],
+        }),
+        new pkijs.Attribute({
+          type: OID.messageDigest,
+          values: [
+            new asn1js.OctetString({
+              valueHex: await webcrypto.subtle.digest('SHA-256', eContent),
+            }),
+          ],
+        }),
+      ],
+    }),
+  });
+
+  const token = new pkijs.SignedData({
+    version: 3,
+    encapContentInfo: new pkijs.EncapsulatedContentInfo({
+      eContentType: OID.tstInfo,
+      eContent: new asn1js.OctetString({ valueHex: eContent }),
+    }),
+    signerInfos: [signerInfo],
+    certificates: [tsaCert],
+  });
+  await token.sign(tsaKey, 0, 'SHA-256');
+
+  return new pkijs.ContentInfo({
+    contentType: OID.signedData,
+    content: token.toSchema(true),
+  }).toSchema();
 }
 
 // ---------------------------------------------------------------------------
@@ -273,12 +411,6 @@ async function write(name, bytes, note) {
 }
 
 // ---------------------------------------------------------------------------
-
-function hexToBytes(hex) {
-  const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i++) out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  return out;
-}
 
 const CA_DN = [
   ['2.5.4.6', 'CZ', 'PrintableString'],
@@ -460,6 +592,82 @@ async function main() {
     'der-trailing-zero.pdf',
     trailingZero.pdf,
     `CMS ends in 0x00 (found after ${trailingZero.attempt + 1} attempts)`,
+  );
+
+  // 5. The shape a real PostSignum qualified signature actually has, as
+  //    observed on a genuine signed document (see docs/qtsp-findings.md):
+  //    SHA-512, ESS signing-certificate v1, NO signingTime attribute at all,
+  //    a single certificate in the CMS, an RFC 3161 token from a third-party
+  //    TSA, and QCStatements without QcSSCD.
+  const tsaKeys = await makeKeys();
+  const tsa = await makeCertificate({
+    subject: [
+      ['2.5.4.6', 'US', 'PrintableString'],
+      ['2.5.4.10', 'Example Timestamping, Inc.'],
+      ['2.5.4.3', 'Example SHA512 RSA4096 Timestamp Responder 2026 1'],
+    ],
+    issuer: CA_DN,
+    serial: new Uint8Array([0x04]).buffer,
+    keys: tsaKeys,
+    signWith: caKeys.privateKey,
+  });
+
+  const qtspKeys = await makeKeys('SHA-512');
+  const qtspLeaf = await makeCertificate({
+    subject: [
+      ['2.5.4.6', 'CZ', 'PrintableString'],
+      ['2.5.4.3', 'Milan Novák'],
+      ['2.5.4.4', 'Novák'],
+      ['2.5.4.42', 'Milan'],
+      ['2.5.4.5', 'P123456', 'PrintableString'],
+    ],
+    issuer: CA_DN,
+    serial: new Uint8Array([0x05]).buffer,
+    keys: qtspKeys,
+    signWith: caKeys.privateKey,
+    extensions: [nonRepudiationKeyUsage(), qcStatementsExtension({ sscd: false })],
+  });
+
+  const qtspOptions = {
+    signerCert: qtspLeaf,
+    privateKey: qtspKeys.privateKey,
+    // A single certificate, as PostSignum ships — the chain is not bundled.
+    bundle: [qtspLeaf],
+    sid: 'issuerAndSerial',
+    signingCertificateAttr: 'v1',
+    withSigningTime: false,
+    digest: 'SHA-512',
+  };
+
+  await write(
+    'qtsp-shape.pdf',
+    await signPdf.sign(
+      await placeholderPdf('The shape a real PostSignum signature has', 'Milan Novak'),
+      new PkijsSigner({
+        ...qtspOptions,
+        timestamp: { tsaCert: tsa, tsaKey: tsaKeys.privateKey },
+      }),
+    ),
+    'SHA-512, signing-cert v1, no signingTime, RFC 3161 token',
+  );
+
+  // 6. The same, but the TSA timestamped something else. A token proves a time
+  //    only if its imprint is over this signature's bytes; one lifted from
+  //    another document must not be reported as this signature's time.
+  await write(
+    'timestamp-foreign.pdf',
+    await signPdf.sign(
+      await placeholderPdf('Timestamp token issued over unrelated bytes', 'Milan Novak'),
+      new PkijsSigner({
+        ...qtspOptions,
+        timestamp: {
+          tsaCert: tsa,
+          tsaKey: tsaKeys.privateKey,
+          imprintOver: new TextEncoder().encode('bytes from a different document'),
+        },
+      }),
+    ),
+    'token imprint does not cover the signature',
   );
 
   console.log('\nDone. These certificates are self-generated and trusted by nobody.');

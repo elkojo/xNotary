@@ -4,14 +4,15 @@ Self-custodial notarization: hash locally → timestamp on Bitcoin via OpenTimes
 Certificate 1 PDF; later, collect eIDAS qualified signatures → Certificate 2.
 
 Read `README.md` for the product, `docs/m0-spike.md` for why the risky parts are built the way
-they are, and `docs/next-session.md` for what to pick up next.
+they are, `docs/qtsp-findings.md` for what real qualified signatures actually contain, and
+`docs/next-session.md` for what to pick up next.
 
 ## Commands
 
 Everything runs from `app/`.
 
 ```bash
-npm test          # offline suite (39 tests) — this is what CI runs
+npm test          # offline suite (45 tests) — this is what CI runs
 npm run check     # svelte-check; must be 0 errors before committing
 npm run dev       # http://localhost:5173
 npm run build     # check + production build
@@ -57,7 +58,7 @@ app/src/lib/       logic that would still matter if the UI were thrown away
 app/src/views/     Notarize · Verify · Library · Help
 app/src/spikes/    M0 risk spikes + fixtures
 app/scripts/       fixture generation, CDP browser drivers
-docs/              m0-spike.md (evidence), next-session.md (handoff)
+docs/              m0-spike.md + qtsp-findings.md (evidence), next-session.md (handoff)
 ```
 
 ## Gotchas
@@ -75,6 +76,12 @@ docs/              m0-spike.md (evidence), next-session.md (handoff)
   `der-trailing-zero.pdf` pins this.
 - **Calendar list is pinned deliberately** in `src/lib/ots.ts` — `catallaxy` is excluded because
   it serves no CORS header. Don't "fix" it back to the library default.
+- **`signingTime` is usually absent on real qualified signatures.** Read the time from
+  `signatureTimestamp` (RFC 3161) and fall back to `signingTime`, never the other way round.
+  Measured on real PostSignum output — see `docs/qtsp-findings.md`.
+- **Testing against a real signed document is fine; committing one is not.** They carry personal
+  data. `/*.pdf` at the repo root is gitignored for exactly this; reproduce the structure as a
+  generated fixture and record what you measured in `docs/qtsp-findings.md`.
 - **`verify()` keys attestations by block *time*, not height.** Easy to misread.
 - Tests that assert on PDF text must decode content streams — pdf-lib flate-compresses them and
   emits hex strings. Use `src/lib/pdf-text.test-helper.ts`.

@@ -18,6 +18,7 @@ import {
   Certificate,
   ContentInfo,
   SignedData,
+  TSTInfo,
   type RelativeDistinguishedNames,
   type SignedAndUnsignedAttributes,
 } from 'pkijs';
@@ -30,6 +31,12 @@ const OID = {
   signingTime: '1.2.840.113549.1.9.5',
   /** ETSI signing-certificate-v2 (RFC 5035) — present on PAdES-B and above. */
   signingCertificateV2: '1.2.840.113549.1.9.16.2.47',
+  /** ESS signing-certificate (RFC 2634), the SHA-1-era predecessor of v2. */
+  signingCertificateV1: '1.2.840.113549.1.9.16.2.12',
+  /** RFC 3161 token over the signature value, in the unsigned attributes. */
+  signatureTimeStampToken: '1.2.840.113549.1.9.16.2.14',
+  /** id-ct-TSTInfo — the eContent type inside that token. */
+  tstInfo: '1.2.840.113549.1.9.16.1.4',
   qcStatements: '1.3.6.1.5.5.7.1.3',
   /** ETSI EN 319 412-5 */
   qcCompliance: '0.4.0.1862.1.1',
@@ -73,6 +80,29 @@ export interface QualifiedClaim {
   readonly nonRepudiation: boolean;
 }
 
+/**
+ * An RFC 3161 timestamp token attached to a signature.
+ *
+ * Like everything else here this reports what the token says, not a verdict.
+ * `time` is the TSA's assertion; nothing in the MVP checks that the TSA is
+ * trusted, that its certificate was valid then, or that the token's own
+ * signature verifies — that is an external-validator concern.
+ *
+ * `matchesSignature` is the one part that *is* checked here, and it is the part
+ * that makes the time worth anything: it confirms the token was issued over
+ * this signature's bytes rather than copied from another document.
+ */
+export interface SignatureTimestamp {
+  /** `genTime` from the TSTInfo — when the TSA says it saw the signature. */
+  readonly time: Date;
+  /** The TSA, if its certificate travels in the token. */
+  readonly authority: string | null;
+  /** The token's message imprint is the hash of this signature's bytes. */
+  readonly matchesSignature: boolean;
+  /** Set when the imprint could not be checked, e.g. an unsupported digest. */
+  readonly warning: string | null;
+}
+
 export interface PadesSignature {
   /** 1-based position in the PDF's signature sequence. */
   readonly index: number;
@@ -91,13 +121,22 @@ export interface PadesSignature {
   readonly subject: DistinguishedName;
   /** The issuing CA — for a QES this is the QTSP. */
   readonly issuer: DistinguishedName;
-  /** Claimed signing time from the CMS signingTime attribute, if present. */
+  /**
+   * Claimed signing time from the CMS signingTime attribute.
+   *
+   * Often `null` on real qualified signatures: the attribute is optional, and
+   * QTSPs that attach an RFC 3161 timestamp routinely omit it — the token is
+   * better evidence than the signer's own clock. Prefer `signatureTimestamp`
+   * and fall back to this.
+   */
   readonly signingTime: Date | null;
   /**
-   * Whether the CMS carries a signature-timestamp (PAdES-T). Without it the
-   * signing time is only the signer's own claim.
+   * The RFC 3161 signature timestamp (PAdES-T), if the CMS carries one.
+   *
+   * `null` means no token was present, so the only available time is the
+   * signer's own claim in `signingTime`.
    */
-  readonly hasSignatureTimestamp: boolean;
+  readonly signatureTimestamp: SignatureTimestamp | null;
   readonly qualifiedClaim: QualifiedClaim;
   readonly certificateSerial: string;
   readonly certificateNotBefore: Date;
@@ -335,10 +374,21 @@ async function parseOne(
     if (Number.isNaN(signingTime?.getTime())) signingTime = null;
   }
 
-  // PAdES-T: an RFC 3161 token in the unsigned attributes.
-  const hasSignatureTimestamp = Boolean(
-    findAttr(signerInfo.unsignedAttrs, '1.2.840.113549.1.9.16.2.14'),
-  );
+  // PAdES-T: an RFC 3161 token in the unsigned attributes. Real qualified
+  // signatures often carry no signingTime attribute at all, so this is where
+  // the signing time has to come from.
+  let signatureTimestamp: SignatureTimestamp | null = null;
+  const tsAttr = findAttr(signerInfo.unsignedAttrs, OID.signatureTimeStampToken);
+  if (tsAttr) {
+    try {
+      signatureTimestamp = await readSignatureTimestamp(tsAttr.values[0], signerInfo);
+    } catch (e) {
+      warnings.push(
+        `A signature timestamp is present but could not be read: ` +
+          `${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
 
   const last = slot.byteRange[2]! + slot.byteRange[3]!;
   const coversWholeDocument = last === pdf.length;
@@ -348,8 +398,16 @@ async function parseOne(
         `${pdf.length - last} byte(s) were appended after signing.`,
     );
   }
-  if (!findAttr(signerInfo.signedAttrs, OID.signingCertificateV2)) {
-    warnings.push('No signing-certificate-v2 attribute; not a PAdES-B baseline signature.');
+  // A signing-certificate attribute binds the signature to one specific
+  // certificate. EN 319 142 baseline asks for v2, but v1 (RFC 2634) is still
+  // what several QTSPs emit — PostSignum among them — so both count.
+  if (
+    !findAttr(signerInfo.signedAttrs, OID.signingCertificateV2) &&
+    !findAttr(signerInfo.signedAttrs, OID.signingCertificateV1)
+  ) {
+    warnings.push(
+      'No signing-certificate attribute; the signature is not bound to a specific certificate.',
+    );
   }
 
   const subject = readDn(signerCert.subject);
@@ -362,7 +420,7 @@ async function parseOne(
     subject,
     issuer: readDn(signerCert.issuer),
     signingTime,
-    hasSignatureTimestamp,
+    signatureTimestamp,
     qualifiedClaim: readQualifiedClaim(signerCert),
     certificateSerial: toHex(new Uint8Array(signerCert.serialNumber.valueBlock.valueHexView)),
     certificateNotBefore: signerCert.notBefore.value,
@@ -370,6 +428,85 @@ async function parseOne(
     digestAlgorithm,
     warnings,
   };
+}
+
+/**
+ * Read an RFC 3161 signature timestamp.
+ *
+ * The attribute value is a full CMS SignedData whose encapsulated content is a
+ * TSTInfo. We take `genTime` from it, and — the part that gives the time any
+ * weight — check that the token's message imprint really is the hash of this
+ * signature's bytes.
+ */
+async function readSignatureTimestamp(
+  value: asn1js.AsnType,
+  signerInfo: SignedData['signerInfos'][number],
+): Promise<SignatureTimestamp> {
+  const token = new SignedData({ schema: new ContentInfo({ schema: value }).content });
+
+  const { eContentType, eContent } = token.encapContentInfo;
+  if (eContentType !== OID.tstInfo) {
+    throw new Error(`token encapsulates ${eContentType}, not a TSTInfo`);
+  }
+  if (!eContent) throw new Error('token carries no TSTInfo content');
+
+  const parsed = asn1js.fromBER(octets(eContent));
+  if (parsed.offset === -1) throw new Error('TSTInfo is not valid DER');
+  const tstInfo = new TSTInfo({ schema: parsed.result });
+
+  // The TSA's own certificate travels in the token when it is present at all.
+  const tsaCert = (token.certificates ?? []).find((c): c is Certificate => c instanceof Certificate);
+  const authority = tsaCert ? displayIssuerName(readDn(tsaCert.subject)) : null;
+
+  const imprintAlgorithm = DIGEST_OIDS[tstInfo.messageImprint.hashAlgorithm.algorithmId];
+  if (!imprintAlgorithm) {
+    return {
+      time: tstInfo.genTime,
+      authority,
+      matchesSignature: false,
+      warning:
+        `The timestamp uses digest ${tstInfo.messageImprint.hashAlgorithm.algorithmId}, which ` +
+        `this device cannot compute, so it was not checked against the signature.`,
+    };
+  }
+
+  const signatureBytes = new Uint8Array(signerInfo.signature.valueBlock.valueHexView);
+  const actual = new Uint8Array(
+    await crypto.subtle.digest(imprintAlgorithm, signatureBytes.slice().buffer as ArrayBuffer),
+  );
+  const expected = new Uint8Array(tstInfo.messageImprint.hashedMessage.valueBlock.valueHexView);
+
+  return {
+    time: tstInfo.genTime,
+    authority,
+    matchesSignature: bytesEqual(expected, actual),
+    warning: null,
+  };
+}
+
+/** eContent may arrive as a constructed OCTET STRING split into chunks. */
+function octets(content: asn1js.OctetString): Uint8Array {
+  const direct = content.valueBlock.valueHexView;
+  if (direct.length > 0) return new Uint8Array(direct);
+
+  const chunks = (content.valueBlock.value ?? []).filter(
+    (c): c is asn1js.OctetString => c instanceof asn1js.OctetString,
+  );
+  const total = chunks.reduce((n, c) => n + c.valueBlock.valueHexView.length, 0);
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c.valueBlock.valueHexView, at);
+    at += c.valueBlock.valueHexView.length;
+  }
+  return out;
+}
+
+/** A TSA or CA is identified by its organisation and common name. */
+function displayIssuerName(dn: DistinguishedName): string {
+  const { CN, O } = dn.attrs;
+  if (CN && O) return `${CN} (${O})`;
+  return CN ?? O ?? dn.text;
 }
 
 /**

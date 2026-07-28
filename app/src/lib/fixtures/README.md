@@ -9,8 +9,13 @@ npm run fixtures:pades
 
 Every certificate here is self-generated for the test run and is trusted by
 nobody. There is no real personal data and no private key in this directory; the
-keys exist only inside the generator process. Never replace one of these with a
-genuinely signed document.
+keys exist only inside the generator process.
+
+**Never replace one of these with a genuinely signed document.** Real documents
+carry personal data — of the signer and usually of others. When one teaches us
+something, reproduce the structure here and record the measurement in
+`docs/qtsp-findings.md`; that is how `qtsp-shape.pdf` came about. Real documents
+brought in for testing belong at the repo root, which is gitignored.
 
 ## Why these exist
 
@@ -27,6 +32,8 @@ awkward shapes are built deliberately rather than discovered later.
 | `diacritics-utf8.pdf` | Czech diacritics as `UTF8String`, identity split across `givenName`/`surname`, with a `CN` that also carries the certificate serial. |
 | `diacritics-bmp.pdf` | The same identity encoded as `BMPString`, as older Czech certificates do. |
 | `der-trailing-zero.pdf` | A CMS whose DER genuinely ends in a `0x00` byte. Writers pad `/Contents` with NUL bytes, so stripping trailing zeroes to remove the padding also truncates roughly one signature in 256. The generator searches signing times until it finds one. |
+| `qtsp-shape.pdf` | The structure of a **real** PostSignum qualified signature, measured feature by feature: SHA-512, ESS `signing-certificate` v1, no `signingTime` attribute at all, a single certificate in the CMS, an RFC 3161 token from a third-party TSA, and QCStatements without QcSSCD. See `docs/qtsp-findings.md`. |
+| `timestamp-foreign.pdf` | The same, except the TSA timestamped unrelated bytes. A well-formed token proves a time only if its message imprint covers *this* signature. |
 
 ## What they do not cover
 
