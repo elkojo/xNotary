@@ -18,6 +18,7 @@ import {
   Certificate,
   ContentInfo,
   SignedData,
+  type RelativeDistinguishedNames,
   type SignedAndUnsignedAttributes,
 } from 'pkijs';
 
@@ -139,15 +140,22 @@ function findSignatureSlots(pdf: Uint8Array): Array<{ byteRange: number[]; conte
     if (open === -1 || close <= open) continue;
 
     const hex = gap.slice(open + 1, close).replace(/[^0-9a-fA-F]/g, '');
-    // Signature placeholders are zero-padded to a fixed length; trim the tail.
-    const trimmed = hex.replace(/(00)+$/, '');
-    const even = trimmed.length % 2 === 0 ? trimmed : trimmed.slice(0, -1);
+    const even = hex.length % 2 === 0 ? hex : hex.slice(0, -1);
     if (even.length === 0) continue;
 
     const contents = new Uint8Array(even.length / 2);
     for (let i = 0; i < contents.length; i++) {
       contents[i] = Number.parseInt(even.slice(i * 2, i * 2 + 2), 16);
     }
+
+    // Writers pad /Contents with NUL bytes out to a fixed placeholder length.
+    // We deliberately do NOT strip that padding: the last byte of a signature
+    // is effectively random, so trimming trailing zeroes truncates roughly one
+    // CMS in 256. DER is self-delimiting — `fromBER` reads the outer length and
+    // ignores whatever follows, so the padding is harmless left in place.
+    // An all-zero /Contents is an unsigned placeholder, not a signature.
+    if (contents.every((b) => b === 0)) continue;
+
     slots.push({ byteRange, contents });
   }
   return slots;
@@ -289,8 +297,12 @@ async function parseOne(
   const certs = (signedData.certificates ?? []).filter(
     (c): c is Certificate => c instanceof Certificate,
   );
-  const signerCert = matchSignerCert(certs, signerInfo);
-  if (!signerCert) throw new Error('Signer certificate not present in the CMS');
+  const signerCert = await matchSignerCert(certs, signerInfo);
+  if (!signerCert) {
+    throw new Error(
+      `Could not identify the signer's certificate among the ${certs.length} in the CMS.`,
+    );
+  }
 
   const covered = signedBytes(pdf, slot.byteRange);
 
@@ -360,18 +372,70 @@ async function parseOne(
   };
 }
 
-/** Resolve which of the bundled certificates the SignerInfo refers to. */
-function matchSignerCert(certs: Certificate[], signerInfo: SignedData['signerInfos'][number]) {
+/**
+ * Resolve which of the bundled certificates the SignerInfo refers to.
+ *
+ * This decides whose name ends up on Certificate 2, so it resolves only on
+ * evidence: either the SignerInfo's issuer *and* serial both match, or its key
+ * identifier matches. There is no "just take the first certificate" fallback —
+ * a real signature bundles the whole chain, and guessing within it would
+ * attribute the signature to the wrong party. Failing to resolve is reported.
+ */
+async function matchSignerCert(
+  certs: Certificate[],
+  signerInfo: SignedData['signerInfos'][number],
+): Promise<Certificate | undefined> {
   const sid = signerInfo.sid;
 
-  // issuerAndSerialNumber form.
+  // issuerAndSerialNumber form. Serial numbers are unique per issuer, not
+  // globally, so matching on the serial alone can pick a different CA's
+  // certificate out of the bundle.
   if (sid instanceof Object && 'serialNumber' in sid && 'issuer' in sid) {
-    const wanted = toHex(new Uint8Array((sid.serialNumber as asn1js.Integer).valueBlock.valueHexView));
-    const found = certs.find(
-      (c) => toHex(new Uint8Array(c.serialNumber.valueBlock.valueHexView)) === wanted,
+    const wantedSerial = toHex(
+      new Uint8Array((sid.serialNumber as asn1js.Integer).valueBlock.valueHexView),
     );
-    if (found) return found;
+    const wantedIssuer = derOf(sid.issuer as RelativeDistinguishedNames);
+    return certs.find(
+      (c) =>
+        toHex(new Uint8Array(c.serialNumber.valueBlock.valueHexView)) === wantedSerial &&
+        derOf(c.issuer) === wantedIssuer,
+    );
   }
-  // subjectKeyIdentifier form, or a single-certificate CMS.
-  return certs.length === 1 ? certs[0] : undefined;
+
+  // subjectKeyIdentifier form: an IMPLICIT [0] primitive holding the raw key
+  // identifier (RFC 5652 §5.3).
+  if (sid instanceof asn1js.BaseBlock) {
+    const wanted = toHex(new Uint8Array(sid.valueBlock.valueHexView));
+    if (wanted.length === 0) return undefined;
+
+    const byExtension = certs.find((c) => subjectKeyIdentifier(c) === wanted);
+    if (byExtension) return byExtension;
+
+    // Certificates are not obliged to carry the extension. RFC 5280 §4.2.1.2
+    // method 1 derives the identifier as SHA-1 of the public key, which is what
+    // issuers overwhelmingly use; a byte-for-byte hit is still a positive match.
+    for (const c of certs) {
+      const spk = c.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHexView;
+      const digest = new Uint8Array(
+        await crypto.subtle.digest('SHA-1', spk.slice().buffer as ArrayBuffer),
+      );
+      if (toHex(digest) === wanted) return c;
+    }
+  }
+
+  return undefined;
+}
+
+/** DER of a distinguished name, for exact comparison. */
+function derOf(name: RelativeDistinguishedNames): string {
+  return toHex(new Uint8Array(name.toSchema().toBER(false)));
+}
+
+/** The certificate's own subjectKeyIdentifier extension value, if it has one. */
+function subjectKeyIdentifier(cert: Certificate): string | undefined {
+  const ext = cert.extensions?.find((e) => e.extnID === '2.5.29.14');
+  if (!ext) return undefined;
+  const parsed = asn1js.fromBER(ext.extnValue.valueBlock.valueHexView);
+  if (parsed.offset === -1 || !(parsed.result instanceof asn1js.OctetString)) return undefined;
+  return toHex(new Uint8Array(parsed.result.valueBlock.valueHexView));
 }

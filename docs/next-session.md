@@ -1,8 +1,9 @@
 # Where things stand — handoff
 
-**Last updated:** 2026-07-27 · **Commit:** `41fe5f0` (initial) on `main` · working tree clean
+**Last updated:** 2026-07-28 · on `main`
 
-M0 and M1 are done and verified. M2 (Certificate 2) has not been started.
+M0 and M1 are done and verified. `pades.ts` has been hardened against the awkward shapes real
+qualified signatures take. M2 (Certificate 2) has not been started.
 
 ## State
 
@@ -11,8 +12,9 @@ M0 and M1 are done and verified. M2 (Certificate 2) has not been started.
 | Flow A — Certificate 1 | Working end to end, verified in a real browser against dev and production builds |
 | Verify-integrity screen | Working, including tamper rejection |
 | Certificate library | Working, with pending → confirmed upgrade |
+| PAdES parsing | Hardened against synthetic edge cases; still unproven against real QTSP output |
 | Certificate 2 | **Not started** |
-| Tests | 31 offline, all passing; type-check clean |
+| Tests | 39 offline, all passing; type-check clean |
 | Repo on GitHub | **Not created** — local only, nothing pushed |
 
 ## Decisions already made — don't relitigate
@@ -30,20 +32,33 @@ M0 and M1 are done and verified. M2 (Certificate 2) has not been started.
 
 ### 1. Get real signed-PDF fixtures — highest residual risk, do this first
 
-`src/lib/pades.ts` works, but has only ever been tested against a **synthetic** certificate
-chain. Before building M2 on it, obtain one real **I.CA** (or PostSignum/eIdentity) signed PDF
-and one **Bank iD**–signed PDF, and add them as fixtures.
+Obtain one real **I.CA** (or PostSignum/eIdentity) signed PDF and one **Bank iD**–signed PDF and
+add them as fixtures. This is a data-availability problem, not a technical unknown — it needs a
+request to a QTSP or a signing run, so start it early.
 
-This is a data-availability problem, not a technical unknown. What could differ on real inputs,
-most likely first:
+Four risks were identified when `pades.ts` had only the single M0 fixture behind it. Three have
+since been closed with generated fixtures that reproduce the shape deliberately
+(`src/lib/fixtures/`, driven by `scripts/make-pades-fixtures.mjs`):
 
-1. Czech diacritics in DN values — `BMPString`/`UTF8String` handling; identity possibly split
-   across `givenName`/`surname` rather than `CN`.
-2. Incremental-update revisions — real multi-signature PDFs append rather than rewrite.
-   `coversWholeDocument` detects appended bytes but multi-revision flow is untested.
-3. PAdES-LTA documents with DSS/VRI dictionaries and archive timestamps.
-4. `SignerInfo` using `subjectKeyIdentifier` — `matchSignerCert` currently falls back to "the
-   only certificate", which would fail on a multi-cert CMS.
+- ~~`SignerInfo` using `subjectKeyIdentifier` with a chain-bundled CMS~~ — was a hard parse
+  failure on every such signature; now resolved by key identifier, with a SHA-1-of-public-key
+  fallback for certificates lacking the extension.
+- ~~Matching a certificate on serial number alone~~ — serials are unique per issuer, so a
+  bundled chain could attribute a signature to the wrong party. Now matches issuer *and* serial.
+- ~~Czech diacritics in DN values, identity split across `givenName`/`surname`~~ — verified
+  working for both `UTF8String` and `BMPString`; no code change was needed.
+
+Also fixed along the way: stripping the `/Contents` NUL padding truncated any CMS whose DER
+legitimately ended in `0x00`, roughly one signature in 256.
+
+**Still open, and genuinely needing real documents:**
+
+1. Incremental-update revisions — real multi-signature PDFs append rather than rewrite.
+   `coversWholeDocument` is tested against appended bytes, but a genuine second revision is not,
+   because building one offline needs `@signpdf/placeholder-plain` (not a dependency).
+2. PAdES-LTA documents with DSS/VRI dictionaries and archive timestamps.
+3. Whether real QTSP certificates encode anything else unexpectedly — the generated fixtures
+   are only as imaginative as the person who wrote them.
 
 Scrub any personal data before committing a fixture, or keep it out of the repo and document
 how to regenerate.

@@ -19,7 +19,7 @@
     "spike:pades": "vitest run --config vitest.spike.config.ts src/spikes/pades.spike.test.ts",
     "spike:cors": "node scripts/cdp-probe.mjs http://localhost:5173/src/spikes/cors-probe.html",
     "e2e": "node scripts/e2e-flow-a.mjs",
-    "fixtures:pades": "bash scripts/make-pades-fixture.sh"
+    "fixtures:pades": "bash scripts/make-pades-fixture.sh && node scripts/make-pades-fixtures.mjs"
   },
   "dependencies": {
     "@noble/hashes": "^1.5.0",
