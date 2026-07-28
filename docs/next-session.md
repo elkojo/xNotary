@@ -114,9 +114,17 @@ Still to do on Certificate 2:
 
 1. **A genuine parallel fixture.** The `notarized-digest` agreement path is tested with two real
    signed copies of one Certificate 1, and `base-revision` is tested at the unit level — but no
-   fixture is a true parallel pair (one base, two files with one signature each), because that
-   needs two independent signing runs. Producing one is a five-minute job for someone with a
-   signing setup: take the *unsigned* Certificate 1, sign it twice separately.
+   fixture is a true parallel pair (one base, two files with one signature each).
+
+   **Do not solve this with `@signpdf/placeholder-plain`.** It was tried and reverted: generating
+   the pair synthetically needs a placeholder appended as an incremental update, and that package
+   drags in `pdfkit`, `crypto-js` and ~1,560 lines of lockfile, adding **four critical**
+   dev-dependency advisories — to produce one test fixture, in a project whose premise is
+   minimising trust. Not worth it.
+
+   The cheap route is a real signing run: take the *unsigned* Certificate 1 and sign it twice
+   **independently** — each signature applied to the original, not one on top of the other.
+   Self-signed throwaway certificates are fine and keep the fixture committable.
 2. **Library integration.** Deliberately not done — and probably should not be. The brief
    specifies on-demand assembly with no stored state, and Certificate 2 is a *view* of the signed
    PDFs rather than an artifact with its own identity. Storing the signed PDFs might make sense;
@@ -162,6 +170,12 @@ GitHub Pages deploy, PWA polish, onboarding/help, disclaimers, security review.
   digest, and the Bitcoin attestation was confirmed against two explorers — but one run against
   a real node before M3 would close this properly.
 - **Legal review** by Czech eIDAS counsel before public launch (not before MVP).
+- **Dev-toolchain advisories for the M3 security review.** `npm audit --omit=dev` reports **0**
+  — nothing vulnerable ships. `npm audit` reports 7 dev-only, of which two matter: Vite (path
+  traversal in optimized-deps `.map` handling, dev server only) and `@vitest/mocker` via vitest.
+  Both follow from the pinned Vite 5 / Node 18 floor, so clearing them means raising Node first.
+  Worth stating explicitly in the review rather than leaving the raw `npm audit` number to alarm
+  a reader.
 
 ## Post-MVP backlog, in priority order
 
