@@ -1,23 +1,25 @@
 # Where things stand — handoff
 
-**Last updated:** 2026-07-28 (end of session) · `main` · everything pushed and deployed
+**Last updated:** 2026-07-30 (end of session) · `main` · everything pushed, tagged and deployed
 
 M0, M1 and M2 are done. Both certificates work end to end, the app is public and live, and
 `pades.ts` has been measured against real qualified signatures rather than only synthetic ones.
+A nine-comment review round has since been answered in full — see *What the review changed* below.
 What is left before a real release is not code: two reviews, and documents only a human can obtain.
 
 ## State
 
 | | |
 |---|---|
-| Live app | <https://elkojo.github.io/xNotary/> — `v0.2.3`, verified working against real OpenTimestamps calendars |
-| Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 6 releases, all marked pre-release |
+| Live app | <https://elkojo.github.io/xNotary/> — `v0.3.0`, verified live after deploy (asset hashes checked, not just a green tick) |
+| Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 7 releases, all marked pre-release |
 | Flow A — Certificate 1 | Working end to end, verified in a real browser against dev, production *and* the deployed site |
 | Verify-integrity screen | Working, including tamper rejection |
 | Certificate library | Working, with pending → confirmed upgrade |
 | PAdES parsing | Hardened; measured against real PostSignum output (`docs/qtsp-findings.md`) |
-| Certificate 2 | Working — `Attest` tab, consent gate, one-page A4, sequential *and* parallel signing |
-| Tests | 125 offline, all passing; type-check clean; CI green |
+| Certificate 2 | Working — `Attest` tab, consent gate, one-page A4, sequential *and* parallel signing, and attestation over the *document itself* |
+| Certificate rendering | Liberation subsets embedded; Czech, Greek and Cyrillic names render correctly |
+| Tests | 140 offline, all passing; type-check clean; CI green |
 
 **Deploying:** commit → push → tag `v*`. The tag fires `deploy.yml`; a plain push does not. The
 `github-pages` environment has a `v*` tag policy so tags are allowed to deploy — do not remove it.
@@ -29,7 +31,7 @@ Read this file, then `CLAUDE.md` (loaded automatically) for the invariants and g
 `docs/qtsp-findings.md` for what real qualified signatures actually contain — that one exists
 because reasoning about the spec was repeatedly wrong and measurement was repeatedly right.
 
-Then `cd app && npm test` (125, offline, ~5s). Green means the tree is sound.
+Then `cd app && npm test` (140, offline, ~5s). Green means the tree is sound.
 
 **Nothing is half-finished.** There is no in-progress branch, no failing test, no partial feature.
 Pick any item under *Next up*; none blocks another.
@@ -37,6 +39,58 @@ Pick any item under *Next up*; none blocks another.
 The pattern worth keeping, because it caught things tests did not: for anything that produces a
 document or a page, **render it and look at it**. Overflowing text off the bottom of a page, a
 digest hidden behind a QR code, and "Certified by <the signer themselves>" all passed their tests.
+It kept earning its keep in the review round: rendering the certificates is how the mangled Czech
+names were confirmed rather than guessed at, and a screenshot of the Help page found four
+passages still claiming Certificate 1 was the thing people sign, hours after that stopped being
+true. `pdftoppm -png cert.pdf out` for a PDF; for a page, drive headless Chrome over CDP the way
+`scripts/e2e-flow-a.mjs` does and call `Page.captureScreenshot`.
+
+Second pattern, same origin: **prose length is a layout input.** The one-page A4 fit broke three
+separate times during the review round purely from wording changes. Any edit to `DISCLAIMER_2` or
+the printed verification steps needs `npm test` — the page-count assertions are what catch it.
+
+## What the review changed (2026-07-30)
+
+Nine comments from a reviewer reading the live app. Two changed behaviour; the rest narrowed what
+the app is allowed to claim. All are shipped in `v0.3.0`. The pattern worth carrying forward: the
+comments that found real defects came from someone using the app on their own documents, not from
+reading the code.
+
+1. **Fonts were a P0, not a nicety.** Certificates printed "Rehor Cízek" for Řehoř Čížek — the
+   standard PDF fonts are WinAnsi-encoded and Czech straddles that boundary. Now embeds Liberation
+   subsets (Latin, Greek, Cyrillic), metric-compatible with Helvetica so the measured one-page
+   layout did not move. **Read `app/src/lib/fonts/README.md` before touching any of it**: it
+   records three failure modes that each cost an hour and none of which is discoverable from the
+   error message.
+2. **Signing the contract itself.** `Attest` now takes the `.ots` (or the Certificate 1 carrying
+   it) alongside the signed files. `findTimestampedRevision` searches every `%%EOF` prefix for the
+   digest the proof commits to; a match means Certificate 2 can state the signatures are over the
+   document, and no match means it states nothing while still attaching the proof. Do not
+   "simplify" this to `baseRevision` — that takes the *first* `%%EOF`, which is wrong for a
+   contract already updated incrementally before it was timestamped.
+3. **Bank iD SIGN is not a QES** — bank-supplied identity plus Bank iD's own qualified *seal*,
+   yielding an advanced signature. It was listed among the QTSPs, which was simply wrong, and this
+   file said so too.
+4. **eIDAS is the example, not the frame.** Every user-facing statement now holds outside the EU.
+   Pinned by a test in `certificate2.test.ts`, because the certificate travels furthest.
+5. **The Commission's DSS instance titles itself "DSS Demonstration WebApp."** Calling it the
+   official validator claimed an assurance nobody gave, and pointed users at uploading their
+   document to a third party. Replaced by DSS-run-locally and qualified validation services.
+6. **§ 6(2) of Act 12/2020 Sb. is not something xNotary can satisfy** — it needs verification from
+   population-register data that the certificate belongs to the signer. Nothing claimed it, but
+   "notarization" invites the inference, so the app now says so explicitly.
+7. **Times** are UTC-and-labelled on certificates, local-and-zone-named on screen (`src/lib/time.ts`).
+
+Two decisions were *raised and deliberately not taken*, both needing a human:
+
+- **Contracted qualified validation.** Only a QTSP may provide qualified validation under eIDAS
+  Art 33, so xNotary can never be one. Doing it means a contract, money, credentials (→ a backend,
+  invariant 2) and the document leaving the device (invariant 1). Today's design — name the
+  routes, let the user choose who sees the document — is the only one that keeps both invariants.
+- **In-browser EUTL validation** is blocked as normally done: measured 2026-07-30, the EU list of
+  trusted lists returns 200 with **no `Access-Control-Allow-Origin`**, so a proxy would be needed
+  and that is a backend. The only no-backend route is a dated build-time snapshot; see
+  `docs/qtsp-findings.md` for the two catches before anyone starts.
 
 ## Decisions already made — don't relitigate
 
@@ -132,6 +186,13 @@ round, one file per signer — pools their signatures and attaches every file. S
 countersigning (one file, several signatures) works as before; no mode switch is needed, because
 the shape of the input already says which it is.
 
+**Attesting the document itself is now supported too.** An optional second drop takes the `.ots`,
+or the Certificate 1 carrying it. `findTimestampedRevision` locates which revision of each signed
+file the proof timestamps, and where it fits, the certificate states the signatures are over the
+timestamped document — attaching `proof.ots` alongside the signed files. Where it fits nothing,
+the certificate says nothing about a timestamp and still attaches the proof, so a reader can see
+what was offered. This is invariant 3 applied to the timestamp link.
+
 Before pooling, `checkAgreement` establishes that the files really are signatures over the same
 document: equal notarized digests from the embedded OpenTimestamps proofs, or failing that a
 byte-identical base revision (everything up to the first `%%EOF`, since signing appends). If they
@@ -168,9 +229,12 @@ Still to do on Certificate 2:
    a lifecycle Certificate 2 does not have. Do not "unify" the two by adding a Certificate 2
    library; that would be consistency at the cost of the thing being sold.
 3. **E2E coverage** — `npm run e2e` drives Flow A only.
-4. **The underlying OTS status is not shown.** `Certificate2Input.underlying` carries an optional
-   `otsStatus` that nothing populates yet; the certificate names the notarized document's digest
-   but does not say whether that timestamp is confirmed.
+4. **The underlying OTS status is still not shown.** `Certificate2Input.underlying` carries an
+   optional `otsStatus` that nothing populates; when the signed file is a Certificate 1, the page
+   names the notarized document's digest but not whether that timestamp is confirmed. Note this is
+   *not* the same field as `Certificate2Input.timestamp`, which the Attest screen does populate
+   (via `checkStatus`, degrading to `unverified` offline) for the sign-the-document-itself flow.
+   Worth unifying: two ways of saying "this was timestamped" on one page will drift.
 
 ### 3. Remove the pre-release warnings — **do this at M3, not before**
 
@@ -199,7 +263,17 @@ two reviews below. None of the remainder is blocked on code.
 ## Open items
 
 - **Security review** — not started. Note for whoever does it: `npm audit --omit=dev` is **0**;
-  nothing vulnerable ships.
+  nothing vulnerable ships. Two dependencies were added on 2026-07-30 and should be looked at:
+  `@pdf-lib/fontkit` (runtime, no transitive tree, 9 lockfile lines) and `subset-font` (dev only,
+  99 lines, harfbuzz/wasm). Both were chosen small on purpose — contrast
+  `@signpdf/placeholder-plain`, which was installed, measured and reverted.
+- **Version numbering is inconsistent.** `app/package.json` still says `0.1.0` while releases are
+  at `v0.3.0`; the seven releases so far have been tag-only. Settle it deliberately — either bump
+  the manifest as part of releasing, or drop the field's pretence of meaning something.
+- **The font subset is 546 KB of base64 committed to the repo**
+  (`app/src/lib/fonts/liberation.generated.ts`, 310 KB gzipped, lazily imported so it never
+  touches first paint). Regenerable with `npm run fonts:subset`. It is the largest single file in
+  the tree and someone should agree to it rather than discover it.
 - **Legal review** by Czech eIDAS counsel — not started, and required before this stops being
   labelled pre-release.
 - **Full `ots verify` never completed end to end.** The reference client requires a local
@@ -225,4 +299,9 @@ Liberation, 408 KB in a lazily-imported chunk. See `src/lib/fonts/README.md`.
 3. Flow B sharing: Nostr identities, client-side encryption, Blossom storage, NIP-44/NIP-59.
 4. nsite/Nostr hosting alongside GitHub Pages.
 5. Bank iD Sign gateway (self-hostable) and EUDI wallet (eIDAS 2.0) adapter.
-6. "Sign the original document" mode, pending counsel input.
+~~6. **"Sign the original document" mode.**~~ Done — see *What the review changed*. What remains
+is the optional next step: a **ready-to-sign bundle** that embeds `proof.ots` into the contract
+itself via a PDF incremental update, so signers receive one file rather than two. That needs a
+hand-written incremental-update writer (pdf-lib rewrites whole files; it cannot append) and it
+means handing counterparties a contract xNotary modified, however faithfully. Deliberately not
+started.
