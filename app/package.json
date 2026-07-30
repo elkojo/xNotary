@@ -19,10 +19,12 @@
     "spike:pades": "vitest run --config vitest.spike.config.ts src/spikes/pades.spike.test.ts",
     "spike:cors": "node scripts/cdp-probe.mjs http://localhost:5173/src/spikes/cors-probe.html",
     "e2e": "node scripts/e2e-flow-a.mjs",
-    "fixtures:pades": "bash scripts/make-pades-fixture.sh && node scripts/make-pades-fixtures.mjs"
+    "fixtures:pades": "bash scripts/make-pades-fixture.sh && node scripts/make-pades-fixtures.mjs",
+    "fonts:subset": "node scripts/make-font-subsets.mjs"
   },
   "dependencies": {
     "@noble/hashes": "^1.5.0",
+    "@pdf-lib/fontkit": "^1.1.1",
     "@vitrified/typescript-opentimestamps": "^0.2.0",
     "asn1js": "^3.0.5",
     "pdf-lib": "^1.17.1",
@@ -37,6 +39,7 @@
     "@tsconfig/svelte": "^5.0.4",
     "@types/qrcode": "^1.5.5",
     "jsdom": "^25.0.1",
+    "subset-font": "^2.5.0",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "tslib": "^2.7.0",

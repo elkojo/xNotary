@@ -30,7 +30,8 @@ export function formatBytes(n: number): string {
   return `${value.toFixed(value < 10 ? 1 : 0)} ${units[i]}`;
 }
 
-export function formatDate(d: Date | number): string {
-  const date = typeof d === 'number' ? new Date(d) : d;
-  return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-}
+/**
+ * Local time, with the zone named — see `localStamp`. Re-exported here because
+ * this is where the views already import their formatting from.
+ */
+export { localStamp as formatDate } from './time';

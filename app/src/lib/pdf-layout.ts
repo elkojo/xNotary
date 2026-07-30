@@ -7,7 +7,7 @@
  * because Certificate 2 has to decide how much detail it can afford per signer
  * to keep everything on one page.
  */
-import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
 
 export const INK = rgb(0.06, 0.09, 0.16);
 export const MUTED = rgb(0.42, 0.45, 0.52);
@@ -21,14 +21,57 @@ export interface Fonts {
   readonly regular: PDFFont;
   readonly bold: PDFFont;
   readonly mono: PDFFont;
+  /** Whether the embedded faces can actually draw this character. */
+  covers(ch: string): boolean;
 }
 
+/**
+ * Embed the certificate faces.
+ *
+ * Liberation rather than the standard PDF fonts, which are WinAnsi-encoded and
+ * cannot draw half of Czech. It is metric-compatible with Helvetica/Courier, so
+ * the switch left every measured layout where it was.
+ *
+ * The subsets are ~400 KB, imported dynamically so they land in their own chunk
+ * and are fetched the first time someone builds a certificate rather than on
+ * page load. pdf-lib subsets again on embed, so a certificate carries only the
+ * glyphs it actually draws — a few KB.
+ */
 export async function loadFonts(pdf: PDFDocument): Promise<Fonts> {
-  return {
-    regular: await pdf.embedFont(StandardFonts.Helvetica),
-    bold: await pdf.embedFont(StandardFonts.HelveticaBold),
-    mono: await pdf.embedFont(StandardFonts.Courier),
+  const [{ default: fontkit }, faces] = await Promise.all([
+    import('@pdf-lib/fontkit'),
+    import('./fonts/liberation.generated'),
+  ]);
+
+  pdf.registerFontkit(fontkit);
+
+  const bytes = {
+    regular: base64ToBytes(faces.regular),
+    bold: base64ToBytes(faces.bold),
+    mono: base64ToBytes(faces.mono),
   };
+
+  // Ask fontkit directly what the subset covers. `PDFFont` cannot answer: with
+  // a custom font it silently maps an absent character to .notdef instead of
+  // throwing the way a standard font does.
+  const coverage = fontkit.create(bytes.regular) as { hasGlyphForCodePoint(cp: number): boolean };
+
+  return {
+    regular: await pdf.embedFont(bytes.regular, { subset: true }),
+    bold: await pdf.embedFont(bytes.bold, { subset: true }),
+    mono: await pdf.embedFont(bytes.mono, { subset: true }),
+    covers: (ch) => {
+      const cp = ch.codePointAt(0);
+      return cp !== undefined && coverage.hasGlyphForCodePoint(cp);
+    },
+  };
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+  return out;
 }
 
 /** Minimal downward-flowing text cursor. */
@@ -177,31 +220,22 @@ export function endSentence(text: string): string {
 }
 
 /**
- * pdf-lib's standard fonts are WinAnsi-encoded and throw on anything outside
- * it. Signer names come from certificates and routinely contain characters
- * WinAnsi lacks, so they are transliterated rather than allowed to abort the
- * whole certificate.
+ * Replace characters the embedded font has no glyph for.
+ *
+ * The certificates carry Liberation subset to Latin, Greek and Cyrillic, so in
+ * practice everything a European name or file name contains draws correctly —
+ * this used to fold "Řehoř Čížek" to "Rehor Cízek", which on a document whose
+ * purpose is to name people was a defect, not a cosmetic compromise.
+ *
+ * What remains outside the subset, chiefly CJK, would otherwise be drawn as
+ * .notdef: a row of identical boxes that looks like a rendering fault rather
+ * than a missing glyph. "?" at least reads as "something was here". Callers
+ * compare the result with the input to know whether to say so.
  */
-export function toWinAnsi(text: string, font: PDFFont): string {
+export function drawable(text: string, fonts: Fonts): string {
   const out: string[] = [];
   for (const ch of text) {
-    try {
-      font.widthOfTextAtSize(ch, 10);
-      out.push(ch);
-    } catch {
-      // Strip the combining marks off e.g. "ř" and keep the base letter.
-      const folded = ch.normalize('NFD').replace(/\p{Diacritic}/gu, '');
-      let usable = '';
-      for (const c of folded) {
-        try {
-          font.widthOfTextAtSize(c, 10);
-          usable += c;
-        } catch {
-          /* drop */
-        }
-      }
-      out.push(usable || '?');
-    }
+    out.push(fonts.covers(ch) ? ch : '?');
   }
   return out.join('');
 }

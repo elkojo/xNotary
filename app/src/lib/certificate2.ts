@@ -3,7 +3,9 @@
  *
  * Certificate 1 says a document existed. Certificate 2 says who put their name
  * to it. It is assembled from a *signed* PDF — normally a Certificate 1 that
- * has been signed by one or more people with eIDAS signatures.
+ * one or more people have signed. Nothing here is specific to one jurisdiction:
+ * the input is a PAdES/CMS signature, and eIDAS is the framework the wording
+ * cites as its worked example, not a precondition.
  *
  * Three constraints shape the whole file:
  *
@@ -15,9 +17,10 @@
  *    intact and independently checkable.
  *
  * 2. **It reports claims, never verdicts.** This module cannot say a signature
- *    is a valid qualified electronic signature — that needs the EU Trusted
- *    Lists. The page prints what the certificates assert and sends the reader
- *    to an official validator for the determination.
+ *    has any particular legal status — that needs a trust list, the EU's being
+ *    the one the certificate links to. The page prints what the certificates
+ *    assert and names who can actually make the determination — see
+ *    `DSS_SOURCE_URL` for why that is not the Commission's hosted demo.
  *
  * 3. **Only consented signers appear.** `signers` is whatever the caller passes;
  *    the consent decision belongs to the UI. Signers who withheld consent are
@@ -28,6 +31,7 @@ import { PDFDocument } from 'pdf-lib';
 
 import { extractOtsAttachment } from './certificate1';
 import { bytesEqual, groupHex, sha256Bytes, toHex } from './hash';
+import { utcStamp } from './time';
 import { parseOts, digestOf, type OtsStatus } from './ots';
 import { parsePades, type PadesSignature, type QualifiedClaim } from './pades';
 import {
@@ -38,18 +42,34 @@ import {
   PAGE_H,
   PAGE_W,
   loadFonts,
-  toWinAnsi,
+  drawable,
 } from './pdf-layout';
 
-/** Where the EU-level determination actually happens. */
-export const VALIDATOR_URL = 'https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/validation';
+/**
+ * The EU's open-source reference implementation for signature validation.
+ *
+ * Deliberately *not* the Commission's hosted instance at
+ * `.../DSS/webapp-demo/validation`: that page titles itself "DSS Demonstration
+ * WebApp" and is a showcase for this library, not an operated validation
+ * service. Calling it official claimed an assurance nobody gave — and pointing
+ * users at it told them to upload the document to a third party, in a product
+ * whose premise is that documents stay put. Naming the source instead lets the
+ * check happen on their own machine.
+ */
+export const DSS_SOURCE_URL = 'https://github.com/esig/dss';
+
+/** The proof's attachment name, and how the closing text recognises it. */
+export const PROOF_NAME = 'proof.ots';
 
 export const DISCLAIMER_2 =
   'This certificate lists the signatures found in what is attached to it and what their ' +
-  'certificates claim. It is not a validation result: xNotary does not check the signing ' +
-  'certificates against the EU Trusted Lists, so it cannot and does not state that any ' +
-  'signature is a qualified electronic signature. Use the official validator above for that. ' +
-  'Nothing here attests to what the document means or to the authority of any signatory.';
+  'certificates claim. It is not a validation result: xNotary checks no trust list, so it ' +
+  'cannot and does not state the legal status of any signature — in the EU, whether it is a ' +
+  'qualified electronic signature. Use a validator for the framework it was issued under, as ' +
+  'above. Where a law treats a signature as equivalent to a handwritten or officially ' +
+  'verified one, ' +
+  'that rests on conditions this certificate does not establish. Nothing here attests to what ' +
+  'the document means or to the authority of any signatory.';
 
 /** One signature, reduced to the fields Certificate 2 is allowed to print. */
 export interface Certificate2Signer {
@@ -103,6 +123,16 @@ export interface Certificate2Input {
     readonly digest: Uint8Array;
     readonly otsStatus?: OtsStatus;
   };
+  /**
+   * The timestamp of the document that was signed, when the signed document is
+   * the original rather than a Certificate 1 about it.
+   *
+   * This is what makes signing the contract itself worth doing: the proof
+   * anchors a revision of the very file these people signed, so the certificate
+   * can say the signatures are over the document, not over a statement about
+   * it. Only stated for sources where `links` actually found the revision.
+   */
+  readonly timestamp?: TimestampEvidence;
 }
 
 /** A signed document to embed. */
@@ -161,6 +191,11 @@ export interface Certificate2Draft {
   readonly errors: readonly string[];
   /** The notarized document all sources agree on, when there is one. */
   readonly underlying: { readonly digest: Uint8Array } | null;
+  /**
+   * A proof supplied alongside, when the signed document is the original rather
+   * than a Certificate 1 about it. `links` says whether it actually fits.
+   */
+  readonly timestamp: TimestampEvidence | null;
   /** What to call the Certificate 2 built from these sources. */
   readonly suggestedFileName: string;
 }
@@ -206,13 +241,27 @@ export async function analyzeSignedDocument(
  */
 export async function analyzeSignedDocuments(
   files: readonly SignedSourceRef[],
+  proof?: TimestampProofRef,
 ): Promise<Certificate2Draft> {
   const sources = await Promise.all(files.map((f) => analyzeSignedDocument(f.fileName, f.bytes)));
   const agreement = checkAgreement(sources);
 
+  let timestamp: TimestampEvidence | null = null;
+  if (proof) {
+    const { ots, digest } = await readTimestampProof(proof);
+    timestamp = {
+      ots,
+      digest,
+      // Status is whatever the caller establishes; nothing is claimed here.
+      status: null,
+      links: await Promise.all(sources.map((s) => findTimestampedRevision(s.bytes, digest))),
+    };
+  }
+
   return {
     sources,
     agreement,
+    timestamp,
     signers: sources.flatMap((s) => s.signers),
     errors: sources.flatMap((s) => s.errors.map((e) => `${s.fileName}: ${e}`)),
     underlying: agreement.kind === 'differs' ? null : (sources[0]?.underlying ?? null),
@@ -329,6 +378,149 @@ export function baseRevision(pdfBytes: Uint8Array): Uint8Array {
   return pdfBytes;
 }
 
+/**
+ * What the certificate may say about a supplied timestamp, if anything.
+ *
+ * Only speaks for sources where the proof was actually located inside the
+ * signed file. A proof that fits none of them establishes nothing about them —
+ * it is still attached, so a reader can see what was offered, but the page
+ * makes no claim. This is invariant 3 for the timestamp link.
+ */
+function timestampStatement(input: Certificate2Input): { when: string; detail: string } | null {
+  const ts = input.timestamp;
+  if (!ts) return null;
+
+  const linked = ts.links.filter((l): l is TimestampLink => l !== null);
+  if (linked.length === 0) return null;
+
+  const status = ts.status;
+  const when =
+    status?.kind === 'confirmed'
+      ? `Bitcoin block ${status.blockHeights.join(', ')} — ${utcStamp(status.blockTime)}`
+      : status?.kind === 'pending'
+        ? 'Accepted by an OpenTimestamps calendar, not yet in a Bitcoin block'
+        : status?.kind === 'unverified' && status.blockHeights.length > 0
+          ? `Attested to Bitcoin block ${status.blockHeights.join(', ')} — not independently checked`
+          : 'Proof attached — not independently checked';
+
+  const all = linked.length === ts.links.length;
+  const which =
+    linked[0]!.of === 1
+      ? 'The document below'
+      : `Revision ${linked[0]!.revision} of ${linked[0]!.of} of the document below`;
+
+  return {
+    when,
+    detail:
+      `${which} hashes to what the attached proof "proof.ots" commits to, so the document ` +
+      `existed in this exact form before it was signed. The signatures below are over that ` +
+      `document itself, not over a certificate about it.` +
+      (all
+        ? ''
+        : ` This was established for ${linked.length} of ${ts.links.length} attached documents; ` +
+          `nothing is claimed about the rest.`),
+  };
+}
+
+/**
+ * Where a supplied proof fits into a signed file.
+ *
+ * The point of the whole exercise: it says the bytes this proof timestamped are
+ * a revision of the file these people signed — so the signatures are over the
+ * document itself, not over a certificate about it.
+ */
+export interface TimestampLink {
+  /** 1-based revision of the signed file whose bytes the proof anchors. */
+  readonly revision: number;
+  readonly of: number;
+}
+
+/** A `.ots`, or a Certificate 1 carrying one, supplied alongside the signatures. */
+export interface TimestampProofRef {
+  readonly fileName: string;
+  readonly bytes: Uint8Array;
+}
+
+/** What a supplied proof establishes about the documents that were signed. */
+export interface TimestampEvidence {
+  /** The proof itself, so Certificate 2 can carry it forward. */
+  readonly ots: Uint8Array;
+  /** The digest the proof commits to. */
+  readonly digest: Uint8Array;
+  /** Only ever what was actually checked — `null` when nothing was. */
+  readonly status: OtsStatus | null;
+  /** Per source, in order: where the proof fits, or `null` if it does not. */
+  readonly links: readonly (TimestampLink | null)[];
+}
+
+/** Pull the proof out of a `.ots` file or out of a Certificate 1 PDF. */
+export async function readTimestampProof(
+  ref: TimestampProofRef,
+): Promise<{ ots: Uint8Array; digest: Uint8Array }> {
+  const isPdf =
+    ref.bytes.length > 5 && new TextDecoder().decode(ref.bytes.subarray(0, 5)) === '%PDF-';
+
+  const ots = isPdf ? await extractOtsAttachment(ref.bytes).catch(() => null) : ref.bytes;
+  if (!ots) {
+    throw new Error(
+      `"${ref.fileName}" carries no OpenTimestamps proof. Supply the .ots file, or the ` +
+        `Certificate 1 that has one embedded.`,
+    );
+  }
+
+  // `parseOts` throws on anything that is not a proof, which is the right
+  // answer: a file we cannot read commits the document to nothing.
+  return { ots, digest: digestOf(parseOts(ots)) };
+}
+
+/**
+ * Find which revision of a signed file the proof timestamped.
+ *
+ * Deliberately a *search* rather than a calculation. `baseRevision` takes the
+ * first `%%EOF`, which is exact for a Certificate 1 — pdf-lib writes one
+ * revision — but an ordinary contract may already have been updated
+ * incrementally before anyone timestamped it, and then the first `%%EOF` is not
+ * the boundary. Here the digest is already known, so every candidate prefix can
+ * simply be tested against it. A match is proof; no match returns `null` rather
+ * than a guess.
+ */
+export async function findTimestampedRevision(
+  pdfBytes: Uint8Array,
+  expected: Uint8Array,
+): Promise<TimestampLink | null> {
+  const ends = revisionEnds(pdfBytes);
+  for (let i = 0; i < ends.length; i++) {
+    for (const length of ends[i]!) {
+      if (bytesEqual(await sha256Bytes(pdfBytes.subarray(0, length)), expected)) {
+        return { revision: i + 1, of: ends.length };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Candidate end-of-revision lengths, in order.
+ *
+ * Each `%%EOF` yields several: writers end a file with `%%EOF`, `%%EOF\n` or
+ * `%%EOF\r\n`, and the timestamp was taken over whichever of those the original
+ * actually was. Testing all three costs three hashes and removes a whole class
+ * of "the link should have been found but wasn't".
+ */
+function revisionEnds(pdfBytes: Uint8Array): number[][] {
+  const marker = new TextEncoder().encode('%%EOF');
+  const out: number[][] = [];
+
+  outer: for (let i = 0; i + marker.length <= pdfBytes.length; i++) {
+    for (let j = 0; j < marker.length; j++) {
+      if (pdfBytes[i + j] !== marker[j]) continue outer;
+    }
+    const end = i + marker.length;
+    out.push([end, end + 1, end + 2].filter((n) => n <= pdfBytes.length));
+  }
+  return out;
+}
+
 /** Reduce a parsed signature to the fields Certificate 2 may print. */
 export function toSigner(
   sig: PadesSignature,
@@ -371,7 +563,7 @@ function authorityLine(signer: Certificate2Signer): string {
 function timeLine(signer: Certificate2Signer, detail: Detail = 'full'): string {
   if (!signer.signedAt) return 'No signing time is recorded in this signature';
 
-  const when = signer.signedAt.toISOString();
+  const when = utcStamp(signer.signedAt);
   if (signer.timeSource === 'claimed') {
     return `${when} — the signer's own claim, with no timestamp to corroborate it`;
   }
@@ -385,8 +577,13 @@ function timeLine(signer: Certificate2Signer, detail: Detail = 'full'): string {
     : `${when} — timestamped`;
 }
 
-/** The claims line, worded so it can never be read as a verdict. */
-function claimsLine(claim: QualifiedClaim): string {
+/**
+ * The claims line, worded so it can never be read as a verdict. Exported
+ * because the Attest screen must show the same thing the certificate prints:
+ * the issuing authority alone reads as an assurance, and this is the sentence
+ * that says what was and was not established.
+ */
+export function claimsLine(claim: QualifiedClaim): string {
   const asserted: string[] = [];
   if (claim.qcCompliance) asserted.push('qualified certificate');
   if (claim.qcTypeEsign) asserted.push('for electronic signature');
@@ -431,7 +628,7 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
 
   const pdf = await PDFDocument.create();
   const fonts = await loadFonts(pdf);
-  const ascii = (s: string) => toWinAnsi(s, fonts.regular);
+  const ascii = (s: string) => drawable(s, fonts);
 
   pdf.setTitle(`xNotary Certificate 2 — ${sources[0]!.originalName}`);
   pdf.setSubject('Attestation by identified signatories');
@@ -507,12 +704,23 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
       width: 330,
     });
   }
+
+  const linked = timestampStatement(input);
+  if (linked) {
+    c.field('Timestamped', linked.when, { width: 330 });
+    c.gap(2);
+    c.paragraph(linked.detail, { color: MUTED });
+    c.gap(4);
+  }
   c.rule();
 
   // ---- Signatories ------------------------------------------------------
   // Reserve what the closing sections need, then spend what is left on
   // signers at the highest detail that fits.
-  const attachmentNames = sources.map((s) => ascii(s.fileName));
+  const attachmentNames = [
+    ...sources.map((s) => ascii(s.fileName)),
+    ...(input.timestamp ? [PROOF_NAME] : []),
+  ];
   const closingHeight = measureClosing(c, attachmentNames);
   // 26 for the rule that precedes the closing, 16 for the section heading.
   const budget = c.remaining - closingHeight - 26 - 16;
@@ -585,6 +793,21 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
     await pdf.attach(source.bytes, source.fileName, {
       mimeType: 'application/pdf',
       description: `A signed document this certificate describes (SHA-256 ${toHex(source.digest)})`,
+      creationDate: input.generatedAt,
+      modificationDate: input.generatedAt,
+    });
+  }
+
+  // The proof travels with them, whether or not it could be linked: it is what
+  // the timestamp claim rests on, and a reader who cannot re-check it has to
+  // take this page's word for it — which is the thing this project does not ask
+  // anyone to do.
+  if (input.timestamp) {
+    await pdf.attach(input.timestamp.ots, PROOF_NAME, {
+      mimeType: 'application/octet-stream',
+      description:
+        `OpenTimestamps proof of the document that was signed ` +
+        `(SHA-256 ${toHex(input.timestamp.digest)})`,
       creationDate: input.generatedAt,
       modificationDate: input.generatedAt,
     });
@@ -664,7 +887,13 @@ function closingText(names: readonly string[]): {
   verify: ClosingLine[];
   disclaimer: string;
 } {
+  // The proof is an attachment too, but it is not a signed document — saying
+  // "they are the signed documents" of a list containing proof.ots would be
+  // wrong about the one file whose whole job is to be checkable.
+  const hasProof = names[names.length - 1] === PROOF_NAME;
+  const documents = hasProof ? names.slice(0, -1) : names;
   const many = names.length > 1;
+  const manyDocs = documents.length > 1;
   const listed = names.map((n) => `"${n}"`).join(', ');
 
   return {
@@ -672,9 +901,12 @@ function closingText(names: readonly string[]): {
       {
         text:
           `1. Detach the attached ${many ? `${names.length} files` : 'file'} from this PDF: ` +
-          `${listed}. ${many ? 'They are' : 'It is'} the signed ` +
-          `${many ? 'documents' : 'document'}, byte for byte — this certificate never modified ` +
-          `${many ? 'them' : 'it'}.`,
+          `${listed}. The signed ${manyDocs ? 'documents are' : 'document is'} there byte for ` +
+          `byte — this certificate never modified ${manyDocs ? 'them' : 'it'}` +
+          (hasProof
+            ? `, alongside the OpenTimestamps proof of what was signed. Check that with ` +
+              `"ots verify".`
+            : `.`),
       },
       {
         text:
@@ -685,15 +917,15 @@ function closingText(names: readonly string[]): {
       { text: `   pdfdetach -saveall "this-certificate.pdf"`, mono: true },
       {
         text:
-          `2. Upload ${many ? 'each of them' : 'it'} to the EU DSS validator for an ` +
-          `authoritative result:`,
+          `2. Validate the signatures — xNotary makes no determination of its own. Run DSS, the ` +
+          `EU's open-source reference implementation, on your own machine, so your document ` +
+          `never leaves it:`,
       },
-      { text: VALIDATOR_URL, mono: true },
+      { text: DSS_SOURCE_URL, mono: true },
       {
         text:
-          `3. The validator checks each signing certificate against the EU Trusted Lists and ` +
-          `reports whether the signature is a qualified electronic signature. That determination ` +
-          `is its own, not xNotary's.`,
+          `   or ask a trust provider for a validation service; in the EU only a qualified ` +
+          `provider may give a qualified validation.`,
       },
     ],
     disclaimer: DISCLAIMER_2,

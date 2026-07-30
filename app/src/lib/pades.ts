@@ -6,12 +6,12 @@
  * been altered, and extract the signer's name, the issuing QTSP and the claimed
  * signing time.
  *
- * Explicitly OUT of scope here: deciding whether a signature is a *qualified*
- * electronic signature. That requires validating the certificate chain against
- * the EU Trusted Lists (EUTL) at the signing time, which the MVP delegates to an
- * external official validator. Everything this module reports about
- * qualified-ness is a *claim read out of the certificate*, never a verdict —
- * see `QualifiedClaim`.
+ * Explicitly OUT of scope here: deciding what legal status a signature has —
+ * in the EU, whether it is a *qualified* electronic signature. That requires
+ * validating the certificate chain against a trust list (in the EU, the EUTL)
+ * at the signing time, which the MVP delegates to an external official
+ * validator. Everything this module reports about qualified-ness is a *claim
+ * read out of the certificate*, never a verdict — see `QualifiedClaim`.
  */
 import * as asn1js from 'asn1js';
 import {
@@ -132,7 +132,7 @@ export interface PadesSignature {
   /** Signer name, best-effort from the certificate subject. */
   readonly signerName: string;
   readonly subject: DistinguishedName;
-  /** The issuing CA — for a QES this is the QTSP. */
+  /** The issuing CA — for an EU qualified signature, the QTSP. */
   readonly issuer: DistinguishedName;
   /**
    * Claimed signing time from the CMS signingTime attribute.

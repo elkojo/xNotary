@@ -109,10 +109,11 @@ describe('Certificate 1', () => {
 });
 
 /**
- * The standard PDF fonts are WinAnsi-encoded. Czech splits across that boundary:
- * "á é í ó ú ý š ž" are in CP1252, "ř ě č ů ť ň ď" are not — so a document
- * called "dílo.pdf" built fine while "balíčky.pdf" threw
- * `WinAnsi cannot encode "č"`, which looks arbitrary to whoever hit it.
+ * Czech used to split across the WinAnsi boundary the standard PDF fonts are
+ * stuck with: "á é í ó ú ý š ž" are in CP1252, "ř ě č ů ť ň ď" are not. So
+ * "Řehoř Čížek" was drawn "Rehor Cízek" — on a document whose purpose is to
+ * name a file and, in Certificate 2, people. The certificates now embed a
+ * Liberation subset covering Latin, Greek and Cyrillic, so these render.
  */
 // The QR sits beside the Document rows, and the value column used to run under
 // it: the digest — the one thing on the page that actually binds — overlapped by
@@ -128,7 +129,7 @@ describe('the Document block does not collide with the QR', () => {
   });
 });
 
-describe('file names the standard fonts cannot render', () => {
+describe('file names outside plain ASCII', () => {
   const NAMES = [
     'Smlouva o dílo.pdf',
     'Příloha č. 1.pdf',
@@ -149,29 +150,48 @@ describe('file names the standard fonts cannot render', () => {
     expect(await extractOtsAttachment(pdf)).not.toBeNull();
   });
 
-  // The printed commands are how someone verifies without xNotary. A
-  // transliterated name inside one is a command that fails with "file not
-  // found" — worse than not printing a name at all, because it looks right.
-  it('never prints a name in a command that would not work when typed', async () => {
-    const text = await pdfText(await build(CONFIRMED, { fileName: 'Příloha č. 1.pdf' }));
-
-    expect(text).not.toContain('Priloha');
-    expect(text).toContain('ots verify -f "<your document>" proof.ots');
-    expect(text).toContain('sha256sum "<your document>"');
+  // This is the P0: the certificate used to print "Príloha c. 1.pdf", which is
+  // not the name of any file the reader has, and not a word in any language.
+  it.each([
+    ['Příloha č. 1.pdf', 'Příloha č. 1.pdf'],
+    ['Žluťoučký kůň úpěl ďábelské ódy.pdf', 'Žluťoučký kůň úpěl ďábelské ódy.pdf'],
+    ['Ισμήνη.pdf', 'Ισμήνη.pdf'],
+  ])('draws %s exactly as given', async (fileName, expected) => {
+    const text = await pdfText(await build(CONFIRMED, { fileName }));
+    expect(text).toContain(expected);
   });
 
-  it('quotes the exact name when it survives encoding', async () => {
-    const text = await pdfText(await build(CONFIRMED, { fileName: 'Smlouva o dílo.pdf' }));
+  it('draws a note with diacritics exactly as given', async () => {
+    const note = 'Účetní závěrka za rok 2026 — příloha č. 3';
+    const text = await pdfText(await build(CONFIRMED, { note }));
+    expect(text).toContain(note);
+  });
 
-    expect(text).toContain('ots verify -f "Smlouva o dílo.pdf" proof.ots');
+  // The printed commands are how someone verifies without xNotary. A folded
+  // name inside one is a command that fails with "file not found" — worse than
+  // no name at all, because it looks right.
+  it('quotes the exact name in the commands to run', async () => {
+    const text = await pdfText(await build(CONFIRMED, { fileName: 'Příloha č. 1.pdf' }));
+
+    expect(text).toContain('ots verify -f "Příloha č. 1.pdf" proof.ots');
+    expect(text).toContain('sha256sum "Příloha č. 1.pdf"');
+    expect(text).not.toContain('Priloha');
     expect(text).not.toContain('<your document>');
   });
 
-  it('says the displayed name was changed, and where the real one is', async () => {
-    const text = await pdfText(await build(CONFIRMED, { fileName: 'balíčky.pdf' }));
+  // CJK is outside the embedded subset — the one case where substitution is
+  // still the honest option, and it has to say so.
+  it('says so when a name has characters the font cannot draw', async () => {
+    const text = await pdfText(await build(CONFIRMED, { fileName: '合同.pdf' }));
 
-    expect(text).toMatch(/shown without accents/);
+    expect(text).toMatch(/shown as "\?"/);
     expect(text).toMatch(/stored unaltered/);
+    expect(text).toContain('ots verify -f "<your document>" proof.ots');
+  });
+
+  it('adds no such note when everything drew', async () => {
+    const text = await pdfText(await build(CONFIRMED, { fileName: 'Příloha č. 1.pdf' }));
+    expect(text).not.toMatch(/shown as "\?"/);
   });
 
   it('does not add that note when nothing was changed', async () => {

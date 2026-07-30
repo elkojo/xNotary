@@ -15,13 +15,15 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DISCLAIMER_2,
-  VALIDATOR_URL,
+  DSS_SOURCE_URL,
   AgreementError,
   analyzeSignedDocument,
   analyzeSignedDocuments,
   baseRevision,
   buildCertificate2,
   checkAgreement,
+  findTimestampedRevision,
+  readTimestampProof,
   type Certificate2Signer,
 } from './certificate2';
 import { readEmbeddedFiles } from './certificate1';
@@ -509,9 +511,43 @@ describe('claims are never presented as verdicts', () => {
     expect(flat).toContain(DISCLAIMER_2.replace(/\s+/g, ' ').slice(0, 80));
   });
 
-  it('sends the reader to the official validator', async () => {
-    const text = await pdfText(await build());
-    expect(text).toContain(VALIDATOR_URL);
+  // Whoever receives this PDF is the person most likely to over-read it, and
+  // they may never see the app. The condition on the legal effect has to travel
+  // with the artifact, not sit in the UI that produced it.
+  it('states that the handwritten-signature effect depends on conditions it cannot check', async () => {
+    const flat = (await pdfText(await build())).replace(/\s+/g, ' ');
+
+    // "Handwritten" alone is not enough: where a law requires an officially
+    // verified signature the conditions are stricter still, and a certificate
+    // headed "notarization" is exactly what invites that reading.
+    expect(flat).toMatch(/equivalent to a handwritten or officially verified one/);
+    expect(flat).toMatch(/conditions this certificate does not establish/);
+  });
+
+  // The certificate travels further than the app, and not only inside the EU.
+  // Naming eIDAS as the example is fine; making the sentence untrue outside it
+  // is not, so no claim here may be phrased as if the EU framework were the
+  // only one that exists.
+  it('states its limits without assuming the reader is in the EU', async () => {
+    const flat = (await pdfText(await build())).replace(/\s+/g, ' ');
+
+    expect(flat).toMatch(/xNotary checks no trust list/);
+    expect(flat).toMatch(/a validator for the framework it was issued under/);
+    expect(flat).toMatch(/a validator for the framework it was issued under/);
+  });
+
+  // The Commission's hosted instance titles itself "DSS Demonstration WebApp".
+  // Naming it as an official service claimed an assurance nobody gave, and sent
+  // the document to a third party besides. The certificate points at software
+  // the reader can run, not at somewhere to upload to.
+  it('names routes to a determination without claiming an official service', async () => {
+    const flat = (await pdfText(await build())).replace(/\s+/g, ' ');
+
+    expect(flat).toContain(DSS_SOURCE_URL);
+    expect(flat).not.toContain('webapp-demo');
+    expect(flat).not.toMatch(/official (EU )?validator/i);
+    expect(flat).toMatch(/your document never leaves it/);
+    expect(flat).toMatch(/only a qualified provider may give a qualified validation/);
   });
 
   it('reports a certificate that asserts nothing as asserting nothing', async () => {
@@ -664,5 +700,143 @@ describe('names outside WinAnsi', () => {
     // Greek name must not take the whole certificate down.
     const cert2 = await build({ signers: [signer({ name: 'Ισμήνη Παπαδοπούλου' })] });
     expect((await PDFDocument.load(cert2)).getPageCount()).toBe(1);
+  });
+});
+
+/**
+ * Signing the contract itself, rather than the certificate about it.
+ *
+ * The reviewer's point: what people need signed is the contract. Signing a
+ * Certificate 1 attests to the certificate, which is a step removed. So the
+ * proof is supplied alongside, and the link is established by finding which
+ * revision of the signed file the proof actually timestamps — a search against
+ * a known digest, never an assumption about where the document ended.
+ */
+describe('signing the document itself', () => {
+  /** Byte length up to and including the nth `%%EOF` (1-based). */
+  function prefixToRevision(bytes: Uint8Array, n: number): Uint8Array {
+    const marker = '%%EOF';
+    const text = new TextDecoder('latin1').decode(bytes);
+    let at = -1;
+    for (let i = 0; i < n; i++) at = text.indexOf(marker, at + 1);
+    return bytes.subarray(0, at + marker.length);
+  }
+
+  it('finds the revision a proof timestamps', async () => {
+    const signed = fixture('cert1-signed-once.pdf');
+    const digest = await sha256Bytes(baseRevision(signed));
+
+    expect(await findTimestampedRevision(signed, digest)).toEqual({ revision: 1, of: 2 });
+  });
+
+  // The reason this is a search: `baseRevision` takes the *first* `%%EOF`, which
+  // is exact for a Certificate 1 but wrong for a contract that had already been
+  // updated incrementally before anyone timestamped it.
+  it('finds a later revision, not just the first', async () => {
+    const signed = fixture('cert1-countersigned.pdf');
+    const digest = await sha256Bytes(prefixToRevision(signed, 2));
+
+    expect(await findTimestampedRevision(signed, digest)).toEqual({ revision: 2, of: 3 });
+  });
+
+  it('reports no link rather than guessing at one', async () => {
+    const stranger = await sha256Bytes(new TextEncoder().encode('some other document'));
+    expect(await findTimestampedRevision(fixture('cert1-signed-once.pdf'), stranger)).toBeNull();
+  });
+
+  it('reads the proof out of a Certificate 1, or out of a bare .ots', async () => {
+    const fromPdf = await readTimestampProof({
+      fileName: 'c1.pdf',
+      bytes: fixture('cert1-signed-once.pdf'),
+    });
+    const fromOts = await readTimestampProof({ fileName: 'proof.ots', bytes: fromPdf.ots });
+
+    expect(toHex(fromPdf.digest)).toBe(
+      'e3748becd853b5cc7d80d277db47208ce54b298ee4350a61f12ddcebe1a04ae9',
+    );
+    expect(toHex(fromOts.digest)).toBe(toHex(fromPdf.digest));
+  });
+
+  it('refuses a file that carries no proof at all', async () => {
+    await expect(
+      readTimestampProof({ fileName: 'contract.pdf', bytes: fixture('chain-ski.pdf') }),
+    ).rejects.toThrow(/no OpenTimestamps proof/);
+  });
+
+  it('links the proof to the signed file when analyzing', async () => {
+    const signed = fixture('cert1-signed-once.pdf');
+    const ots = (await readTimestampProof({ fileName: 'c1.pdf', bytes: signed })).ots;
+    // Stand in for a signed contract: pretend the proof is over the bytes that
+    // were signed, which is exactly the arrangement this flow creates.
+    const digest = await sha256Bytes(baseRevision(signed));
+    const draft = await analyzeSignedDocuments([{ fileName: 'contract-signed.pdf', bytes: signed }], {
+      fileName: 'proof.ots',
+      bytes: ots,
+    });
+
+    expect(draft.timestamp).not.toBeNull();
+    // This proof is of the *notarized* document, not of the signed bytes, so it
+    // correctly fits nowhere in the file.
+    expect(draft.timestamp!.links).toEqual([null]);
+    expect(toHex(digest)).not.toBe(toHex(draft.timestamp!.digest));
+  });
+
+  describe('what the certificate then says', () => {
+    const signed = () => fixture('cert1-signed-once.pdf');
+
+    const linked = async () => ({
+      ots: (await readTimestampProof({ fileName: 'c1.pdf', bytes: signed() })).ots,
+      digest: await sha256Bytes(baseRevision(signed())),
+      status: {
+        kind: 'confirmed' as const,
+        blockTime: new Date('2026-07-28T09:00:00.000Z'),
+        blockHeights: [908_391],
+        confirmedBy: ['blockstream'],
+      },
+      links: [{ revision: 1, of: 2 }],
+    });
+
+    it('states the signatures are over the document, and attaches the proof', async () => {
+      const pdf = await build({
+        sources: [{ fileName: 'contract-signed.pdf', bytes: signed() }],
+        timestamp: await linked(),
+      });
+      const text = (await pdfText(pdf)).replace(/\s+/g, ' ');
+
+      expect(text).toMatch(/signatures below are over that document itself/);
+      expect(text).toMatch(/not over a certificate about it/);
+      expect(text).toContain('908391');
+      expect(text).toContain('2026-07-28 09:00:00 UTC');
+
+      const attached = await readEmbeddedFiles(pdf);
+      const proof = (await linked()).ots;
+      expect(attached).toHaveLength(2);
+      expect(attached.some((a) => bytesEqual(a, proof))).toBe(true);
+    });
+
+    it('still fits one page', async () => {
+      const pdf = await build({
+        sources: [{ fileName: 'contract-signed.pdf', bytes: signed() }],
+        signers: [signer(), signer({ name: 'Jan Novák' }), signer({ name: 'Řehoř Čížek' })],
+        timestamp: await linked(),
+      });
+      expect((await PDFDocument.load(pdf)).getPageCount()).toBe(1);
+    });
+
+    // Invariant 3 for the timestamp link: a proof that fits nowhere establishes
+    // nothing, and the page must not imply otherwise.
+    it('claims nothing when the proof fits no revision', async () => {
+      const pdf = await build({
+        sources: [{ fileName: 'contract-signed.pdf', bytes: signed() }],
+        timestamp: { ...(await linked()), links: [null] },
+      });
+      const text = (await pdfText(pdf)).replace(/\s+/g, ' ');
+
+      expect(text).not.toMatch(/signatures below are over that document itself/);
+      expect(text).not.toContain('908391');
+      // Still attached: the reader can see exactly what was offered.
+      const proof = (await linked()).ots;
+      expect((await readEmbeddedFiles(pdf)).some((a) => bytesEqual(a, proof))).toBe(true);
+    });
   });
 });

@@ -17,6 +17,7 @@ import { PDFDict, PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from 
 import QRCode from 'qrcode';
 
 import { groupHex, toHex } from './hash';
+import { utcStamp } from './time';
 import type { OtsStatus } from './ots';
 import {
   Cursor,
@@ -27,7 +28,7 @@ import {
   PAGE_W,
   endSentence,
   loadFonts,
-  toWinAnsi,
+  drawable,
 } from './pdf-layout';
 
 export interface Certificate1Input {
@@ -60,8 +61,9 @@ export const VALUE_COLUMN_X = MARGIN + 118;
 export const DISCLAIMER =
   'This certificate attests that the digest above existed at the attested time. ' +
   'It says nothing about who created the document, what it means, or whether ' +
-  'anyone agreed to it. It is not an electronic signature and not a qualified ' +
-  'electronic timestamp within the meaning of eIDAS.';
+  'anyone agreed to it. It is not an electronic signature, and it is not a ' +
+  'timestamp from an accredited trust service — in the EU, a qualified ' +
+  'electronic timestamp under eIDAS.';
 
 function statusLine(status: OtsStatus): { text: string; detail: string } {
   switch (status.kind) {
@@ -69,7 +71,7 @@ function statusLine(status: OtsStatus): { text: string; detail: string } {
       return {
         text: `Anchored in Bitcoin block ${status.blockHeights.join(', ')}`,
         detail:
-          `Attested time ${status.blockTime.toISOString()} ` +
+          `Attested time ${utcStamp(status.blockTime)} ` +
           `(confirmed via ${status.confirmedBy.join(', ')}). The document existed no later ` +
           `than this block.`,
       };
@@ -124,14 +126,13 @@ export async function buildCertificate1(input: Certificate1Input): Promise<Uint8
 
   const digestHex = toHex(input.digest);
 
-  // The standard PDF fonts are WinAnsi-encoded and throw on anything outside it,
-  // which includes most Czech letters — "ř", "ě", "č", "ů" — while "á", "é" and
-  // "í" pass. A file called "balíčky.pdf" therefore used to fail outright while
-  // "dílo.pdf" worked, which looks arbitrary from the outside.
+  // The embedded font covers Latin, Greek and Cyrillic, so this is now a no-op
+  // for anything a European file name contains. It still matters for scripts
+  // outside the subset — CJK — where the name cannot be drawn at all.
   //
   // Only *drawn* text has this constraint. PDF strings do not, so the exact name
   // still travels losslessly in the title and the attachment description below.
-  const shownName = toWinAnsi(input.fileName, fonts.regular);
+  const shownName = drawable(input.fileName, fonts);
   const nameWasChanged = shownName !== input.fileName;
   // A name that survived encoding is quoted verbatim, so the reader can paste
   // the command as printed. One that did not gets a placeholder they must fill
@@ -141,7 +142,7 @@ export async function buildCertificate1(input: Certificate1Input): Promise<Uint8
   c.heading('Document');
   c.field('File name', shownName, { width: DOC_VALUE_WIDTH });
   c.field('File size', `${input.fileSize.toLocaleString('en-US')} bytes`);
-  if (input.note) c.field('Note', toWinAnsi(input.note, fonts.regular), { width: DOC_VALUE_WIDTH });
+  if (input.note) c.field('Note', drawable(input.note, fonts), { width: DOC_VALUE_WIDTH });
   c.field('SHA-256', groupHex(digestHex), { mono: true, width: DOC_VALUE_WIDTH });
 
   // QR of the digest, so the hash can be moved to another device by camera.
@@ -170,7 +171,7 @@ export async function buildCertificate1(input: Certificate1Input): Promise<Uint8
 
   const status = statusLine(input.status);
   c.heading('Timestamp');
-  c.field('Requested', input.requestedAt.toISOString());
+  c.field('Requested', utcStamp(input.requestedAt));
   c.field('Status', status.text);
   c.field('Network', 'Bitcoin, via OpenTimestamps');
   c.gap(2);
@@ -186,10 +187,9 @@ export async function buildCertificate1(input: Certificate1Input): Promise<Uint8
   c.gap(4);
   c.paragraph('   pdfdetach -saveall "this-certificate.pdf"', { font: fonts.mono, size: 8.5 });
   c.gap(4);
-  c.paragraph(
-    '2. Install the reference OpenTimestamps client:  pip install opentimestamps-client',
-    { font: fonts.mono, size: 8.5 },
-  );
+  c.paragraph('2. Install the reference OpenTimestamps client:');
+  c.gap(4);
+  c.paragraph('   pip install opentimestamps-client', { font: fonts.mono, size: 8.5 });
   c.gap(4);
   c.paragraph('3. Run, in the folder holding the original document:');
   c.gap(4);
@@ -211,9 +211,10 @@ export async function buildCertificate1(input: Certificate1Input): Promise<Uint8
   if (nameWasChanged) {
     c.gap(4);
     c.paragraph(
-      `The file name above is shown without accents, because the standard PDF fonts cannot ` +
-        `render them. Substitute the real name — it is stored unaltered in this PDF's title and ` +
-        `in the description of the attached proof, and the digest is what actually binds.`,
+      `Some characters of the file name are shown as "?", because the font embedded in this ` +
+        `certificate has no glyph for them. Substitute the real name — it is stored unaltered ` +
+        `in this PDF's title and in the description of the attached proof, and the digest is ` +
+        `what actually binds.`,
       { color: MUTED },
     );
   }
