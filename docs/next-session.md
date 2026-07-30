@@ -94,7 +94,9 @@ the two questions that were blocking M2:
 
 1. **A qualified countersignature** — the committed countersigned fixture uses self-signed
    certificates, so two *qualified* signatures on one document remain unseen.
-2. **Bank iD** — a different QTSP with a different profile. Nothing measured so far speaks for it.
+2. **Bank iD SIGN** — not a QTSP signature: bank-supplied identity plus Bank iD's own qualified
+   *seal*, yielding an advanced signature rather than a QES. Nothing measured so far speaks for
+   its shape, and it should differ from the QTSP output most.
 3. **I.CA / eIdentity** — likewise.
 4. **PAdES-LTA** with DSS/VRI dictionaries and archive timestamps. Everything measured is
    PAdES-T at most.
@@ -108,7 +110,8 @@ teaches as a generated fixture and record the measurement in `docs/qtsp-findings
 `src/lib/certificate2.ts` + the **Attest** tab. Signed-PDF ingestion → per-signature consent gate
 (every box starts unticked) → a one-page A4 certificate naming only those who consented, with the
 signed document embedded as an attachment. On-demand: no expiry, no complete/incomplete state.
-Links out to the EU DSS validator; makes no qualified/not-qualified verdict of its own.
+Names DSS-run-locally and qualified validation services as the routes to a determination; makes
+no qualified/not-qualified verdict of its own, and no longer links the Commission's hosted demo.
 
 Design decisions worth not relitigating:
 
@@ -212,12 +215,10 @@ two reviews below. None of the remainder is blocked on code.
 
 ## Post-MVP backlog, in priority order
 
-0. **Embed a Unicode font in the PDFs.** Today non-WinAnsi characters are transliterated —
-   "balíčky" is drawn as "balícky" — which is honest but lossy, and the certificate has to say so.
-   The complete fix is `@pdf-lib/fontkit` plus a TTF with Czech coverage. Deferred because it is a
-   new dependency (4.3 MB unpacked) plus a font asset on an offline-first PWA, to render metadata
-   that is not part of the cryptographic claim. Worth doing once bundle size is being looked at
-   anyway.
+~~0. **Embed a Unicode font in the PDFs.**~~ Done — this turned out to be a P0, not a nicety. A
+reviewer would not send a certificate reading "Rehor Cízek" to a client, and the deferral had
+underweighted that the mangled text is a *person's name*. `@pdf-lib/fontkit` plus subsets of
+Liberation, 408 KB in a lazily-imported chunk. See `src/lib/fonts/README.md`.
 
 1. Qualified RFC 3161 timestamp (e.g. I.CA) + PAdES-LTA/LTV embedding.
 2. Full in-browser QES validation against EUTL trusted lists.

@@ -29,9 +29,18 @@ later than a particular Bitcoin block. The file is hashed in your browser; only 
 SHA-256 digest is ever sent, to public [OpenTimestamps](https://opentimestamps.org) calendar
 servers.
 
-**Certificate 2 — attestation.** A one-page A4 certificate naming the people who signed a
-Certificate 1 with their eIDAS signatures — each with their issuing authority and when they
-signed — with the signed documents embedded inside it, byte for byte.
+**Certificate 2 — attestation.** A one-page A4 certificate naming the people who signed, each with
+their issuing authority and when they signed, with the signed documents embedded inside it, byte
+for byte. Any PAdES signature is read the same way, wherever it was issued; eIDAS is the framework
+this documentation uses as its worked example, not a requirement.
+
+**Sign the contract, not the certificate.** Have everyone sign the document itself, then hand
+Certificate 2 both the signed file and the `.ots` (or the Certificate 1 carrying it). xNotary finds
+which revision of the signed file the proof timestamps — a search against the known digest, so a
+match is proof rather than an assumption — and the certificate then states that the signatures are
+over the document itself, with the proof attached alongside it. If no revision matches, it says so
+and claims nothing. Signing the Certificate 1 still works; it just attests to the certificate
+rather than to the contract.
 
 Nobody is named without ticking a box for them first, and signatures whose signer withheld
 consent are disclosed as a count rather than silently dropped. Signing in sequence (one file,
@@ -39,10 +48,15 @@ several signatures) and in parallel (one copy per signer) are both accepted; in 
 xNotary first establishes that the copies really are signatures over the same document, and
 refuses to combine them if they are not.
 
-It reports what each signing certificate *claims* and links to the
-[EU DSS validator](https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/validation) for
-the authoritative determination. It never decides for itself whether a signature is a qualified
-electronic signature — that needs the EU Trusted Lists.
+It reports what each signing certificate *claims* and sends the reader to a validator for the
+framework the signature was issued under: [DSS](https://github.com/esig/dss), the EU's
+open-source reference implementation, run on their own machine — or a validation service from a
+trust provider, which in the EU is the only kind that can give a *qualified* validation. It never
+decides a signature's legal status for itself: that needs a trust list, and xNotary checks none.
+
+It deliberately does not link the Commission's hosted DSS instance. That page titles itself "DSS
+Demonstration WebApp": it is a showcase for the library, not an operated validation service, and
+sending a document to it is an upload xNotary has no business recommending.
 
 ## Principles
 
@@ -175,17 +189,28 @@ Stack: Svelte 5 + Vite 5 + TypeScript, offline-first via a hand-written service 
 
 Deferred post-MVP, in priority order: qualified RFC 3161 timestamp + PAdES-LTA/LTV · full
 in-browser EUTL validation · Nostr/Blossom sharing (Flow B) · nsite hosting · Bank iD Sign
-gateway and EUDI wallet adapters · "sign the original document" mode.
+gateway and EUDI wallet adapters · a ready-to-sign bundle that embeds the proof into the contract
+itself via an incremental update, so signers receive one file rather than two.
 
 ## What this is not
 
 - **Not a signature.** Certificate 1 proves a file existed at a time. It says nothing about who
   made it or what it means.
-- **Not a qualified timestamp.** The Bitcoin anchor is strong evidence but is not a qualified
-  electronic timestamp under eIDAS. That is the first post-MVP milestone.
-- **Not legal advice.** Certificate 2 will prove that identified people attested *to
-  Certificate 1* — which is not the same as signing the underlying document. Czech eIDAS counsel
-  review is planned before public launch.
+- **Not an accredited timestamp.** The Bitcoin anchor is strong evidence, and needs no trusted
+  provider anywhere in the world — but it is not a timestamp from an accredited trust service,
+  which in the EU means a qualified electronic timestamp under eIDAS. That is the first post-MVP
+  milestone.
+- **Not an officially verified ("notarized") signature.** The name says notarization; that means
+  hash-and-timestamp plus attestation, not the act of an official. Where a law requires a
+  signature verified by an official, an electronic signature substitutes only on that
+  jurisdiction's terms — which xNotary neither checks nor certifies. In Czechia, § 6(2) of Act
+  12/2020 Sb. grants the right only where it can be verified *from population-register data* that
+  the qualified certificate belongs to the signer, and § 6(3) excludes some cases outright. That
+  register check is not something a page running in a browser can do. See the
+  [DIA methodology](https://www.dia.gov.cz/cs/legislativa/eidas-sluzby-vytvarejici-duveru-a-elektronicka-identifikace/informace-pro-uzivatele/pravo-na-nahrazeni-uredne-overeneho-podpisu-dle-ss-6-odst-2-zakona-c-12-2020-sb).
+- **Not legal advice.** Certificate 2 records that identified people signed *Certificate 1* —
+  which is not the same as signing the underlying document. Czech eIDAS counsel review is planned
+  before public launch.
 - **Not backed up.** Self-custody cuts both ways: clear your browser data and your library is
   gone. Export your certificates.
 

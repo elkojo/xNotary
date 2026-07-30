@@ -56,7 +56,7 @@ downgraded a real qualified signature.
 
 This is exactly why `QualifiedClaim` reports claims rather than verdicts. `qcSSCD: false` means
 *the certificate does not assert it*, not *the key was not in a QSCD*. Certificate 2 must present
-these as read-outs and link to an official validator for the actual determination.
+these as read-outs and name who can make the actual determination.
 
 **4. Single-certificate CMS is real.** The chain was not bundled, so the issuer-and-serial match
 had to resolve on its own. It did. Note this cuts the other way from the fixtures built the week
@@ -109,12 +109,31 @@ the genuinely suspicious case, where content was added after everybody had signe
 For Certificate 2 this is the difference between "Max Svoboda signed revision 1 of 2" and an
 alarm. The first is true and useful; the second was neither.
 
+## Why qualified status is not checked in the app
+
+Measured 30 Jul 2026: `https://ec.europa.eu/tools/lotl/eu-lotl.xml` returns 200 and 465 KB, with
+**no `Access-Control-Allow-Origin` header**. The browser therefore cannot fetch the EU List of
+Trusted Lists from the Pages origin, and the usual remedy — a proxy — is a backend, which
+invariant 2 forbids. This is the same shape of finding as `catallaxy` in the calendar list.
+
+The only route that keeps the no-backend model is to bundle a **dated snapshot** of the LOTL and
+the national trust lists at build time, and report a verdict qualified by that date. Two caveats
+before anyone starts: a strict ETSI TS 119 615 determination needs the trust list status as it
+stood at *signing* time, not at snapshot time; and the national lists are large, so the snapshot
+would have to be trimmed to service digital identities and status history, which has not been
+measured. Until then the determination belongs to the external validator, and the wording
+throughout the app and on the certificate says so.
+
 ## What is still unverified
 
 - **A qualified countersignature.** The countersigned fixture uses self-signed certificates. A
   document signed by two *qualified* certificates has still not been seen.
 - **PAdES-LTA.** No DSS/VRI dictionaries or document timestamps in anything measured so far.
-- **Bank iD.** A different QTSP with a different profile; nothing here speaks for it.
+- **Bank iD SIGN.** Not a QTSP signature at all: the bank supplies the identity and the document
+  is sealed with Bank iD's own qualified *seal*, so the signer gets an advanced signature
+  (*zaručený elektronický podpis*), not a QES. Expect no QcCompliance on a personal certificate
+  and possibly no personal certificate at all — worth measuring precisely because the shape
+  should differ from everything here.
 - **I.CA and eIdentity.** Likewise.
 
 Two real artifacts closed four defects between them. It is worth collecting more.

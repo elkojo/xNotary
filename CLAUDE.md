@@ -81,11 +81,16 @@ docs/              m0-spike.md + qtsp-findings.md (evidence), next-session.md (h
   fixture bytes. The `cert1-*.pdf` trio is real product output that was really signed, because a
   genuine second revision cannot be produced offline. See the README there before touching any of
   it. Never commit a `.p12`.
-- **Anything drawn into a PDF must go through `toWinAnsi`.** The standard fonts are
-  WinAnsi-encoded and *throw* on what they cannot encode. Czech straddles the boundary — `á é í`
-  pass, `ř ě č ů ť` do not — so the failure looks arbitrary. Never put a transliterated name
-  inside a printed shell command: that yields a command which fails with "file not found". The
-  exact string still travels in PDF metadata, which has no such limit.
+- **The certificates embed Liberation, not the standard PDF fonts.** The standard fonts are
+  WinAnsi-encoded, and Czech straddles that boundary — `á é í` pass, `ř ě č ů ť` do not — so
+  certificates printed `Rehor Cízek` for **Řehoř Čížek**. Text now goes through `drawable`, which
+  only substitutes what the subset genuinely lacks (in practice CJK), and the certificate says so
+  when it does. Never put a substituted name inside a printed shell command: that yields a command
+  which fails with "file not found". `npm run fonts:subset` regenerates the faces — read
+  `src/lib/fonts/README.md` first, it records two failure modes that cost an hour each.
+- **Times on a certificate are UTC and say so; times on screen are local and say so.** Both go
+  through `src/lib/time.ts`. A bare `toLocaleString` leaves two readers in different countries
+  disagreeing about when something happened with no way to tell why.
 - **A certificate is named after the document, not after the file it was built from.**
   `X — Certificate 1.pdf` signed and renamed `X — Certificate 1_sign2.pdf` still yields
   `X — Certificate 2.pdf`. The original name is read from the Certificate 1 PDF's Title metadata,
@@ -104,6 +109,20 @@ docs/              m0-spike.md + qtsp-findings.md (evidence), next-session.md (h
   shows nothing. Certificate 2 builds one `EntryLine[]` and both measures and draws from it for
   exactly this reason. A test that only greps extracted text will not catch overflow — assert the
   page count too.
+- **The timestamp link is found by search, not by calculation.** `findTimestampedRevision` tries
+  every `%%EOF` prefix against the digest the `.ots` already commits to. `baseRevision` takes the
+  *first* `%%EOF`, which is exact for a Certificate 1 but wrong for a contract that was already
+  updated incrementally before it was timestamped. No match means no claim — never fall back to
+  "probably the first revision".
+- **"Notarization" is the product's name, never a legal claim.** In Czech it reads as *úřední
+  ověření*, so silence about the difference is not neutral — a reader infers it. No copy may
+  suggest xNotary substitutes for an officially verified signature: Czechia's § 6(2) of Act
+  12/2020 Sb. requires verifying from population-register data that the qualified certificate
+  belongs to the signer, which no static page can do, and § 6(3) excludes cases outright.
+- **eIDAS is the example, not the frame.** xNotary is meant to work anywhere, so no user-facing
+  statement may only be true inside the EU. Say "trust list" and "the framework it was issued
+  under", then name the EU/eIDAS/QES version as the worked example — that order, not the reverse.
+  `certificate2.test.ts` pins this for the certificate itself, which travels furthest.
 - **`coversWholeDocument: false` is normal, not suspicious.** In a countersigned PDF every
   signature but the last legitimately stops short of the end of the file. Check `supersededBy`
   before saying anything alarming — only `false` with `supersededBy === null` means bytes nobody
