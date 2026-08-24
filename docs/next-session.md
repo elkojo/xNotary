@@ -21,7 +21,10 @@ What is left before a real release is not code: two reviews, and documents only 
 | Certificate rendering | Liberation subsets embedded; Czech, Greek and Cyrillic names render correctly |
 | Tests | 140 offline, all passing; type-check clean; CI green |
 
-**Deploying:** commit → push → tag `v*`. The tag fires `deploy.yml`; a plain push does not. The
+**Deploying:** bump `version` in `app/package.json` to match → commit → push → tag `v*`. The tag
+fires `deploy.yml`; a plain push does not. Nothing in the app reads that version field, so keeping
+it in step is a discipline rather than a mechanism — it drifted from `0.1.0` to `v0.3.0` before
+anyone noticed. The
 `github-pages` environment has a `v*` tag policy so tags are allowed to deploy — do not remove it.
 After deploying, `gh release create` publishes the release notes; that step is manual.
 
@@ -267,9 +270,10 @@ two reviews below. None of the remainder is blocked on code.
   `@pdf-lib/fontkit` (runtime, no transitive tree, 9 lockfile lines) and `subset-font` (dev only,
   99 lines, harfbuzz/wasm). Both were chosen small on purpose — contrast
   `@signpdf/placeholder-plain`, which was installed, measured and reverted.
-- **Version numbering is inconsistent.** `app/package.json` still says `0.1.0` while releases are
-  at `v0.3.0`; the seven releases so far have been tag-only. Settle it deliberately — either bump
-  the manifest as part of releasing, or drop the field's pretence of meaning something.
+- ~~**Version numbering is inconsistent.**~~ **Settled 2026-08-24:** `app/package.json` now says
+  `0.3.0`, matching the tag, and the bump is part of the deploy steps above. Keeping the field was
+  the deliberate choice over deleting it: `npm` prints it, and a manifest disagreeing with the
+  release is the kind of small wrongness that makes a reader distrust the larger claims.
 - **The font subset is 546 KB of base64 committed to the repo**
   (`app/src/lib/fonts/liberation.generated.ts`, 310 KB gzipped, lazily imported so it never
   touches first paint). Regenerable with `npm run fonts:subset`. It is the largest single file in

@@ -143,7 +143,7 @@ Other commands:
 
 | Command | What it does |
 |---|---|
-| `npm test` | Offline test suite (22 tests), including the PAdES regression suite |
+| `npm test` | Offline test suite (140 tests), including the PAdES regression suite |
 | `npm run check` | Type-check Svelte + TypeScript |
 | `npm run build` | Type-check, then production build to `app/dist` |
 | `npm run spike:ots` | M0 spike against **live** OpenTimestamps calendars |
@@ -162,9 +162,10 @@ src/lib/          the parts that would still matter if the UI were thrown away
   hash.ts         local SHA-256, chunked for large files
   ots.ts          OpenTimestamps: stamp / upgrade / status, and the calendar list
   certificate1.ts Certificate 1 PDF generation + .ots attachment extraction
+  certificate2.ts Certificate 2: signer attestation, agreement checks, timestamp link
   pades.ts        PAdES signature parsing and signer-identity extraction (M2)
   library.ts      the local certificate store (IndexedDB)
-src/views/        Notarize · Verify integrity · My certificates · How it works
+src/views/        Notarize · Attest signatures · Verify integrity · My certificates · How it works
 src/spikes/       M0 risk spikes and their fixtures
 scripts/          fixture generation and browser-driven checks
 ```
@@ -208,9 +209,9 @@ itself via an incremental update, so signers receive one file rather than two.
   the qualified certificate belongs to the signer, and § 6(3) excludes some cases outright. That
   register check is not something a page running in a browser can do. See the
   [DIA methodology](https://www.dia.gov.cz/cs/legislativa/eidas-sluzby-vytvarejici-duveru-a-elektronicka-identifikace/informace-pro-uzivatele/pravo-na-nahrazeni-uredne-overeneho-podpisu-dle-ss-6-odst-2-zakona-c-12-2020-sb).
-- **Not legal advice.** Certificate 2 records that identified people signed *Certificate 1* —
-  which is not the same as signing the underlying document. Czech eIDAS counsel review is planned
-  before public launch.
+- **Not legal advice.** Certificate 2 records that identified people signed something, and states
+  which: the document itself where the proof establishes that link, otherwise its Certificate 1 —
+  which is not the same thing. Czech eIDAS counsel review is planned before public launch.
 - **Not backed up.** Self-custody cuts both ways: clear your browser data and your library is
   gone. Export your certificates.
 
