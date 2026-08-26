@@ -102,6 +102,12 @@ docs/              m0-spike.md + qtsp-findings.md (evidence), next-session.md (h
   padding, but the last byte of a CMS is effectively random — trimming truncates roughly one
   signature in 256. DER is self-delimiting; leave the padding and let `fromBER` stop on its own.
   `der-trailing-zero.pdf` pins this.
+- **The OpenTimestamps library is linked, not bundled.** It is the one LGPL dependency that
+  reaches the browser, and serving the app conveys it. `vite.config.ts` keeps it external, builds
+  it alone into `vendor/opentimestamps.js` (unhashed, unminified, `treeShaking: false`) and
+  imports it by URL, so a user can substitute their own build. Don't fold it back into a chunk,
+  hash the filename, or minify it. `docs/relinking.md` records why, and what the alternatives
+  cost. `THIRD-PARTY.txt` is generated from the real module graph — don't hand-maintain a list.
 - **Calendar list is pinned deliberately** in `src/lib/ots.ts` — `catallaxy` is excluded because
   it serves no CORS header. Don't "fix" it back to the library default.
 - **PDF layout must measure what it draws.** `Cursor` happily draws below the bottom margin:

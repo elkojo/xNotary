@@ -25,6 +25,11 @@ jobs:
         working-directory: app
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history and tags: the build stamps `git describe` into the app
+          # so the deployed page can link the exact source it was built from
+          # (AGPL §13). A shallow checkout would leave it showing a bare SHA.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:

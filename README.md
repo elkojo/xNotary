@@ -220,3 +220,17 @@ itself via an incremental update, so signers receive one file rather than two.
 
 [AGPL-3.0-or-later](LICENSE). If you run a modified version as a network service, you must offer
 its source to users.
+
+Contributions are taken under the [DCO](CONTRIBUTING.md) — sign your commits off with
+`git commit -s`. There is no CLA and no copyright assignment: xNotary is meant to stay open
+source, and paid services around it (archiving, printed certificates, delivery) do not require
+taking the code proprietary.
+
+Every deployed build links the exact commit it was made from, on the "How it works" screen. That
+is what AGPL § 13 asks of anyone running it as a service, this project included.
+
+Third-party code that reaches the browser is listed with its licences in `THIRD-PARTY.txt`,
+generated at build time from the modules actually present in the bundle. One of them — the
+OpenTimestamps client — is LGPL-3.0-or-later; it is linked as a separate module rather than
+bundled, so anyone can replace it with their own build. See
+[docs/relinking.md](docs/relinking.md).

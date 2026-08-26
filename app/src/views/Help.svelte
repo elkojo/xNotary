@@ -13,6 +13,22 @@
    */
   const DIA_SUBSTITUTION_URL =
     'https://www.dia.gov.cz/cs/legislativa/eidas-sluzby-vytvarejici-duveru-a-elektronicka-identifikace/informace-pro-uzivatele/pravo-na-nahrazeni-uredne-overeneho-podpisu-dle-ss-6-odst-2-zakona-c-12-2020-sb';
+
+  /** Emitted by the build, so these resolve on a deployed site, not in `npm run dev`. */
+  const base = import.meta.env.BASE_URL;
+  const NOTICES_URL = `${base}THIRD-PARTY.txt`;
+  const RELINKING_URL = `${base}vendor/README.md`;
+  const SOURCE_URL = 'https://github.com/elkojo/xNotary';
+
+  /**
+   * The source of *this* build, not just of the project. Stamped in by
+   * vite.config.ts; a build made from uncommitted changes is marked `-dirty`
+   * and gets no commit link, because there is no public commit to point at.
+   */
+  const revision = __APP_REVISION__;
+  const commit = __APP_COMMIT__;
+  const revisionUrl =
+    commit && !revision.endsWith('-dirty') ? `${SOURCE_URL}/tree/${commit}` : null;
 </script>
 
 <div class="card">
@@ -292,6 +308,47 @@
       <span class="value">
         Self-custody cuts both ways. Clear your browser data and your library is gone. Export your
         certificates.
+      </span>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Licensing</h2>
+  <p class="hint">
+    xNotary is free software: <strong>AGPL-3.0-or-later</strong>. The
+    <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">source</a> is public, which is
+    what lets anyone check that the claims on this page are true of the code actually running.
+  </p>
+  <div class="rows" style="margin-top:1rem">
+    <div class="row">
+      <span>This build</span>
+      <span class="value">
+        {#if revisionUrl}
+          <a href={revisionUrl} target="_blank" rel="noopener noreferrer">
+            <span class="mono">{revision}</span>
+          </a> — the exact source this page was built from. Anyone running xNotary as a service
+          owes you that, not merely a link to the project.
+        {:else}
+          <span class="mono">{revision}</span> — built from changes that are not in any published
+          commit, so there is nothing to link. A deployed build should never say this.
+        {/if}
+      </span>
+    </div>
+    <div class="row">
+      <span>Third-party code</span>
+      <span class="value">
+        Everything your browser downloaded, with its licence, is listed in
+        <a href={NOTICES_URL}>THIRD-PARTY.txt</a> — generated at build time from the modules
+        actually present, so it cannot drift from what was shipped.
+      </span>
+    </div>
+    <div class="row">
+      <span>OpenTimestamps library</span>
+      <span class="value">
+        The OpenTimestamps client is licensed LGPL-3.0-or-later. It is loaded as a separate module
+        rather than bundled in, so you can build your own version of it and have this app run
+        against yours instead: see <a href={RELINKING_URL}>how to relink it</a>.
       </span>
     </div>
   </div>
