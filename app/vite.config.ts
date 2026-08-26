@@ -90,7 +90,7 @@ function webManifest(): Plugin {
             short_name: 'xNotary',
             description:
               'Self-custodial notarization: hash a file locally, timestamp it on Bitcoin, ' +
-              'collect qualified electronic signatures.',
+              'attest the electronic signatures made over it elsewhere.',
             theme_color: '#0b1020',
             background_color: '#0b1020',
             display: 'standalone',

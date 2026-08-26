@@ -1,7 +1,8 @@
 # xNotary
 
-**Self-custodial notarization.** Hash any file locally, timestamp it on Bitcoin, then collect
-qualified electronic signatures over the result. No accounts, no database, no backend — and no
+**Self-custodial notarization.** Hash any file locally, timestamp it on Bitcoin, then attest the
+electronic signatures made over it — qualified ones included. You sign with your own tools;
+xNotary reads the signed file and names who signed. No accounts, no database, no backend — and no
 copy of your documents anywhere but your own device.
 
 > ### ⚠️ Pre-release — not for real use yet
