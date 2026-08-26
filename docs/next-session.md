@@ -1,6 +1,6 @@
 # Where things stand — handoff
 
-**Last updated:** 2026-07-30 (end of session) · `main` · everything pushed, tagged and deployed
+**Last updated:** 2026-08-26 (end of session) · `main` · everything pushed, tagged and deployed
 
 M0, M1 and M2 are done. Both certificates work end to end, the app is public and live, and
 `pades.ts` has been measured against real qualified signatures rather than only synthetic ones.
@@ -11,8 +11,8 @@ What is left before a real release is not code: two reviews, and documents only 
 
 | | |
 |---|---|
-| Live app | <https://elkojo.github.io/xNotary/> — `v0.3.0`, verified live after deploy (asset hashes checked, not just a green tick) |
-| Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 7 releases, all marked pre-release |
+| Live app | <https://elkojo.github.io/xNotary/> — `v0.3.1`, verified live after deploy (asset hashes checked, not just a green tick) |
+| Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 8 releases, all marked pre-release |
 | Flow A — Certificate 1 | Working end to end, verified in a real browser against dev, production *and* the deployed site |
 | Verify-integrity screen | Working, including tamper rejection |
 | Certificate library | Working, with pending → confirmed upgrade |
@@ -20,6 +20,7 @@ What is left before a real release is not code: two reviews, and documents only 
 | Certificate 2 | Working — `Attest` tab, consent gate, one-page A4, sequential *and* parallel signing, and attestation over the *document itself* |
 | Certificate rendering | Liberation subsets embedded; Czech, Greek and Cyrillic names render correctly |
 | Tests | 140 offline, all passing; type-check clean; CI green |
+| Licensing | Notices shipped and generated from the real bundle; the one LGPL dependency is linked, not bundled; every build links the source it was built from |
 
 **Deploying:** bump `version` in `app/package.json` to match → commit → push → tag `v*`. The tag
 fires `deploy.yml`; a plain push does not. Nothing in the app reads that version field, so keeping
@@ -95,6 +96,42 @@ Two decisions were *raised and deliberately not taken*, both needing a human:
   and that is a backend. The only no-backend route is a dated build-time snapshot; see
   `docs/qtsp-findings.md` for the two catches before anyone starts.
 
+## What this session changed (2026-08-26)
+
+Licensing and wording. No product behaviour moved; the test count is unchanged at 140.
+
+1. **The README's lead sentence was wrong about the product.** "Collect qualified electronic
+   signatures" describes a signature-request workflow — send, chase, gather — which xNotary does
+   not have and cannot have without a backend. Signing happens in the user's own tool; this app
+   reads an already-signed PDF. It also made "qualified" the frame, contradicting the README ten
+   lines further down and claiming something no trust-list check backs. Fixed there and in the PWA
+   manifest.
+
+2. **The one LGPL dependency is now linked rather than bundled.**
+   `@vitrified/typescript-opentimestamps` is LGPL-3.0-or-later and is the only copyleft code that
+   reaches the browser; everything else is MIT or BSD. Serving a static SPA *is* conveying it, so
+   LGPL § 4 applies exactly as it would to a downloadable binary. `vite.config.ts` keeps it
+   external, builds it alone into `vendor/opentimestamps.js` — unhashed, unminified,
+   `treeShaking: false` — and imports it by URL, so a user can substitute their own build. Full
+   reasoning, the honest caveat about § 4(d)(0) and ES modules, and what the alternatives cost:
+   **`docs/relinking.md`**. Verified against the production build under both base paths, and
+   `npm run e2e` passes Flow A through the externally linked module.
+
+3. **`THIRD-PARTY.txt` is generated at build time from the modules actually in the bundle**, not
+   from `package.json`, so it cannot drift from what shipped. Reachable from the Help screen along
+   with the relinking note. There were no third-party notices at all before this.
+
+4. **Every build stamps its own revision and links that commit** (AGPL § 13 — whoever runs this as
+   a service owes users the source of *that* version, not a link to the project). A build made
+   from uncommitted changes prints `-dirty` and links nothing, because pointing at a commit the
+   bundle does not match is worse than admitting there is none. `deploy.yml` now checks out with
+   `fetch-depth: 0` so the stamp reads a tag rather than a bare SHA.
+
+5. **`CONTRIBUTING.md` — DCO, no CLA.** See *Decisions already made*.
+
+6. **`esbuild` moved into devDependencies.** It builds the vendored library; relying on it
+   implicitly as Vite's own dependency would break under a stricter installer.
+
 ## Decisions already made — don't relitigate
 
 - **Bitcoin, not Litecoin.** Investigated and rejected; reasoning in `README.md`
@@ -105,6 +142,21 @@ Two decisions were *raised and deliberately not taken*, both needing a human:
 - **Calendar list pinned** to alice/bob/finney; catallaxy serves no CORS header.
 - **Svelte 5 + Vite 5**, hand-written service worker (Node 18 constraint).
 - **BYOS** — xNotary never holds or brokers signing keys.
+- **The code stays open source; the money is in services around it** — archive, printed
+  certificates, physical delivery. This settles several questions at once: no CLA is needed (see
+  below), the AGPL stays, and anything proprietary must live behind the network boundary, because
+  a modified hosted SPA is itself AGPL and its source must be offered to users.
+- **Contributions under the DCO, not a CLA.** Sole copyright would only be needed to relicense or
+  sell proprietary exceptions, which the services model does not require. A CLA also reads as
+  "they intend to close this", which corrodes the trust that is the actual product. If an
+  OEM-exception business ever appears, a CLA can be adopted then — it covers everything written so
+  far, since the author is sole.
+- **The LGPL dependency is linked, not replaced.** A clean-room reimplementation of the `.ots`
+  format, calendar protocol and verification (~500–900 lines, behind the `src/lib/ots.ts` seam) is
+  the only way out from under the LGPL entirely, and it is deliberately *not* being done
+  pre-emptively. Relicensing the dependency is a dead end: the package is a fork of La Crypta's
+  work, so it would need every upstream holder, and no permissive OpenTimestamps client exists —
+  the Python reference client is LGPL too.
 
 ## Next up
 
@@ -280,6 +332,30 @@ two reviews below. None of the remainder is blocked on code.
   the tree and someone should agree to it rather than discover it.
 - **Legal review** by Czech eIDAS counsel — not started, and required before this stops being
   labelled pre-release.
+- **The retention claims need scoping before the archive product exists.** README principle 3 says
+  xNotary "keeps no copy of anything, anywhere … a notarization service that cannot leak, subpoena
+  or lose what it never held", and CLAUDE.md invariants 1 and 2 say the same. A paid archive makes
+  all of that false on the day it ships unless it is rewritten first: *the app* retains nothing and
+  needs no server; the optional archive holds only what the user explicitly sends it. Doing this
+  before launch is cheap and after it is not — it is the same class of error as the "collect
+  signatures" line fixed this session. Physical delivery also makes the operator a data controller
+  (document name, digest, signer names), which needs a retention policy, a vendor DPA and privacy
+  copy that is actually true.
+- **Trademark, not copyright, is what protects the business.** The AGPL lets anyone run a fork as
+  a competing service; it does not let them call it xNotary. For a trust product the name is the
+  asset, so registering the mark (CZ or EUIPO) belongs with the domain move, along with a
+  trademark policy line in the README.
+- **A new domain is planned.** Two things bite, neither of them licensing: the certificate library
+  lives in IndexedDB scoped to `elkojo.github.io`, so an origin change presents every existing user
+  with an empty library — ship export/import first and leave the old URL redirecting with
+  instructions. And a dedicated origin is a *security* upgrade, not just branding: today xNotary
+  shares an origin with every other project on that Pages account, any of which can read its
+  IndexedDB. `BASE_PATH` already parameterises the build, so a custom domain is just dropping it.
+- **Whether to accept pull requests at all is undecided.** Raised and deferred this session. GitHub
+  has no switch for it; the workable combination is a stated policy, a workflow that auto-closes
+  incoming PRs, and optionally disabling forking. Refusing contributions outright (the SQLite
+  model) would make the ownership question moot rather than managing it — worth deciding
+  deliberately rather than by drift, since the first merged outside PR is the point of no return.
 - **Full `ots verify` never completed end to end.** The reference client requires a local
   Bitcoin node and won't trust a block explorer. The proof parses and commits to the right
   digest, and the Bitcoin attestation was confirmed against two explorers — but one run against
