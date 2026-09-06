@@ -1,6 +1,6 @@
 # Where things stand — handoff
 
-**Last updated:** 2026-09-06 (end of session) · `main` · interface rebuilt; not yet tagged or deployed
+**Last updated:** 2026-09-06 (end of session) · `main` · everything pushed, tagged and deployed
 
 M0, M1 and M2 are done. Both certificates work end to end, the app is public and live, and
 `pades.ts` has been measured against real qualified signatures rather than only synthetic ones.
@@ -11,7 +11,7 @@ What is left before a real release is not code: two reviews, and documents only 
 
 | | |
 |---|---|
-| Live app | <https://elkojo.github.io/xNotary/> — `v0.3.1` deployed; `main` is ahead of it. Public address is <https://xnotary.digital>, which **forwards** here: GitHub Pages stays the host, so the origin — and the IndexedDB library scoped to it — does not move |
+| Live app | <https://elkojo.github.io/xNotary/> — `v0.4.0`. Public address is <https://xnotary.digital>, which **forwards** here: GitHub Pages stays the host, so the origin — and the IndexedDB library scoped to it — does not move |
 | Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 8 releases, all marked pre-release |
 | Flow A — Certificate 1 | Working end to end, verified in a real browser against dev, production *and* the deployed site |
 | Verify-integrity screen | Working, including tamper rejection |
@@ -37,10 +37,8 @@ because reasoning about the spec was repeatedly wrong and measurement was repeat
 
 Then `cd app && npm test` (144, offline, ~9s). Green means the tree is sound.
 
-**Nothing is half-finished in the code.** No in-progress branch, no failing test, no partial
-feature. The one outstanding chore is that the rebuilt interface is committed but **not versioned
-or tagged**, so it is not on the live site yet — see *What this session changed (2026-09-06)*.
-Otherwise pick any item under *Next up*; none blocks another.
+**Nothing is half-finished.** There is no in-progress branch, no failing test, no partial feature.
+Pick any item under *Next up*; none blocks another.
 
 The pattern worth keeping, because it caught things tests did not: for anything that produces a
 document or a page, **render it and look at it**. Overflowing text off the bottom of a page, a
@@ -217,8 +215,6 @@ Neither was introduced here; both were reached by driving the real build in a re
 
 ### Left for whoever picks this up
 
-- **The version was not bumped and nothing was tagged**, so this is not deployed. Follow *Deploying*
-  above when you want it live.
 - The domain is a **forward**, so nothing in the build changed for it. If it is ever made a real
   custom domain (a `CNAME` in `public/`, `BASE_PATH=/`), that is an **origin change** and every
   existing user's library goes empty — ship export/import first. See *Open items*.
