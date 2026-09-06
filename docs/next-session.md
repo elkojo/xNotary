@@ -287,9 +287,17 @@ hangs with no error — which looks exactly like a bug in the app, and cost a wh
 
 ## Decisions already made — don't relitigate
 
-- **Bitcoin, not Litecoin.** Investigated and rejected; reasoning in `README.md`
-  ("Why Bitcoin, and not Litecoin"). Short version: no Litecoin calendar exists any more, and
-  the reference `ots` client cannot verify Litecoin attestations at all.
+- **Bitcoin, and no other chain.** Litecoin and Bitcoin SV have both been investigated and
+  rejected, and a *user-selectable chain* was considered and dropped with them. Full findings,
+  re-measured 2026-09-06, are in `README.md` ("Why Bitcoin, and not another chain"). Short
+  version: Litecoin has no calendar left (both hosts are gone from DNS) and the reference client's
+  `LitecoinBlockHeaderAttestation.verify_against_blockheader()` raises `NotImplementedError`, so
+  `ots verify` fails on such a proof; BSV has no OpenTimestamps attestation type at all, so it
+  would need a private tag no other client can read, and it runs at ~0.023% of Bitcoin's hashrate
+  on the *same* SHA-256 algorithm with a history of 14-block reorgs. Both break invariant 4, and
+  both need a calendar we would have to run, which breaks invariant 2. If redundancy is the goal,
+  the answer is a qualified RFC 3161 timestamp — a different *kind* of authority — which is
+  already post-MVP item 1.
 - **`@vitrified/typescript-opentimestamps`**, not `javascript-opentimestamps`. See
   `docs/m0-spike.md`.
 - **Calendar list pinned** to alice/bob/finney; catallaxy serves no CORS header.
