@@ -8,6 +8,10 @@
     file?: File | null;
     /** Accept several files at once — parallel signing produces one per signer. */
     multiple?: boolean;
+    /** The two-up variant used where a screen needs more than one drop target. */
+    compact?: boolean;
+    /** Glyph in the file mark. Kept short: it is set at 20px in a 48px box. */
+    icon?: string;
     onselect: (file: File) => void;
     /** Called instead of `onselect` when `multiple` is set. */
     onselectmany?: (files: File[]) => void;
@@ -19,6 +23,8 @@
     accept = '',
     file = null,
     multiple = false,
+    compact = false,
+    icon = '+',
     onselect,
     onselectmany,
   }: Props = $props();
@@ -37,6 +43,7 @@
 <div
   class="dropzone"
   class:over
+  class:compact
   role="button"
   tabindex="0"
   ondragover={(e) => {
@@ -65,19 +72,18 @@
     onchange={(e) => take(e.currentTarget.files)}
   />
 
-  {#if file}
-    <strong>{file.name}</strong>
-    <div class="meta">{formatBytes(file.size)} · click to choose a different file</div>
-  {:else}
-    <strong>{label}</strong>
-    {#if hint}<div class="meta">{hint}</div>{/if}
-  {/if}
+  <div>
+    <span class="file-icon" aria-hidden="true">{file ? '✓' : icon}</span>
+    {#if file}
+      <strong>{file.name}</strong>
+      <p>{formatBytes(file.size)} · click to choose a different file</p>
+    {:else}
+      <strong>{label}</strong>
+      {#if hint}<p>{hint}</p>{/if}
+      <!-- Looks like a button, is not one: the whole zone is already the control. -->
+      {#if !compact}
+        <span class="button dark small">Choose a file</span>
+      {/if}
+    {/if}
+  </div>
 </div>
-
-<style>
-  .meta {
-    color: var(--muted);
-    font-size: 0.85rem;
-    margin-top: 0.35rem;
-  }
-</style>

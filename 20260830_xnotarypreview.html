@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="xNotary creates portable proof for documents, signatures and agreements.">
+  <title>xNotary — Proof for any document</title>
+  <style>
+    :root {
+      --bg: #07130f;
+      --bg-soft: #0b1b16;
+      --paper: #f4f3ed;
+      --ink: #10201a;
+      --ink-soft: #5e6a65;
+      --white: #f8faf6;
+      --line: rgba(222, 234, 226, .14);
+      --line-dark: rgba(16, 32, 26, .13);
+      --lime: #baff73;
+      --mint: #59e6bd;
+      --green: #173f32;
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 1180px; background: var(--bg); }
+    body {
+      min-width: 1180px;
+      margin: 0;
+      color: var(--white);
+      background: var(--bg);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input { font: inherit; }
+    button { color: inherit; }
+    a { color: inherit; text-decoration: none; }
+    h1, h2, h3, p { margin-top: 0; }
+    button, [data-view-target], [data-step-target], [data-verify-state] { cursor: pointer; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: 72px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(7, 19, 15, .94);
+      backdrop-filter: blur(18px);
+    }
+
+    .nav {
+      width: min(1280px, calc(100% - 72px));
+      height: 100%;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 235px 1fr 235px;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      width: max-content;
+      border: 0;
+      background: transparent;
+      font-size: 20px;
+      font-weight: 780;
+      letter-spacing: -.035em;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border: 1px solid rgba(186, 255, 115, .55);
+      border-radius: 8px;
+      color: var(--lime);
+      background: rgba(186, 255, 115, .05);
+      font-size: 13px;
+      font-weight: 850;
+      transform: rotate(45deg);
+    }
+
+    .brand-mark span { transform: rotate(-45deg); }
+    .brand-domain { color: #9aaba3; font-weight: 500; }
+
+    .main-nav { display: flex; justify-content: center; align-items: center; gap: 3px; }
+    .nav-link {
+      height: 38px;
+      padding: 0 15px;
+      border: 0;
+      border-radius: 9px;
+      color: #acbab3;
+      background: transparent;
+      font-size: 13px;
+      font-weight: 650;
+      transition: color .16s ease, background .16s ease;
+    }
+
+    .nav-link:hover { color: var(--white); background: rgba(255, 255, 255, .045); }
+    .nav-link.active { color: var(--lime); background: rgba(186, 255, 115, .075); }
+
+    .beta {
+      justify-self: end;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #b7c2bc;
+      font-size: 12px;
+      font-weight: 640;
+    }
+
+    .beta::before {
+      width: 7px;
+      height: 7px;
+      content: "";
+      border-radius: 50%;
+      background: var(--lime);
+      box-shadow: 0 0 0 5px rgba(186, 255, 115, .08);
+    }
+
+    .view { display: none; min-height: calc(100vh - 72px); }
+    .view.active { display: block; animation: enter .22s ease both; }
+    @keyframes enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+    .home {
+      padding: 88px 0 72px;
+      background: radial-gradient(circle at 50% 8%, rgba(89, 230, 189, .10), transparent 34rem), var(--bg);
+    }
+
+    .home-wrap { width: min(1120px, calc(100% - 96px)); margin: 0 auto; }
+    .hero { max-width: 790px; margin: 0 auto; text-align: center; }
+    .eyebrow { margin-bottom: 20px; color: var(--lime); font-size: 11px; font-weight: 780; letter-spacing: .17em; text-transform: uppercase; }
+
+    h1 {
+      margin-bottom: 23px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 68px;
+      font-weight: 500;
+      line-height: 1.02;
+      letter-spacing: -.052em;
+    }
+
+    .hero > p { max-width: 650px; margin: 0 auto; color: #bac6c0; font-size: 18px; line-height: 1.7; }
+    .hero-actions { display: flex; justify-content: center; gap: 11px; margin-top: 32px; }
+    .button {
+      display: inline-flex;
+      min-height: 46px;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 0 19px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 740;
+      transition: transform .16s ease, background .16s ease, border-color .16s ease;
+    }
+
+    .button:hover { transform: translateY(-1px); }
+    .button.primary { color: #0d1a14; background: var(--lime); }
+    .button.primary:hover { background: #c9ff91; }
+    .button.secondary { border-color: rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .035); }
+    .button.secondary:hover { border-color: rgba(255, 255, 255, .26); }
+    .button.dark { color: #fff; background: var(--green); }
+    .button.dark:hover { background: #205441; }
+    .button.ghost-dark { color: var(--ink); border-color: var(--line-dark); background: transparent; }
+    .button.small { min-height: 36px; padding: 0 13px; font-size: 12px; }
+
+    .service-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 72px; }
+    .service-card {
+      position: relative;
+      min-height: 205px;
+      padding: 26px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: inherit;
+      background: rgba(255, 255, 255, .035);
+      text-align: left;
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+
+    .service-card:hover { transform: translateY(-3px); border-color: rgba(186, 255, 115, .32); background: rgba(255, 255, 255, .055); }
+    .service-number { color: #789087; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+    .service-card h2 { margin: 37px 0 8px; font-size: 21px; letter-spacing: -.025em; }
+    .service-card p { margin-bottom: 0; color: #9eaea6; font-size: 13px; line-height: 1.6; }
+    .service-arrow { position: absolute; right: 23px; top: 23px; color: var(--lime); font-size: 18px; }
+
+    .trust-row { display: flex; justify-content: center; gap: 34px; margin-top: 42px; color: #84978e; font-size: 11px; font-weight: 690; letter-spacing: .04em; text-transform: uppercase; }
+    .trust-row span { display: inline-flex; align-items: center; gap: 8px; }
+    .trust-row span::before { width: 5px; height: 5px; content: ""; border-radius: 50%; background: var(--mint); }
+
+    .future-note { display: flex; align-items: center; justify-content: space-between; gap: 40px; margin-top: 72px; padding: 24px 28px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: #c4cec9; }
+    .future-note strong { color: var(--white); }
+    .future-note p { margin: 0; font-size: 13px; }
+    .future-note span { color: var(--lime); font-size: 12px; font-weight: 720; white-space: nowrap; }
+
+    .product-view { color: var(--ink); background: var(--paper); }
+    .workspace { width: min(1120px, calc(100% - 96px)); margin: 0 auto; padding: 54px 0 76px; }
+    .page-head { display: flex; align-items: end; justify-content: space-between; gap: 40px; margin-bottom: 30px; }
+    .page-head h1 { margin: 0 0 9px; font-family: Inter, ui-sans-serif, sans-serif; font-size: 34px; font-weight: 760; line-height: 1.15; letter-spacing: -.04em; }
+    .page-head p { max-width: 600px; margin: 0; color: var(--ink-soft); font-size: 14px; }
+    .secure-note { display: inline-flex; align-items: center; gap: 8px; color: #477061; font-size: 12px; font-weight: 700; }
+    .secure-note::before { content: "●"; color: #2d9f72; font-size: 9px; }
+
+    .flow-shell { display: grid; grid-template-columns: 1fr 300px; gap: 18px; align-items: start; }
+    .flow-main, .side-card, .single-card, .list-card { border: 1px solid var(--line-dark); border-radius: var(--radius); background: #fff; box-shadow: 0 12px 40px rgba(25, 42, 35, .055); }
+    .flow-main { min-height: 510px; }
+    .stepper { display: flex; gap: 0; padding: 0 30px; border-bottom: 1px solid var(--line-dark); }
+    .step { position: relative; flex: 1; padding: 19px 0 17px; border: 0; color: #8a9490; background: transparent; text-align: left; font-size: 11px; font-weight: 730; letter-spacing: .055em; text-transform: uppercase; }
+    .step.active { color: var(--ink); }
+    .step.done { color: #32805f; }
+    .step.active::after { position: absolute; right: 12px; bottom: -1px; left: 0; height: 2px; content: ""; background: var(--green); }
+
+    .flow-panel { display: none; padding: 42px; }
+    .flow-panel.active { display: block; animation: enter .18s ease both; }
+    .panel-title { margin-bottom: 8px; font-size: 25px; line-height: 1.2; letter-spacing: -.035em; }
+    .panel-copy { max-width: 590px; margin-bottom: 27px; color: var(--ink-soft); font-size: 14px; }
+
+    .dropzone { display: grid; min-height: 225px; place-items: center; padding: 32px; border: 1.5px dashed #aab7b1; border-radius: 13px; background: #fafaf7; text-align: center; }
+    .file-icon { display: grid; width: 48px; height: 54px; margin: 0 auto 17px; place-items: center; border: 1px solid #99aca3; border-radius: 7px; color: var(--green); background: #fff; font-size: 20px; font-weight: 800; box-shadow: 6px 6px 0 #e3e9e5; }
+    .dropzone strong { display: block; margin-bottom: 6px; font-size: 17px; }
+    .dropzone p { margin: 0 0 17px; color: #75817c; font-size: 12px; }
+    .privacy { display: flex; align-items: center; gap: 9px; margin-top: 17px; color: #65746e; font-size: 12px; }
+    .privacy::before { content: "✓"; color: #207957; font-weight: 850; }
+
+    .review-box { border: 1px solid var(--line-dark); border-radius: 12px; overflow: hidden; }
+    .review-row { display: grid; grid-template-columns: 155px 1fr; gap: 20px; padding: 17px 19px; border-bottom: 1px solid var(--line-dark); }
+    .review-row:last-child { border-bottom: 0; }
+    .review-row > span:first-child { color: #7a8580; font-size: 11px; font-weight: 720; letter-spacing: .05em; text-transform: uppercase; }
+    .review-row strong { font-size: 13px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px !important; font-weight: 560 !important; overflow-wrap: anywhere; }
+
+    .field { margin-top: 18px; }
+    .field label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 720; }
+    .input { width: 100%; height: 44px; padding: 0 13px; border: 1px solid #c7cfcb; border-radius: 9px; outline: none; color: var(--ink); background: #fff; }
+    .input:focus { border-color: #537e6d; box-shadow: 0 0 0 3px rgba(57, 129, 99, .09); }
+    .field-help { margin: 6px 0 0; color: #7c8782; font-size: 11px; }
+    .flow-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 27px; }
+    .flow-actions.end { justify-content: flex-end; }
+
+    .side-card { padding: 24px; }
+    .side-card h3 { margin-bottom: 11px; font-size: 14px; letter-spacing: -.015em; }
+    .side-card p { margin-bottom: 17px; color: var(--ink-soft); font-size: 12px; line-height: 1.6; }
+    .side-list { display: grid; gap: 13px; padding-top: 17px; border-top: 1px solid var(--line-dark); }
+    .side-list div { display: flex; align-items: start; gap: 9px; color: #56655e; font-size: 11px; }
+    .side-list div::before { content: "✓"; color: #25815e; font-weight: 900; }
+
+    .success { text-align: center; padding: 10px 0 0; }
+    .success-mark { display: grid; width: 70px; height: 70px; margin: 0 auto 21px; place-items: center; border-radius: 50%; color: #fff; background: #237658; font-size: 30px; box-shadow: 0 0 0 10px #e5f1ec; }
+    .success h2 { margin-bottom: 8px; font-size: 27px; letter-spacing: -.035em; }
+    .success > p { max-width: 520px; margin: 0 auto 25px; color: var(--ink-soft); }
+    .certificate-mini { max-width: 530px; margin: 0 auto; border: 1px solid var(--line-dark); border-radius: 12px; background: #fafaf7; text-align: left; }
+    .certificate-mini .review-row { grid-template-columns: 130px 1fr; }
+    .success-actions { display: flex; justify-content: center; gap: 10px; margin-top: 26px; }
+    .keep-note { margin-top: 15px !important; color: #7a8580 !important; font-size: 11px; }
+
+    .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .choice { min-height: 145px; padding: 22px; border: 1px solid var(--line-dark); border-radius: 12px; color: var(--ink); background: #fafaf7; text-align: left; }
+    .choice:hover { border-color: #6f9183; }
+    .choice strong { display: block; margin-bottom: 7px; font-size: 15px; }
+    .choice p { margin: 0; color: var(--ink-soft); font-size: 12px; }
+    .choice-icon { display: block; margin-bottom: 21px; color: #2b7457; font-size: 20px; }
+
+    .signers { display: grid; gap: 10px; }
+    .signer-input { display: grid; grid-template-columns: 1fr 1.25fr 34px; gap: 9px; }
+    .remove { border: 1px solid var(--line-dark); border-radius: 8px; color: #7e8884; background: #fff; }
+    .link-button { margin-top: 13px; padding: 0; border: 0; color: #286c51; background: transparent; font-size: 12px; font-weight: 750; }
+
+    .status-list { border: 1px solid var(--line-dark); border-radius: 12px; overflow: hidden; }
+    .status-person { display: grid; grid-template-columns: 1fr 160px; align-items: center; gap: 20px; padding: 17px 19px; border-bottom: 1px solid var(--line-dark); }
+    .status-person:last-child { border-bottom: 0; }
+    .person-name { display: block; font-size: 13px; font-weight: 740; }
+    .person-email { color: #7a8680; font-size: 11px; }
+    .pill { justify-self: end; padding: 5px 9px; border-radius: 999px; font-size: 10px; font-weight: 780; text-transform: uppercase; }
+    .pill.signed, .pill.verified { color: #236048; background: #dff0e8; }
+    .pill.waiting { color: #815f22; background: #f7edd5; }
+
+    .verify-uploader { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .mini-drop { padding: 25px; border: 1px dashed #aeb9b4; border-radius: 12px; background: #fafaf7; text-align: center; }
+    .mini-drop strong { display: block; margin: 9px 0 5px; font-size: 14px; }
+    .mini-drop p { margin: 0; color: #7e8883; font-size: 11px; }
+
+    .state-tabs { display: flex; gap: 7px; margin-bottom: 18px; }
+    .state-tab { padding: 7px 10px; border: 1px solid var(--line-dark); border-radius: 8px; color: #607068; background: transparent; font-size: 11px; font-weight: 720; }
+    .state-tab.active { color: #fff; border-color: var(--green); background: var(--green); }
+    .verify-state { display: none; }
+    .verify-state.active { display: block; }
+    .result-banner { display: flex; align-items: start; gap: 15px; padding: 20px; border-radius: 12px; }
+    .result-banner.good { border: 1px solid #bcdcca; background: #edf7f2; }
+    .result-banner.bad { border: 1px solid #e9c5c0; background: #fff1ef; }
+    .result-icon { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: #fff; font-weight: 900; }
+    .good .result-icon { background: #267a5a; }
+    .bad .result-icon { background: #b95148; }
+    .result-banner h3 { margin-bottom: 4px; font-size: 16px; }
+    .result-banner p { margin: 0; color: #607068; font-size: 12px; }
+
+    .single-card { padding: 34px; }
+    .section-title { margin-bottom: 6px; font-size: 21px; letter-spacing: -.03em; }
+    .section-copy { margin-bottom: 24px; color: var(--ink-soft); font-size: 13px; }
+
+    .list-toolbar { display: flex; justify-content: space-between; gap: 20px; padding: 20px 22px; border-bottom: 1px solid var(--line-dark); }
+    .search { width: 330px; height: 38px; padding: 0 12px; border: 1px solid #cbd2ce; border-radius: 8px; color: var(--ink); background: #fafaf8; }
+    .list-card { overflow: hidden; }
+    .table-head, .table-row { display: grid; grid-template-columns: 2fr 135px 120px 115px 50px; gap: 16px; align-items: center; }
+    .table-head { padding: 12px 22px; color: #7b8781; background: #f7f7f3; font-size: 10px; font-weight: 780; letter-spacing: .06em; text-transform: uppercase; }
+    .table-row { padding: 18px 22px; border-top: 1px solid var(--line-dark); }
+    .doc-name { display: block; font-size: 13px; font-weight: 740; }
+    .doc-hash { color: #84908a; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
+    .table-value { color: #52615a; font-size: 12px; }
+    .more { border: 0; color: #65736d; background: transparent; font-size: 18px; }
+    .storage-note { display: flex; align-items: center; gap: 9px; margin-top: 15px; color: #65736d; font-size: 11px; }
+    .storage-note::before { content: "○"; color: #2d7b5d; font-size: 19px; }
+
+    .how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 26px; }
+    .how-step { padding: 24px; border: 1px solid var(--line-dark); border-radius: 12px; background: #fafaf7; }
+    .how-number { display: block; margin-bottom: 30px; color: #2e7258; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+    .how-step h3 { margin-bottom: 8px; font-size: 16px; }
+    .how-step p { margin: 0; color: var(--ink-soft); font-size: 12px; }
+
+    .boundary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; }
+    .boundary { padding: 23px; border-radius: 12px; }
+    .boundary.yes { border: 1px solid #c8ddcf; background: #edf6f1; }
+    .boundary.no { border: 1px solid #ded6ca; background: #f7f2ea; }
+    .boundary h3 { margin-bottom: 12px; font-size: 14px; }
+    .boundary ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; color: #58665f; font-size: 12px; }
+    .boundary li::before { margin-right: 8px; font-weight: 900; }
+    .boundary.yes li::before { content: "✓"; color: #267756; }
+    .boundary.no li::before { content: "—"; color: #a1722f; }
+
+    .vision-strip { display: flex; align-items: center; justify-content: space-between; gap: 40px; margin-top: 18px; padding: 22px 24px; border-radius: 12px; color: #dfe8e3; background: var(--bg-soft); }
+    .vision-strip strong { display: block; margin-bottom: 4px; font-size: 14px; }
+    .vision-strip p { margin: 0; color: #9fb0a7; font-size: 11px; }
+    .vision-strip span { color: var(--lime); font-size: 12px; font-weight: 750; white-space: nowrap; }
+
+    .demo-hint { position: fixed; right: 22px; bottom: 20px; z-index: 30; padding: 9px 12px; border: 1px solid rgba(255, 255, 255, .12); border-radius: 999px; color: #b8c4be; background: rgba(7, 19, 15, .92); box-shadow: 0 10px 30px rgba(0, 0, 0, .2); font-size: 10px; font-weight: 680; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="nav">
+      <button class="brand" type="button" data-view-target="home" aria-label="Open xNotary home">
+        <span class="brand-mark"><span>xN</span></span>
+        <span>xNotary<span class="brand-domain">.digital</span></span>
+      </button>
+
+      <nav class="main-nav" aria-label="Product navigation">
+        <button class="nav-link" type="button" data-view-target="timestamp">Timestamp</button>
+        <button class="nav-link" type="button" data-view-target="sign">Sign</button>
+        <button class="nav-link" type="button" data-view-target="verify">Verify</button>
+        <button class="nav-link" type="button" data-view-target="certificates">My Certificates</button>
+        <button class="nav-link" type="button" data-view-target="how">How it works</button>
+      </nav>
+
+      <span class="beta">Public beta</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="view home active" data-view="home">
+      <div class="home-wrap">
+        <div class="hero">
+          <div class="eyebrow">Independent document evidence</div>
+          <h1>Make any document provable.</h1>
+          <p>Create a portable record of what existed, when, and who signed it. Your document stays with you.</p>
+          <div class="hero-actions">
+            <button class="button primary" type="button" data-view-target="timestamp">Timestamp a document →</button>
+            <button class="button secondary" type="button" data-view-target="verify">Verify a certificate</button>
+          </div>
+        </div>
+
+        <div class="service-grid" aria-label="xNotary services">
+          <button class="service-card" type="button" data-view-target="timestamp">
+            <span class="service-number">01</span><span class="service-arrow">↗</span>
+            <h2>Timestamp</h2>
+            <p>Prove that an exact file existed at a specific time.</p>
+          </button>
+          <button class="service-card" type="button" data-view-target="sign">
+            <span class="service-number">02</span><span class="service-arrow">↗</span>
+            <h2>Sign</h2>
+            <p>Collect signatures tied to the exact document fingerprint.</p>
+          </button>
+          <button class="service-card" type="button" data-view-target="verify">
+            <span class="service-number">03</span><span class="service-arrow">↗</span>
+            <h2>Verify</h2>
+            <p>Check a document and its certificate independently.</p>
+          </button>
+        </div>
+
+        <div class="trust-row">
+          <span>No document upload</span><span>No account required</span><span>Open verification</span><span>Portable certificate</span>
+        </div>
+
+        <div class="future-note">
+          <p><strong>Proof for people today. Verifiable authority for software tomorrow.</strong> The same evidence layer can support remote multiparty agreements and contracts between authorised AI agents.</p>
+          <span>Our direction →</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="view product-view" data-view="timestamp">
+      <div class="workspace">
+        <div class="page-head">
+          <div><h1>Timestamp a document</h1><p>Create independent proof that an exact file existed at a specific time.</p></div>
+          <span class="secure-note">Processed locally in your browser</span>
+        </div>
+
+        <div class="flow-shell">
+          <div class="flow-main" data-flow="timestamp">
+            <div class="stepper">
+              <button class="step active" type="button" data-step-target="1">1&nbsp; Choose file</button>
+              <button class="step" type="button" data-step-target="2">2&nbsp; Review</button>
+              <button class="step" type="button" data-step-target="3">3&nbsp; Certificate</button>
+            </div>
+
+            <div class="flow-panel active" data-step="1">
+              <h2 class="panel-title">Choose the file you want to prove</h2>
+              <p class="panel-copy">We calculate its unique fingerprint on this device. The document itself is never uploaded.</p>
+              <div class="dropzone">
+                <div><span class="file-icon">+</span><strong>Drop a file here</strong><p>Any file type · up to 100 MB</p><button class="button dark small" type="button" data-step-target="2">Choose a file</button></div>
+              </div>
+              <div class="privacy">Only the document fingerprint is used to create the proof.</div>
+            </div>
+
+            <div class="flow-panel" data-step="2">
+              <h2 class="panel-title">Review before creating proof</h2>
+              <p class="panel-copy">This fingerprint identifies this exact version of the file. Any change produces a different fingerprint.</p>
+              <div class="review-box">
+                <div class="review-row"><span>File</span><strong>Services_Agreement_v3.pdf · 842 KB</strong></div>
+                <div class="review-row"><span>Fingerprint</span><strong class="mono">a81f7c2b09dd8f4d61b37c27c28b29d62192d1e37df1589f1b8418892e31</strong></div>
+                <div class="review-row"><span>Visibility</span><strong>Fingerprint only · document remains private</strong></div>
+              </div>
+              <div class="field">
+                <label for="timestamp-note">Public note <span style="font-weight:500;color:#7c8782">(optional)</span></label>
+                <input class="input" id="timestamp-note" value="Final version agreed by both parties">
+                <p class="field-help">The note becomes part of the permanent certificate.</p>
+              </div>
+              <div class="flow-actions"><button class="button ghost-dark" type="button" data-step-target="1">← Back</button><button class="button dark" type="button" data-step-target="3">Create timestamp</button></div>
+            </div>
+
+            <div class="flow-panel" data-step="3">
+              <div class="success">
+                <div class="success-mark">✓</div>
+                <h2>Proof created</h2>
+                <p>This certificate proves that your exact document existed no later than <strong>28 Aug 2026, 12:42 UTC</strong>.</p>
+                <div class="certificate-mini">
+                  <div class="review-row"><span>Certificate</span><strong>xN-28AUG26-7F2C</strong></div>
+                  <div class="review-row"><span>Status</span><strong style="color:#267658">Timestamp confirmed</strong></div>
+                  <div class="review-row"><span>Document</span><strong>Services_Agreement_v3.pdf</strong></div>
+                </div>
+                <div class="success-actions"><button class="button dark" type="button">Download certificate</button><button class="button ghost-dark" type="button" data-view-target="sign">Add signatures</button></div>
+                <p class="keep-note">Keep the original file. A certificate proves it, but cannot restore it.</p>
+              </div>
+            </div>
+          </div>
+
+          <aside class="side-card">
+            <h3>What you get</h3><p>A portable certificate that anyone can verify together with the original document.</p>
+            <div class="side-list"><div>Document fingerprint</div><div>Independent time proof</div><div>Verification instructions</div></div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="view product-view" data-view="sign">
+      <div class="workspace">
+        <div class="page-head">
+          <div><h1>Collect signatures</h1><p>Ask two or more people to approve the exact same document fingerprint.</p></div>
+          <span class="secure-note">Every signature is bound to one version</span>
+        </div>
+
+        <div class="flow-shell">
+          <div class="flow-main" data-flow="sign">
+            <div class="stepper">
+              <button class="step active" type="button" data-step-target="1">1&nbsp; Document</button>
+              <button class="step" type="button" data-step-target="2">2&nbsp; Signers</button>
+              <button class="step" type="button" data-step-target="3">3&nbsp; Status</button>
+            </div>
+
+            <div class="flow-panel active" data-step="1">
+              <h2 class="panel-title">Which document should be signed?</h2>
+              <p class="panel-copy">Start with a new file or continue from an existing xNotary certificate.</p>
+              <div class="choice-grid">
+                <button class="choice" type="button" data-step-target="2"><span class="choice-icon">＋</span><strong>Choose a document</strong><p>Create its fingerprint now, then invite signers.</p></button>
+                <button class="choice" type="button" data-step-target="2"><span class="choice-icon">◇</span><strong>Use a certificate</strong><p>Add signatures to a document already timestamped.</p></button>
+              </div>
+              <div class="privacy">Signers will see the filename, fingerprint and your message before approving.</div>
+            </div>
+
+            <div class="flow-panel" data-step="2">
+              <h2 class="panel-title">Who needs to sign?</h2>
+              <p class="panel-copy">Each person receives a private link and confirms the same document fingerprint.</p>
+              <div class="signers">
+                <div class="signer-input"><input class="input" aria-label="Signer one name" value="Jan Novak"><input class="input" aria-label="Signer one email" value="jan@example.com"><button class="remove" type="button">×</button></div>
+                <div class="signer-input"><input class="input" aria-label="Signer two name" value="Anna Smith"><input class="input" aria-label="Signer two email" value="anna@example.com"><button class="remove" type="button">×</button></div>
+              </div>
+              <button class="link-button" type="button">＋ Add another signer</button>
+              <div class="field"><label for="sign-message">Message to signers</label><input class="input" id="sign-message" value="Please review and approve the final agreement."></div>
+              <div class="flow-actions"><button class="button ghost-dark" type="button" data-step-target="1">← Back</button><button class="button dark" type="button" data-step-target="3">Send signing links</button></div>
+            </div>
+
+            <div class="flow-panel" data-step="3">
+              <h2 class="panel-title">Waiting for 1 signature</h2>
+              <p class="panel-copy">We will mark the certificate complete when every requested signer has approved the document.</p>
+              <div class="status-list">
+                <div class="status-person"><div><span class="person-name">Jan Novak</span><span class="person-email">jan@example.com</span></div><span class="pill signed">Signed · 12:46</span></div>
+                <div class="status-person"><div><span class="person-name">Anna Smith</span><span class="person-email">anna@example.com</span></div><span class="pill waiting">Waiting</span></div>
+              </div>
+              <div class="flow-actions"><button class="button ghost-dark" type="button">Copy signing link</button><button class="button dark" type="button">Send reminder</button></div>
+            </div>
+          </div>
+
+          <aside class="side-card">
+            <h3>Clear consent</h3><p>Before signing, each person should see exactly what they are approving.</p>
+            <div class="side-list"><div>Document name and fingerprint</div><div>Requester and message</div><div>Certificate after completion</div></div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="view product-view" data-view="verify">
+      <div class="workspace">
+        <div class="page-head">
+          <div><h1>Verify a document</h1><p>Check whether a file matches its certificate, timestamp and recorded signatures.</p></div>
+          <span class="secure-note">Verification is free and open</span>
+        </div>
+
+        <div class="flow-shell">
+          <div class="flow-main" data-flow="verify">
+            <div class="stepper">
+              <button class="step active" type="button" data-step-target="1">1&nbsp; Add files</button>
+              <button class="step" type="button" data-step-target="2">2&nbsp; Result</button>
+            </div>
+
+            <div class="flow-panel active" data-step="1">
+              <h2 class="panel-title">Add the document and certificate</h2>
+              <p class="panel-copy">Both are checked locally. Nothing is uploaded during verification.</p>
+              <div class="verify-uploader">
+                <div class="mini-drop"><span class="file-icon">+</span><strong>Original document</strong><p>Drop the file you received</p></div>
+                <div class="mini-drop"><span class="file-icon">◇</span><strong>xNotary certificate</strong><p>Drop the .xnotary certificate</p></div>
+              </div>
+              <div class="flow-actions end"><button class="button dark" type="button" data-step-target="2">Verify sample files</button></div>
+            </div>
+
+            <div class="flow-panel" data-step="2">
+              <div class="state-tabs" aria-label="Demo result states">
+                <button class="state-tab active" type="button" data-verify-state="valid">Valid result</button>
+                <button class="state-tab" type="button" data-verify-state="problem">Problem result</button>
+              </div>
+              <div class="verify-state active" data-state="valid">
+                <div class="result-banner good"><span class="result-icon">✓</span><div><h3>Verified — the document matches</h3><p>This exact file matches the certificate and has not changed.</p></div></div>
+                <div class="review-box" style="margin-top:16px">
+                  <div class="review-row"><span>Timestamp</span><strong>Confirmed · 28 Aug 2026, 12:42 UTC</strong></div>
+                  <div class="review-row"><span>Signatures</span><strong>2 valid signatures</strong></div>
+                  <div class="review-row"><span>Certificate</span><strong>xN-28AUG26-7F2C</strong></div>
+                </div>
+              </div>
+              <div class="verify-state" data-state="problem">
+                <div class="result-banner bad"><span class="result-icon">!</span><div><h3>Not verified — the document does not match</h3><p>The file may have changed, or this certificate belongs to a different file. Ask the sender for the original document.</p></div></div>
+                <div class="review-box" style="margin-top:16px">
+                  <div class="review-row"><span>Certificate</span><strong>Readable</strong></div>
+                  <div class="review-row"><span>Fingerprint</span><strong style="color:#a24e47">Does not match this file</strong></div>
+                  <div class="review-row"><span>Next step</span><strong>Do not rely on this copy</strong></div>
+                </div>
+              </div>
+              <div class="flow-actions"><button class="button ghost-dark" type="button" data-step-target="1">Verify another document</button><button class="button dark" type="button">Download verification report</button></div>
+            </div>
+          </div>
+
+          <aside class="side-card">
+            <h3>What “verified” means</h3><p>The file matches the fingerprint in the certificate, and the recorded proof can be independently checked.</p>
+            <div class="side-list"><div>Exact document match</div><div>Timestamp status</div><div>Recorded signature status</div></div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="view product-view" data-view="certificates">
+      <div class="workspace">
+        <div class="page-head">
+          <div><h1>My Certificates</h1><p>Certificates saved in this browser. Export anything you want to keep or use elsewhere.</p></div>
+          <button class="button dark" type="button">Import certificate</button>
+        </div>
+
+        <div class="list-card">
+          <div class="list-toolbar"><input class="search" aria-label="Search certificates" placeholder="Search by document or certificate ID"><button class="button ghost-dark small" type="button">All certificates ▾</button></div>
+          <div class="table-head"><span>Document</span><span>Created</span><span>Signatures</span><span>Status</span><span></span></div>
+          <div class="table-row"><div><span class="doc-name">Services_Agreement_v3.pdf</span><span class="doc-hash">xN-28AUG26-7F2C</span></div><span class="table-value">28 Aug 2026</span><span class="table-value">2 of 2</span><span class="pill verified" style="justify-self:start">Complete</span><button class="more" type="button">···</button></div>
+          <div class="table-row"><div><span class="doc-name">Board_resolution_08-26.pdf</span><span class="doc-hash">xN-24AUG26-A119</span></div><span class="table-value">24 Aug 2026</span><span class="table-value">3 of 4</span><span class="pill waiting" style="justify-self:start">Waiting</span><button class="more" type="button">···</button></div>
+          <div class="table-row"><div><span class="doc-name">Delivery_acceptance.pdf</span><span class="doc-hash">xN-19AUG26-82DE</span></div><span class="table-value">19 Aug 2026</span><span class="table-value">—</span><span class="pill verified" style="justify-self:start">Timestamped</span><button class="more" type="button">···</button></div>
+        </div>
+        <div class="storage-note">Nothing here is uploaded to xNotary. Clearing browser data can remove locally saved certificates.</div>
+      </div>
+    </section>
+
+    <section class="view product-view" data-view="how">
+      <div class="workspace">
+        <div class="page-head">
+          <div><h1>How xNotary works</h1><p>A simple evidence layer for documents — without sending the document to us.</p></div>
+          <button class="button dark" type="button" data-view-target="timestamp">Create your first proof</button>
+        </div>
+
+        <div class="single-card">
+          <h2 class="section-title">From file to verifiable proof</h2>
+          <p class="section-copy">Three steps. The original document remains under your control.</p>
+          <div class="how-grid">
+            <article class="how-step"><span class="how-number">01 / Fingerprint</span><h3>Your browser reads the file</h3><p>It creates a unique fingerprint. The file itself does not leave your device.</p></article>
+            <article class="how-step"><span class="how-number">02 / Record</span><h3>xNotary records the proof</h3><p>The fingerprint, time and any signatures are bound together in a certificate.</p></article>
+            <article class="how-step"><span class="how-number">03 / Verify</span><h3>Anyone can check it</h3><p>The original file and certificate can be verified later, independently.</p></article>
+          </div>
+
+          <div class="boundary-grid">
+            <div class="boundary yes"><h3>What xNotary proves</h3><ul><li>The exact file fingerprint</li><li>The recorded time</li><li>Signatures bound to that fingerprint</li><li>Whether the certificate still verifies</li></ul></div>
+            <div class="boundary no"><h3>What xNotary does not prove — today</h3><ul><li>That statements inside the document are true</li><li>A signer’s legal authority unless separately verified</li><li>Official government or civil-law notarisation</li><li>Enforceability in every jurisdiction</li></ul></div>
+          </div>
+
+          <div class="vision-strip"><div><strong>One evidence layer, more kinds of agreement.</strong><p>The long-term direction extends from human signatures to delegated authority and contracts between two or more AI agents.</p></div><span>Documents → people → agents</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="demo-hint">Interactive copy & UX demo · use the tabs and buttons</div>
+
+  <script>
+    const views = [...document.querySelectorAll('[data-view]')];
+    const navLinks = [...document.querySelectorAll('.nav-link')];
+
+    function openView(name) {
+      views.forEach(view => view.classList.toggle('active', view.dataset.view === name));
+      navLinks.forEach(link => link.classList.toggle('active', link.dataset.viewTarget === name));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.querySelectorAll('[data-view-target]').forEach(control => {
+      control.addEventListener('click', () => openView(control.dataset.viewTarget));
+    });
+
+    document.querySelectorAll('[data-flow]').forEach(flow => {
+      const steps = [...flow.querySelectorAll('.step')];
+      const panels = [...flow.querySelectorAll('.flow-panel')];
+
+      function openStep(number) {
+        const value = Number(number);
+        panels.forEach(panel => panel.classList.toggle('active', Number(panel.dataset.step) === value));
+        steps.forEach((step, index) => {
+          step.classList.toggle('active', Number(step.dataset.stepTarget) === value);
+          step.classList.toggle('done', index + 1 < value);
+        });
+      }
+
+      flow.querySelectorAll('[data-step-target]').forEach(control => {
+        control.addEventListener('click', () => openStep(control.dataset.stepTarget));
+      });
+    });
+
+    document.querySelectorAll('[data-verify-state]').forEach(control => {
+      control.addEventListener('click', () => {
+        const state = control.dataset.verifyState;
+        document.querySelectorAll('[data-verify-state]').forEach(tab => tab.classList.toggle('active', tab === control));
+        document.querySelectorAll('[data-state]').forEach(panel => panel.classList.toggle('active', panel.dataset.state === state));
+      });
+    });
+  </script>
+</body>
+</html>

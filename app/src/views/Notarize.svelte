@@ -1,4 +1,13 @@
 <script lang="ts">
+  /**
+   * "Timestamp" — Certificate 1, in three steps: choose the file, look at what
+   * is about to be published, create the proof.
+   *
+   * The digest is computed at step 1 rather than on submit, so the review step
+   * can show the fingerprint the user is actually about to send. Hashing is
+   * local and costs nothing but time; nothing leaves the device until the
+   * button on step 2.
+   */
   import FileDrop from '../components/FileDrop.svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import { buildCertificate1 } from '../lib/certificate1';
@@ -6,15 +15,20 @@
   import { groupHex, sha256File, toHex } from '../lib/hash';
   import { putCertificate, requestPersistence, type CertificateRecord } from '../lib/library';
   import { checkStatus, describeProof, parseOts, stamp, type OtsStatus } from '../lib/ots';
+  import { utcStamp } from '../lib/time';
+  import type { View } from '../nav';
 
   interface Props {
     onstored: () => void;
+    go: (view: View) => void;
   }
-  let { onstored }: Props = $props();
+  let { onstored, go }: Props = $props();
 
-  type Phase = 'idle' | 'hashing' | 'stamping' | 'building' | 'done' | 'error';
+  type Phase = 'idle' | 'hashing' | 'stamping' | 'building' | 'error';
 
   let file = $state<File | null>(null);
+  let digest = $state<Uint8Array | null>(null);
+  let digestHex = $state('');
   let note = $state('');
   let phase = $state<Phase>('idle');
   let hashProgress = $state(0);
@@ -28,55 +42,70 @@
     proofText: string;
   } | null>(null);
 
-  function reset() {
+  const step = $derived(result ? 3 : digest ? 2 : 1);
+  const busy = $derived(phase === 'hashing' || phase === 'stamping' || phase === 'building');
+
+  function startOver() {
+    file = null;
+    digest = null;
+    digestHex = '';
+    note = '';
     phase = 'idle';
-    error = '';
     hashProgress = 0;
+    error = '';
     calendarWarnings = [];
     result = null;
   }
 
-  function pick(chosen: File) {
-    reset();
+  /** Hash on selection, so step 2 can show the digest before anything is sent. */
+  async function pick(chosen: File) {
+    startOver();
     file = chosen;
+    phase = 'hashing';
+    try {
+      const bytes = await sha256File(chosen, (read, total) => {
+        hashProgress = total === 0 ? 1 : read / total;
+      });
+      digest = bytes;
+      digestHex = toHex(bytes);
+      phase = 'idle';
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+      phase = 'error';
+    }
   }
 
   async function notarize() {
-    if (!file) return;
+    if (!file || !digest) return;
     const chosen = file;
-    reset();
+    const chosenDigest = digest;
+    error = '';
+    calendarWarnings = [];
 
     try {
-      // 1. Hash locally. The file itself never leaves the device.
-      phase = 'hashing';
-      const digest = await sha256File(chosen, (read, total) => {
-        hashProgress = total === 0 ? 1 : read / total;
-      });
-      const digestHex = toHex(digest);
-
-      // 2. Submit only the digest to the OpenTimestamps calendars.
+      // Only the 32-byte digest goes to the OpenTimestamps calendars.
       phase = 'stamping';
-      const stamped = await stamp(digest);
+      const stamped = await stamp(chosenDigest);
       calendarWarnings = [...stamped.errors];
 
       // A fresh stamp is always pending, but check anyway: re-stamping a digest
       // that a calendar already anchored can come back complete.
       const status = await checkStatus(stamped.timestamp);
 
-      // 3. Build Certificate 1 around the proof.
       phase = 'building';
       const requestedAt = new Date();
       const pdf = await buildCertificate1({
         fileName: chosen.name,
         fileSize: chosen.size,
-        digest,
+        digest: chosenDigest,
         ots: stamped.ots,
         requestedAt,
         status,
         note: note.trim() || undefined,
       });
 
-      // 4. Keep it in the local library.
+      // Keep it in the local library — the one thing xNotary stores, and only
+      // so a pending timestamp can be upgraded to confirmed later.
       const record: CertificateRecord = {
         id: digestHex,
         fileName: chosen.name,
@@ -98,151 +127,249 @@
         status,
         proofText: describeProof(parseOts(stamped.ots)),
       };
-      phase = 'done';
+      phase = 'idle';
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
       phase = 'error';
     }
   }
-
-  const busy = $derived(phase === 'hashing' || phase === 'stamping' || phase === 'building');
 </script>
 
-<div class="card">
-  <h2>Notarize a file</h2>
-  <p class="hint">
-    The file is hashed on this device and only the 32-byte SHA-256 digest is sent to the
-    OpenTimestamps calendars. The file itself never leaves your device.
-  </p>
-
-  <div style="margin-top:1rem">
-    <FileDrop
-      label="Drop a file here, or click to choose"
-      hint="Any file type. Large files are hashed in chunks."
-      {file}
-      onselect={pick}
-    />
-  </div>
-
-  {#if file}
-    <div style="margin-top:1rem">
-      <label for="note" style="font-size:.88rem;color:var(--muted)">
-        Note (optional — appears on the certificate)
-      </label>
-      <input id="note" type="text" bind:value={note} placeholder="e.g. Lease agreement, v3" />
+<section class="product-view">
+  <div class="workspace">
+    <div class="page-head">
+      <div>
+        <h1>Timestamp a document</h1>
+        <p>
+          Create independent proof that an exact file existed at a specific time, anchored in the
+          Bitcoin blockchain.
+        </p>
+      </div>
+      <span class="secure-note">Processed in this browser</span>
     </div>
-  {/if}
 
-  <div class="actions">
-    <button class="primary" disabled={!file || busy} onclick={notarize}>
-      {#if busy}<span class="spinner"></span>{/if}
-      {phase === 'hashing'
-        ? `Hashing… ${Math.round(hashProgress * 100)}%`
-        : phase === 'stamping'
-          ? 'Submitting to calendars…'
-          : phase === 'building'
-            ? 'Building certificate…'
-            : 'Create Certificate 1'}
-    </button>
-    {#if result}
-      <button
-        onclick={() => {
-          file = null;
-          note = '';
-          reset();
-        }}>Notarize another</button
-      >
-    {/if}
-  </div>
-
-  {#if phase === 'hashing'}
-    <div class="progress"><div style="width:{hashProgress * 100}%"></div></div>
-  {/if}
-
-  {#if error}
-    <div class="notice bad"><strong>Could not create the certificate.</strong> {error}</div>
-  {/if}
-</div>
-
-{#if result}
-  <div class="card">
-    <h2>Certificate 1 created <StatusBadge status={result.status} /></h2>
-
-    <div class="rows" style="margin-top:1rem">
-      <div class="row">
-        <span>File</span>
-        <span class="value">{result.record.fileName} · {formatBytes(result.record.fileSize)}</span>
-      </div>
-      <div class="row">
-        <span>SHA-256</span>
-        <span class="value mono">{groupHex(result.digestHex)}</span>
-      </div>
-      {#if result.status.kind === 'confirmed'}
-        <div class="row">
-          <span>Attested time</span>
-          <span class="value">{result.status.blockTime.toUTCString()}</span>
+    <div class="flow-shell">
+      <div class="flow-main">
+        <div class="stepper">
+          <button class="step" class:active={step === 1} class:done={step > 1} disabled>
+            1 Choose file
+          </button>
+          <button class="step" class:active={step === 2} class:done={step > 2} disabled>
+            2 Review
+          </button>
+          <button class="step" class:active={step === 3} disabled>3 Certificate</button>
         </div>
-        <div class="row">
-          <span>Bitcoin block</span>
-          <span class="value">{result.status.blockHeights.join(', ')}</span>
-        </div>
-      {:else if result.status.kind === 'pending'}
-        <div class="row">
-          <span>Calendars</span>
-          <span class="value">{result.status.calendars.length} accepted the digest</span>
-        </div>
-      {/if}
-    </div>
 
-    {#if result.status.kind === 'pending'}
-      <div class="notice warn">
-        <strong>The proof is not yet anchored in Bitcoin.</strong> The calendars have committed to
-        including your digest in a Bitcoin transaction; this usually completes within a few hours.
-        Come back to <em>My certificates</em> and press <em>Upgrade</em> — the attested time will
-        then be the time of the Bitcoin block, and the certificate will be verifiable by anyone with
-        no calendar involved.
+        {#if step === 1}
+          <div class="flow-panel">
+            <h2 class="panel-title">Choose the file you want to prove</h2>
+            <p class="panel-copy">
+              Its fingerprint is calculated on this device. The document itself is never uploaded —
+              there is no server to upload it to.
+            </p>
+
+            <FileDrop
+              label="Drop a file here"
+              hint="Any file type. Large files are hashed in chunks."
+              onselect={pick}
+            />
+
+            {#if phase === 'hashing'}
+              <div class="progress"><div style="width:{hashProgress * 100}%"></div></div>
+              <p class="field-help">Hashing… {Math.round(hashProgress * 100)}%</p>
+            {/if}
+
+            <div class="privacy">Only the document fingerprint is used to create the proof.</div>
+
+            {#if error}
+              <div class="notice bad"><strong>Could not read that file.</strong> {error}</div>
+            {/if}
+          </div>
+        {:else if step === 2}
+          <div class="flow-panel">
+            <h2 class="panel-title">Review before creating proof</h2>
+            <p class="panel-copy">
+              This fingerprint identifies this exact version of the file. Any change to it, however
+              small, produces a different one.
+            </p>
+
+            <div class="review-box">
+              <div class="review-row">
+                <span>File</span>
+                <strong>{file?.name} · {formatBytes(file?.size ?? 0)}</strong>
+              </div>
+              <div class="review-row">
+                <span>Fingerprint</span>
+                <strong class="mono">{groupHex(digestHex)}</strong>
+              </div>
+              <div class="review-row">
+                <span>Sent</span>
+                <strong>
+                  The 32-byte SHA-256 digest above, and nothing else, to the public OpenTimestamps
+                  calendars.
+                </strong>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="note">Note (optional)</label>
+              <input
+                id="note"
+                class="input"
+                type="text"
+                bind:value={note}
+                placeholder="e.g. Lease agreement, v3"
+              />
+              <p class="field-help">
+                The note is printed on the certificate. It is not sent to the calendars.
+              </p>
+            </div>
+
+            <div class="flow-actions">
+              <button class="button ghost-dark" disabled={busy} onclick={startOver}>
+                ← Choose another file
+              </button>
+              <button class="button dark" disabled={busy} onclick={notarize}>
+                {#if busy}<span class="spinner"></span>{/if}
+                {phase === 'stamping'
+                  ? 'Submitting to calendars…'
+                  : phase === 'building'
+                    ? 'Building certificate…'
+                    : 'Create Certificate 1'}
+              </button>
+            </div>
+
+            {#if error}
+              <div class="notice bad">
+                <strong>Could not create the certificate.</strong>
+                {error}
+              </div>
+            {/if}
+          </div>
+        {:else if result}
+          <div class="flow-panel">
+            <div class="success">
+              <div class="success-mark" aria-hidden="true">✓</div>
+              <h2>Certificate 1 created</h2>
+              <p>
+                {#if result.status.kind === 'confirmed'}
+                  This certificate proves that your exact document existed no later than
+                  <strong>{utcStamp(result.status.blockTime)}</strong>.
+                {:else}
+                  The calendars have accepted your fingerprint. The attested time becomes provable
+                  once it reaches a Bitcoin block — usually within a few hours.
+                {/if}
+              </p>
+
+              <div class="certificate-mini">
+                <div class="review-row">
+                  <span>Status</span>
+                  <div><StatusBadge status={result.status} /></div>
+                </div>
+                <div class="review-row">
+                  <span>Document</span>
+                  <strong>{result.record.fileName}</strong>
+                </div>
+                <div class="review-row">
+                  <span>Fingerprint</span>
+                  <strong class="mono">{groupHex(result.digestHex)}</strong>
+                </div>
+                {#if result.status.kind === 'confirmed'}
+                  <div class="review-row">
+                    <span>Attested time</span>
+                    <strong>{utcStamp(result.status.blockTime)}</strong>
+                  </div>
+                  <div class="review-row">
+                    <span>Bitcoin block</span>
+                    <strong>{result.status.blockHeights.join(', ')}</strong>
+                  </div>
+                {:else if result.status.kind === 'pending'}
+                  <div class="review-row">
+                    <span>Calendars</span>
+                    <strong>{result.status.calendars.length} accepted the digest</strong>
+                  </div>
+                {/if}
+              </div>
+
+              <div class="success-actions">
+                <button
+                  class="button dark"
+                  onclick={() =>
+                    downloadBytes(
+                      result!.record.pdf,
+                      `${baseName(result!.record.fileName)} — Certificate 1.pdf`,
+                      'application/pdf',
+                    )}>Save Certificate 1 (PDF)</button
+                >
+                <button
+                  class="button ghost-dark"
+                  onclick={() =>
+                    downloadBytes(
+                      result!.record.ots,
+                      `${result!.record.fileName}.ots`,
+                      'application/vnd.opentimestamps.ots',
+                    )}>Save proof (.ots)</button
+                >
+              </div>
+              <p class="keep-note">
+                Keep the original file. A certificate proves it; it cannot restore it.
+              </p>
+            </div>
+
+            {#if result.status.kind === 'pending'}
+              <div class="notice warn">
+                <strong>The proof is not yet anchored in Bitcoin.</strong> The calendars have
+                committed to including your digest in a Bitcoin transaction; this usually completes
+                within a few hours. Come back to
+                <button class="link-button" onclick={() => go('library')}>My certificates</button>
+                and press <em>Upgrade</em> — the attested time will then be the time of the Bitcoin
+                block, and the certificate will be verifiable by anyone with no calendar involved.
+              </div>
+            {/if}
+
+            {#if calendarWarnings.length}
+              <div class="notice">
+                Some calendars did not respond ({calendarWarnings.length}). The proof is still valid
+                — it only needs one.
+                <details class="raw">
+                  <summary>Details</summary>
+                  <pre>{calendarWarnings.join('\n')}</pre>
+                </details>
+              </div>
+            {/if}
+
+            <div class="notice">
+              <strong>Back these up.</strong> xNotary has no server and no copy of your data. The
+              certificate is stored in this browser only. The <code>.ots</code> proof is also
+              embedded inside the PDF, so the PDF alone is enough to verify — but keep the original
+              file, or there is nothing to verify against.
+            </div>
+
+            <details class="raw">
+              <summary>OpenTimestamps proof tree</summary>
+              <pre>{result.proofText}</pre>
+            </details>
+
+            <div class="flow-actions end">
+              <button class="button ghost-dark" onclick={startOver}>Timestamp another file</button>
+            </div>
+          </div>
+        {/if}
       </div>
-    {/if}
 
-    {#if calendarWarnings.length}
-      <div class="notice">
-        Some calendars did not respond ({calendarWarnings.length}). The proof is still valid — it
-        only needs one. <details class="raw">
-          <summary>Details</summary>
-          <pre>{calendarWarnings.join('\n')}</pre>
-        </details>
-      </div>
-    {/if}
-
-    <div class="actions">
-      <button
-        class="primary"
-        onclick={() =>
-          downloadBytes(
-            result!.record.pdf,
-            `${baseName(result!.record.fileName)} — Certificate 1.pdf`,
-            'application/pdf',
-          )}>Save Certificate 1 (PDF)</button
-      >
-      <button
-        onclick={() =>
-          downloadBytes(
-            result!.record.ots,
-            `${result!.record.fileName}.ots`,
-            'application/vnd.opentimestamps.ots',
-          )}>Save proof (.ots)</button
-      >
+      <aside class="side-card">
+        <h3>What you get</h3>
+        <p>
+          A portable certificate that anyone can verify together with the original document — with
+          the reference OpenTimestamps client, and no xNotary involved.
+        </p>
+        <div class="side-list">
+          <div>The document's SHA-256 fingerprint</div>
+          <div>An independent time proof, anchored in Bitcoin</div>
+          <div>The proof file embedded in the PDF</div>
+          <div>Printed instructions for verifying it elsewhere</div>
+        </div>
+      </aside>
     </div>
-
-    <div class="notice">
-      <strong>Back these up.</strong> xNotary has no server and no copy of your data. The certificate
-      is stored in this browser only. The <code>.ots</code> proof is also embedded inside the PDF, so
-      the PDF alone is enough to verify — but keep the original file, or there is nothing to verify against.
-    </div>
-
-    <details class="raw" style="margin-top:1rem">
-      <summary>OpenTimestamps proof tree</summary>
-      <pre>{result.proofText}</pre>
-    </details>
   </div>
-{/if}
+</section>

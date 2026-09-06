@@ -1,6 +1,6 @@
 # Where things stand — handoff
 
-**Last updated:** 2026-08-26 (end of session) · `main` · everything pushed, tagged and deployed
+**Last updated:** 2026-09-06 (end of session) · `main` · interface rebuilt; not yet tagged or deployed
 
 M0, M1 and M2 are done. Both certificates work end to end, the app is public and live, and
 `pades.ts` has been measured against real qualified signatures rather than only synthetic ones.
@@ -11,15 +11,15 @@ What is left before a real release is not code: two reviews, and documents only 
 
 | | |
 |---|---|
-| Live app | <https://elkojo.github.io/xNotary/> — `v0.3.1`, verified live after deploy (asset hashes checked, not just a green tick) |
+| Live app | <https://elkojo.github.io/xNotary/> — `v0.3.1` deployed; `main` is ahead of it. Public address is <https://xnotary.digital>, which **forwards** here: GitHub Pages stays the host, so the origin — and the IndexedDB library scoped to it — does not move |
 | Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 8 releases, all marked pre-release |
 | Flow A — Certificate 1 | Working end to end, verified in a real browser against dev, production *and* the deployed site |
 | Verify-integrity screen | Working, including tamper rejection |
 | Certificate library | Working, with pending → confirmed upgrade |
 | PAdES parsing | Hardened; measured against real PostSignum output (`docs/qtsp-findings.md`) |
-| Certificate 2 | Working — `Attest` tab, consent gate, one-page A4, sequential *and* parallel signing, and attestation over the *document itself* |
+| Certificate 2 | Working — `Signatures` tab, consent gate, one-page A4, sequential *and* parallel signing, and attestation over the *document itself* |
 | Certificate rendering | Liberation subsets embedded; Czech, Greek and Cyrillic names render correctly |
-| Tests | 140 offline, all passing; type-check clean; CI green |
+| Tests | 144 offline, all passing; type-check clean; `npm run e2e` passes Flow A through the new interface |
 | Licensing | Notices shipped and generated from the real bundle; the one LGPL dependency is linked, not bundled; every build links the source it was built from |
 
 **Deploying:** bump `version` in `app/package.json` to match → commit → push → tag `v*`. The tag
@@ -35,10 +35,12 @@ Read this file, then `CLAUDE.md` (loaded automatically) for the invariants and g
 `docs/qtsp-findings.md` for what real qualified signatures actually contain — that one exists
 because reasoning about the spec was repeatedly wrong and measurement was repeatedly right.
 
-Then `cd app && npm test` (140, offline, ~5s). Green means the tree is sound.
+Then `cd app && npm test` (144, offline, ~9s). Green means the tree is sound.
 
-**Nothing is half-finished.** There is no in-progress branch, no failing test, no partial feature.
-Pick any item under *Next up*; none blocks another.
+**Nothing is half-finished in the code.** No in-progress branch, no failing test, no partial
+feature. The one outstanding chore is that the rebuilt interface is committed but **not versioned
+or tagged**, so it is not on the live site yet — see *What this session changed (2026-09-06)*.
+Otherwise pick any item under *Next up*; none blocks another.
 
 The pattern worth keeping, because it caught things tests did not: for anything that produces a
 document or a page, **render it and look at it**. Overflowing text off the bottom of a page, a
@@ -131,6 +133,97 @@ Licensing and wording. No product behaviour moved; the test count is unchanged a
 
 6. **`esbuild` moved into devDependencies.** It builds the vendored library; relying on it
    implicitly as Vite's own dependency would break under a stricter installer.
+
+## What this session changed (2026-09-06)
+
+The interface was rebuilt to the design in `20260830_xnotarypreview.html`, which sits at the repo
+root and is **untracked** — commit it if the design source is worth keeping, because nothing else
+records what was being matched. **No product behaviour was removed or added**, with the exceptions
+noted below; the same lib code sits behind every screen. Two real bugs surfaced while checking the
+result, both older than this session.
+
+### The visual system
+
+Dark landing (`--bg #07130f`, lime accent) for the face of the product; light "paper" for every
+working screen. Fixed appearance, not `prefers-color-scheme`: the two surfaces carry meaning here
+(you are reading about it / you are working on a document), and inverting one breaks that. All of
+it is in `src/app.css`; the views carry almost no CSS of their own now.
+
+The mock is desktop-only (`min-width: 1180px`). That was not adopted — the layout is responsive,
+and every screen was checked at 1280 and 390 with a horizontal-overflow assertion, not by eye.
+
+Screens are now `Home · Timestamp · Signatures · Verify · My certificates · How it works`.
+**Route ids did not change** (`home/notarize/attest/verify/library/help`, in `src/nav.ts`), because
+`#/notarize` and `#/attest` are in bookmarks and in the installed PWA's start URL.
+
+### What the mock claimed that the app must not
+
+The mock is a design document, not a specification, and several screens described a different
+product. Taken as layout, refused as copy:
+
+- **The whole "Sign" flow** — signer emails, "Send signing links", reminders, per-signer "Waiting"
+  status. That is a signature-collection service and cannot exist without a backend (invariant 2).
+  The tab is the existing **Attest** flow restyled into the mock's three-step shell: bring the
+  signed files → who may be named → certificate. The consent gate is untouched. The screen says
+  outright that xNotary sends no invitations and holds no key, because the visual language of the
+  mock invites the opposite assumption.
+- **"2 valid signatures"** on the verify result, and "recorded signature status" — invariant 5.
+  `pades.ts` reports claims; it cannot say a signature is valid.
+- **"Timestamp confirmed"** on the screen immediately after stamping. It is `pending` for hours;
+  the success step says so and the copy is conditional on the real status.
+- **"xNotary records the proof"** in How it works. It does not; the calendars and Bitcoin do.
+- **A `.xnotary` certificate container** with short ids. Certificate 1 stays a PDF with the `.ots`
+  embedded — invariant 4 is the whole point.
+- **"Public beta"** in the top bar, which is softer than the truth. It reads **Pre-release**, and
+  the full notice is a band directly under the top bar on every screen, landing included.
+- **"Import certificate"** in the library toolbar. There is no import; a control that does nothing
+  is worse than an absent one. (Export already exists per record.) Left out deliberately — if
+  export/import is ever built, the toolbar has a place for it.
+
+The landing's direction copy — remote multiparty agreements, contracts between authorised software
+agents — was kept, with wording that states plainly it is intent rather than capability. The same
+paragraph appears on How it works.
+
+### Two bugs found by rendering it and looking at it
+
+Neither was introduced here; both were reached by driving the real build in a real browser.
+
+1. **`localStamp` threw on every call.** It asked `toLocaleString` for `dateStyle` + `timeStyle`
+   *and* `timeZoneName`. ECMA-402 forbids combining the style shorthands with any individual
+   component, and the result is a **TypeError**, not an ignored option — reproducible in Node too.
+   It threw inside the certificate list's render, so Svelte abandoned that branch and the library
+   sat behind a permanent "Loading…" with the records already in memory. Spelled the components out;
+   `src/lib/time.test.ts` is new and pins it. This is why the count moved 140 → 144.
+
+   Worth noting how it hid: nothing in `npm test` calls `localStamp`, the failure was silent in the
+   UI (a stuck spinner, not an error), and the digest, proof and certificate were all correct. It
+   took a CDP probe reading `Runtime.exceptionThrown` to see it at all.
+
+2. **The library's `loading` flag was reset on every reload**, so an upgrade or a delete blanked
+   the whole list while IndexedDB was re-read. It is now `loaded`, one-way, and the list is no
+   longer gated on `navigator.storage.estimate()` — which is slow in some browsers and is only
+   needed for a number at the foot of the page.
+
+### Also
+
+- `index.html` still described the product as "collect qualified electronic signatures" — the same
+  wrong-product line fixed in the README and the manifest on 2026-08-26, missed here. Corrected.
+- Favicon and both PWA icons are the new mark; `theme_color`/`background_color` follow the palette.
+- `scripts/e2e-flow-a.mjs` was updated for the new interface: it now asserts the landing renders,
+  navigates by `.nav-link`, and asserts the review step shows the digest *before* anything is sent.
+  Three of its text assertions had to change with the copy. One is worth remembering: `innerText`
+  reflects rendered text, so the uppercased status pill reads `PENDING ANCHOR` — match it
+  case-insensitively.
+
+### Left for whoever picks this up
+
+- **The version was not bumped and nothing was tagged**, so this is not deployed. Follow *Deploying*
+  above when you want it live.
+- The domain is a **forward**, so nothing in the build changed for it. If it is ever made a real
+  custom domain (a `CNAME` in `public/`, `BASE_PATH=/`), that is an **origin change** and every
+  existing user's library goes empty — ship export/import first. See *Open items*.
+- The mock's library table has a **Signatures** column. There is nothing to put in it: the library
+  holds Certificate 1s, which have no signers. It shows **Size** instead.
 
 ## Decisions already made — don't relitigate
 

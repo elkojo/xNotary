@@ -11,26 +11,39 @@
     type CertificateRecord,
   } from '../lib/library';
   import { checkStatus, parseOts, upgradeProof } from '../lib/ots';
+  import { utcStamp } from '../lib/time';
+  import type { View } from '../nav';
 
   interface Props {
     /** Bumped by the parent whenever a certificate is added, to force a reload. */
     revision: number;
+    go: (view: View) => void;
   }
-  let { revision }: Props = $props();
+  let { revision, go }: Props = $props();
 
   let records = $state<CertificateRecord[]>([]);
-  let loading = $state(true);
+  let loaded = $state(false);
   let busyId = $state<string | null>(null);
   let message = $state<{ tone: 'ok' | 'bad' | ''; text: string } | null>(null);
   let storage = $state<{ usage: number; quota: number } | null>(null);
   let expanded = $state<string | null>(null);
   let confirmingDelete = $state<string | null>(null);
+  let filter = $state('');
 
+  /**
+   * `loaded` only ever goes false → true, and is never reset for a reload: an
+   * upgrade or a delete re-reads the store, and blanking the list to "Loading…"
+   * while it does is a worse answer than leaving the rows that are already
+   * correct on screen.
+   *
+   * The list is also not gated on the storage estimate.
+   * `navigator.storage.estimate()` is slow in some browsers, and a number at
+   * the foot of the page is not worth withholding the page for.
+   */
   async function load() {
-    loading = true;
     records = await listCertificates();
+    loaded = true;
     storage = await storageEstimate();
-    loading = false;
   }
 
   // Reload when the parent signals a new certificate was stored.
@@ -40,6 +53,17 @@
   });
 
   const pendingCount = $derived(records.filter((r) => r.status.kind !== 'confirmed').length);
+
+  const shown = $derived.by(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return records;
+    return records.filter(
+      (r) =>
+        r.fileName.toLowerCase().includes(q) ||
+        r.id.includes(q) ||
+        (r.note ?? '').toLowerCase().includes(q),
+    );
+  });
 
   /**
    * Re-fetch the proof from the calendars and, if it has been anchored since,
@@ -124,130 +148,176 @@
   }
 </script>
 
-<div class="card">
-  <h2>My certificates</h2>
-  <p class="hint">
-    Stored in this browser only — xNotary has no server. Clearing site data, or using a different
-    browser or device, will not find them. Export anything you want to keep.
-  </p>
-
-  {#if pendingCount > 0}
-    <div class="actions">
-      <button onclick={upgradeAll} disabled={busyId !== null}>
-        {#if busyId === '*'}<span class="spinner"></span>{/if}
-        Upgrade {pendingCount} pending proof{pendingCount === 1 ? '' : 's'}
-      </button>
+<section class="product-view">
+  <div class="workspace">
+    <div class="page-head">
+      <div>
+        <h1>My certificates</h1>
+        <p>
+          The Certificate 1s made in this browser, kept here only so a pending timestamp can be
+          upgraded once Bitcoin catches up. Save anything you want to keep — this is not a backup.
+        </p>
+      </div>
+      <button class="button dark" onclick={() => go('notarize')}>Timestamp a document</button>
     </div>
-  {/if}
 
-  {#if message}
-    <div class="notice {message.tone}">{message.text}</div>
-  {/if}
-
-  {#if storage}
-    <p class="hint" style="margin-top:.75rem">
-      Using {formatBytes(storage.usage)} of roughly {formatBytes(storage.quota)} available to this site.
-    </p>
-  {/if}
-</div>
-
-{#if loading}
-  <div class="empty">Loading…</div>
-{:else if records.length === 0}
-  <div class="empty">
-    No certificates yet. Notarize a file to create your first one.
-  </div>
-{:else}
-  <div class="list">
-    {#each records as record (record.id)}
-      <div class="item" style="flex-direction:column;align-items:stretch">
-        <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap">
-          <div>
-            <strong>{record.fileName}</strong>
-            <div class="meta">
-              {formatBytes(record.fileSize)} · notarized {formatDate(record.createdAt)}
-              {#if record.note}· {record.note}{/if}
-            </div>
-          </div>
-          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-            <StatusBadge status={record.status} />
-            <button
-              class="link"
-              onclick={() => (expanded = expanded === record.id ? null : record.id)}
-            >
-              {expanded === record.id ? 'Hide' : 'Details'}
+    <div class="list-card">
+      {#if records.length > 0}
+        <div class="list-toolbar">
+          <input
+            class="search"
+            type="text"
+            placeholder="Search by name, note or fingerprint"
+            bind:value={filter}
+            aria-label="Search certificates"
+          />
+          {#if pendingCount > 0}
+            <button class="button ghost-dark small" onclick={upgradeAll} disabled={busyId !== null}>
+              {#if busyId === '*'}<span class="spinner"></span>{/if}
+              Upgrade {pendingCount} pending proof{pendingCount === 1 ? '' : 's'}
             </button>
-          </div>
+          {/if}
+        </div>
+      {/if}
+
+      {#if !loaded}
+        <div class="empty">Loading…</div>
+      {:else if records.length === 0}
+        <div class="empty">No certificates yet. Timestamp a file to create your first one.</div>
+      {:else if shown.length === 0}
+        <div class="empty">Nothing here matches “{filter}”.</div>
+      {:else}
+        <div class="table-head">
+          <span>Document</span>
+          <span>Notarized</span>
+          <span>Size</span>
+          <span>Status</span>
+          <span></span>
         </div>
 
-        {#if expanded === record.id}
-          <div class="rows" style="margin-top:.9rem">
-            <div class="row">
-              <span>SHA-256</span>
-              <span class="value mono">{groupHex(record.id)}</span>
+        {#each shown as record (record.id)}
+          <div>
+            <div class="table-row">
+              <div>
+                <span class="doc-name">{record.fileName}</span>
+                <span class="doc-hash">{record.id.slice(0, 32)}…</span>
+              </div>
+              <span class="table-value">{formatDate(record.createdAt)}</span>
+              <span class="table-value">{formatBytes(record.fileSize)}</span>
+              <StatusBadge status={record.status} />
+              <button
+                class="more"
+                aria-expanded={expanded === record.id}
+                aria-label={expanded === record.id
+                  ? `Hide details for ${record.fileName}`
+                  : `Show details for ${record.fileName}`}
+                onclick={() => (expanded = expanded === record.id ? null : record.id)}
+              >
+                {expanded === record.id ? '⌃' : '⋯'}
+              </button>
             </div>
-            {#if record.status.kind === 'confirmed'}
-              <div class="row">
-                <span>Attested time</span>
-                <span class="value">{record.status.blockTime.toUTCString()}</span>
-              </div>
-              <div class="row">
-                <span>Bitcoin block</span>
-                <span class="value">{record.status.blockHeights.join(', ')}</span>
-              </div>
-            {:else if record.status.kind === 'pending'}
-              <div class="row">
-                <span>Waiting on</span>
-                <span class="value">{record.status.calendars.join(', ')}</span>
-              </div>
-            {:else}
-              <div class="row">
-                <span>Not checked</span>
-                <span class="value">{record.status.reason}</span>
-              </div>
-            {/if}
-            {#if record.updatedAt !== record.createdAt}
-              <div class="row">
-                <span>Proof updated</span>
-                <span class="value">{formatDate(record.updatedAt)}</span>
-              </div>
-            {/if}
-          </div>
 
-          <div class="actions">
-            <button
-              onclick={() =>
-                downloadBytes(
-                  record.pdf,
-                  `${baseName(record.fileName)} — Certificate 1.pdf`,
-                  'application/pdf',
-                )}>Certificate 1 (PDF)</button
-            >
-            <button
-              onclick={() =>
-                downloadBytes(
-                  record.ots,
-                  `${record.fileName}.ots`,
-                  'application/vnd.opentimestamps.ots',
-                )}>Proof (.ots)</button
-            >
-            {#if record.status.kind !== 'confirmed'}
-              <button onclick={() => upgradeClicked(record)} disabled={busyId !== null}>
-                {#if busyId === record.id}<span class="spinner"></span>{/if}
-                Upgrade proof
-              </button>
-            {/if}
-            {#if confirmingDelete === record.id}
-              <button class="danger" onclick={() => remove(record)}>
-                Delete permanently — this cannot be undone
-              </button>
-              <button class="link" onclick={() => (confirmingDelete = null)}>Cancel</button>
-            {:else}
-              <button class="danger" onclick={() => (confirmingDelete = record.id)}>Delete</button>
+            {#if expanded === record.id}
+              <div class="row-detail">
+                <div class="review-box">
+                  <div class="review-row">
+                    <span>SHA-256</span>
+                    <strong class="mono">{groupHex(record.id)}</strong>
+                  </div>
+                  {#if record.note}
+                    <div class="review-row">
+                      <span>Note</span>
+                      <strong>{record.note}</strong>
+                    </div>
+                  {/if}
+                  {#if record.status.kind === 'confirmed'}
+                    <div class="review-row">
+                      <span>Attested time</span>
+                      <strong>{utcStamp(record.status.blockTime)}</strong>
+                    </div>
+                    <div class="review-row">
+                      <span>Bitcoin block</span>
+                      <strong>{record.status.blockHeights.join(', ')}</strong>
+                    </div>
+                  {:else if record.status.kind === 'pending'}
+                    <div class="review-row">
+                      <span>Waiting on</span>
+                      <strong>{record.status.calendars.join(', ')}</strong>
+                    </div>
+                  {:else}
+                    <div class="review-row">
+                      <span>Not checked</span>
+                      <strong>{record.status.reason}</strong>
+                    </div>
+                  {/if}
+                  {#if record.updatedAt !== record.createdAt}
+                    <div class="review-row">
+                      <span>Proof updated</span>
+                      <strong>{formatDate(record.updatedAt)}</strong>
+                    </div>
+                  {/if}
+                </div>
+
+                <div class="flow-actions end" style="margin-top:16px">
+                  <button
+                    class="button ghost-dark small"
+                    onclick={() =>
+                      downloadBytes(
+                        record.pdf,
+                        `${baseName(record.fileName)} — Certificate 1.pdf`,
+                        'application/pdf',
+                      )}>Certificate 1 (PDF)</button
+                  >
+                  <button
+                    class="button ghost-dark small"
+                    onclick={() =>
+                      downloadBytes(
+                        record.ots,
+                        `${record.fileName}.ots`,
+                        'application/vnd.opentimestamps.ots',
+                      )}>Proof (.ots)</button
+                  >
+                  {#if record.status.kind !== 'confirmed'}
+                    <button
+                      class="button ghost-dark small"
+                      onclick={() => upgradeClicked(record)}
+                      disabled={busyId !== null}
+                    >
+                      {#if busyId === record.id}<span class="spinner"></span>{/if}
+                      Upgrade proof
+                    </button>
+                  {/if}
+                  {#if confirmingDelete === record.id}
+                    <button class="button danger small" onclick={() => remove(record)}>
+                      Delete permanently — this cannot be undone
+                    </button>
+                    <button class="link-button" onclick={() => (confirmingDelete = null)}>
+                      Cancel
+                    </button>
+                  {:else}
+                    <button
+                      class="button danger small"
+                      onclick={() => (confirmingDelete = record.id)}
+                    >
+                      Delete
+                    </button>
+                  {/if}
+                </div>
+              </div>
             {/if}
           </div>
-        {/if}
-      </div>
-    {/each}
+        {/each}
+      {/if}
+    </div>
+
+    {#if message}
+      <div class="notice {message.tone}">{message.text}</div>
+    {/if}
+
+    <div class="storage-note">
+      Nothing here is uploaded to xNotary — there is no server. Clearing this browser's data removes
+      these certificates{#if storage && records.length > 0}, which share {formatBytes(storage.usage)}
+        of roughly {formatBytes(storage.quota)} available to this site{/if}.
+    </div>
   </div>
-{/if}
+</section>

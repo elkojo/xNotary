@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
-   * "Verify integrity" — the screen a signer uses after receiving a document and
-   * a Certificate 1 out of band. It answers two separate questions:
+   * "Verify" — the screen a signer uses after receiving a document and a
+   * Certificate 1 out of band. It answers two separate questions:
    *   1. Is this document the one the certificate is about? (hash match)
    *   2. Is the certificate's timestamp real? (OTS proof against Bitcoin)
    * Both must hold. Either failing is reported plainly rather than glossed.
@@ -12,6 +12,7 @@
   import { formatBytes } from '../lib/download';
   import { bytesEqual, groupHex, sha256File, toHex } from '../lib/hash';
   import { checkStatus, describeProof, digestOf, parseOts, type OtsStatus } from '../lib/ots';
+  import { utcStamp } from '../lib/time';
 
   let documentFile = $state<File | null>(null);
   let proofFile = $state<File | null>(null);
@@ -84,136 +85,205 @@
     if (outcome.status.kind === 'pending') return 'pending';
     return 'unchecked';
   });
+
+  const step = $derived(outcome ? 2 : 1);
+  const tone = $derived(
+    verdict === 'mismatch' ? 'bad' : verdict === 'proven' ? 'good' : 'waiting',
+  );
 </script>
 
-<div class="card">
-  <h2>Verify integrity</h2>
-  <p class="hint">
-    Received a document and a Certificate 1? Check here that the certificate really belongs to that
-    exact document, and that its timestamp is anchored in Bitcoin. Everything is checked on this
-    device; nothing is uploaded.
-  </p>
-
-  <div style="display:grid;gap:.75rem;margin-top:1rem">
-    <FileDrop
-      label="1. The document"
-      hint="The original file the certificate was issued for"
-      file={documentFile}
-      onselect={(f) => {
-        documentFile = f;
-        reset();
-      }}
-    />
-    <FileDrop
-      label="2. Certificate 1 (PDF) or the .ots proof"
-      hint="The PDF is enough — the proof is embedded inside it"
-      accept=".pdf,.ots"
-      file={proofFile}
-      onselect={(f) => {
-        proofFile = f;
-        reset();
-      }}
-    />
-  </div>
-
-  <div class="actions">
-    <button class="primary" disabled={!documentFile || !proofFile || checking} onclick={check}>
-      {#if checking}<span class="spinner"></span>{/if}
-      {checking ? 'Checking…' : 'Verify'}
-    </button>
-  </div>
-
-  {#if error}
-    <div class="notice bad">{error}</div>
-  {/if}
-</div>
-
-{#if outcome}
-  <div class="card">
-    {#if verdict === 'mismatch'}
-      <h2><span class="badge bad">Does not match</span></h2>
-      <div class="notice bad">
-        <strong>This certificate is not for this document.</strong> The document you supplied hashes
-        to a different value than the one the proof commits to. Either the file was modified after the
-        certificate was issued, or these two files simply belong to different documents. Do not sign.
+<section class="product-view">
+  <div class="workspace">
+    <div class="page-head">
+      <div>
+        <h1>Verify a document</h1>
+        <p>
+          Check whether a file matches its certificate, and whether that certificate's timestamp is
+          really anchored in Bitcoin.
+        </p>
       </div>
-    {:else if verdict === 'proven'}
-      <h2><span class="badge ok">Verified</span></h2>
-      <div class="notice ok">
-        This document is byte-for-byte the one the certificate was issued for, and its digest was
-        anchored in the Bitcoin blockchain. It provably existed no later than the attested time
-        below.
-      </div>
-    {:else if verdict === 'pending'}
-      <h2><span class="badge pending">Matches, timestamp still pending</span></h2>
-      <div class="notice warn">
-        The document matches the certificate, but the timestamp is not yet anchored in Bitcoin — the
-        calendars have accepted it and are waiting for a block. Until that happens the attested time
-        rests on the calendars' promise rather than on the blockchain. Ask the creator to re-issue
-        the certificate once it confirms, or check again in a few hours.
-      </div>
-    {:else}
-      <h2><span class="badge muted">Matches, anchor not checked</span></h2>
-      <div class="notice">
-        The document matches the certificate, and the proof is attested — but this device did not
-        confirm that attestation: {outcome.status.kind === 'unverified' ? outcome.status.reason : ''}
-        Check your connection and try again, or verify independently with the reference client.
-      </div>
-    {/if}
-
-    <div class="rows" style="margin-top:1rem">
-      <div class="row">
-        <span>Document</span>
-        <span class="value">{documentFile?.name} · {formatBytes(documentFile?.size ?? 0)}</span>
-      </div>
-      <div class="row">
-        <span>Document SHA-256</span>
-        <span class="value mono">{groupHex(outcome.documentDigest)}</span>
-      </div>
-      <div class="row">
-        <span>Proof commits to</span>
-        <span class="value mono">{groupHex(outcome.proofDigest)}</span>
-      </div>
-      <div class="row">
-        <span>Proof read from</span>
-        <span class="value">{outcome.proofSource}</span>
-      </div>
-      <div class="row">
-        <span>Timestamp</span>
-        <span class="value"><StatusBadge status={outcome.status} /></span>
-      </div>
-      {#if outcome.status.kind === 'confirmed'}
-        <div class="row">
-          <span>Attested time</span>
-          <span class="value">{outcome.status.blockTime.toUTCString()}</span>
-        </div>
-        <div class="row">
-          <span>Bitcoin block</span>
-          <span class="value">
-            {outcome.status.blockHeights.join(', ')}
-            <span class="meta">(confirmed via {outcome.status.confirmedBy.join(', ')})</span>
-          </span>
-        </div>
-      {/if}
+      <span class="secure-note">Checked in this browser</span>
     </div>
 
-    <div class="notice">
-      Want to check this without trusting xNotary? Install the reference client
-      (<code>pip install opentimestamps-client</code>) and run
-      <code>ots verify -f "{documentFile?.name}" proof.ots</code>. The instructions are also printed
-      on the certificate itself.
+    <div class="flow-shell">
+      <div class="flow-main">
+        <div class="stepper">
+          <button class="step" class:active={step === 1} class:done={step > 1} disabled>
+            1 Add files
+          </button>
+          <button class="step" class:active={step === 2} disabled>2 Result</button>
+        </div>
+
+        {#if step === 1}
+          <div class="flow-panel">
+            <h2 class="panel-title">Add the document and its certificate</h2>
+            <p class="panel-copy">
+              Both are read on this device. Nothing is uploaded — checking a timestamp only queries
+              public block explorers for a block that is already public.
+            </p>
+
+            <div class="verify-uploader">
+              <FileDrop
+                compact
+                label="Original document"
+                hint="The file the certificate was issued for"
+                file={documentFile}
+                onselect={(f) => {
+                  documentFile = f;
+                  reset();
+                }}
+              />
+              <FileDrop
+                compact
+                icon="◇"
+                label="Certificate 1, or the .ots proof"
+                hint="The PDF is enough — the proof is embedded in it"
+                accept=".pdf,.ots"
+                file={proofFile}
+                onselect={(f) => {
+                  proofFile = f;
+                  reset();
+                }}
+              />
+            </div>
+
+            {#if error}
+              <div class="notice bad">{error}</div>
+            {/if}
+
+            <div class="flow-actions end">
+              <button
+                class="button dark"
+                disabled={!documentFile || !proofFile || checking}
+                onclick={check}
+              >
+                {#if checking}<span class="spinner"></span>{/if}
+                {checking ? 'Checking…' : 'Verify'}
+              </button>
+            </div>
+          </div>
+        {:else if outcome}
+          <div class="flow-panel">
+            <div class="result-banner {tone}">
+              <span class="result-icon" aria-hidden="true">
+                {verdict === 'mismatch' ? '!' : verdict === 'proven' ? '✓' : '·'}
+              </span>
+              <div>
+                {#if verdict === 'mismatch'}
+                  <h3>Not verified — the document does not match</h3>
+                  <p>
+                    <strong>This certificate is not for this document.</strong> The file you supplied
+                    hashes to a different value than the one the proof commits to. Either it was modified
+                    after the certificate was issued, or these two files simply belong to different
+                    documents. Do not sign.
+                  </p>
+                {:else if verdict === 'proven'}
+                  <h3>Verified — the document matches</h3>
+                  <p>
+                    This document is byte-for-byte the one the certificate was issued for, and its
+                    digest was anchored in the Bitcoin blockchain. It provably existed no later than
+                    the attested time below.
+                  </p>
+                {:else if verdict === 'pending'}
+                  <h3>Matches, but the timestamp is still pending</h3>
+                  <p>
+                    The document matches the certificate, but the timestamp is not yet anchored in
+                    Bitcoin — the calendars have accepted it and are waiting for a block. Until that
+                    happens the attested time rests on the calendars' promise rather than on the
+                    blockchain. Ask the creator to re-issue the certificate once it confirms, or
+                    check again in a few hours.
+                  </p>
+                {:else}
+                  <h3>Matches, but the anchor was not checked</h3>
+                  <p>
+                    The document matches the certificate, and the proof is attested — but this
+                    device did not confirm that attestation: {outcome.status.kind === 'unverified'
+                      ? outcome.status.reason
+                      : ''}
+                    Check your connection and try again, or verify independently with the reference
+                    client.
+                  </p>
+                {/if}
+              </div>
+            </div>
+
+            <div class="review-box" style="margin-top:18px">
+              <div class="review-row">
+                <span>Document</span>
+                <strong>{documentFile?.name} · {formatBytes(documentFile?.size ?? 0)}</strong>
+              </div>
+              <div class="review-row">
+                <span>Document SHA-256</span>
+                <strong class="mono">{groupHex(outcome.documentDigest)}</strong>
+              </div>
+              <div class="review-row">
+                <span>Proof commits to</span>
+                <strong class="mono">{groupHex(outcome.proofDigest)}</strong>
+              </div>
+              <div class="review-row">
+                <span>Proof read from</span>
+                <strong>{outcome.proofSource}</strong>
+              </div>
+              <div class="review-row">
+                <span>Timestamp</span>
+                <div><StatusBadge status={outcome.status} /></div>
+              </div>
+              {#if outcome.status.kind === 'confirmed'}
+                <div class="review-row">
+                  <span>Attested time</span>
+                  <strong>{utcStamp(outcome.status.blockTime)}</strong>
+                </div>
+                <div class="review-row">
+                  <span>Bitcoin block</span>
+                  <strong>
+                    {outcome.status.blockHeights.join(', ')}
+                    <span class="meta">(confirmed via {outcome.status.confirmedBy.join(', ')})</span
+                    >
+                  </strong>
+                </div>
+              {/if}
+            </div>
+
+            <div class="notice">
+              Want to check this without trusting xNotary? Install the reference client
+              (<code>pip install opentimestamps-client</code>) and run
+              <code>ots verify -f "{documentFile?.name}" proof.ots</code>. The instructions are also
+              printed on the certificate itself.
+            </div>
+
+            <details class="raw">
+              <summary>OpenTimestamps proof tree</summary>
+              <pre>{outcome.proofText}</pre>
+            </details>
+
+            <div class="flow-actions">
+              <button class="button ghost-dark" onclick={reset}>← Change files</button>
+              <button
+                class="button dark"
+                onclick={() => {
+                  documentFile = null;
+                  proofFile = null;
+                  reset();
+                }}>Verify another document</button
+              >
+            </div>
+          </div>
+        {/if}
+      </div>
+
+      <aside class="side-card">
+        <h3>What “verified” means</h3>
+        <p>
+          That the file matches the fingerprint the certificate commits to, and that the proof can
+          be independently checked against Bitcoin. Nothing more.
+        </p>
+        <div class="side-list">
+          <div>Exact document match</div>
+          <div>Timestamp status, as far as it was checked</div>
+          <div>Nothing about who signed — that is Certificate 2</div>
+          <div>Nothing about what the document says or means</div>
+        </div>
+      </aside>
     </div>
-
-    <details class="raw" style="margin-top:1rem">
-      <summary>OpenTimestamps proof tree</summary>
-      <pre>{outcome.proofText}</pre>
-    </details>
   </div>
-{/if}
-
-<style>
-  .meta {
-    color: var(--muted);
-    font-size: 0.82rem;
-  }
-</style>
+</section>

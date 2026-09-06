@@ -12,7 +12,7 @@ they are, `docs/qtsp-findings.md` for what real qualified signatures actually co
 Everything runs from `app/`.
 
 ```bash
-npm test          # offline suite (125 tests) — this is what CI runs
+npm test          # offline suite (144 tests) — this is what CI runs
 npm run check     # svelte-check; must be 0 errors before committing
 npm run dev       # http://localhost:5173
 npm run build     # check + production build
@@ -65,7 +65,9 @@ These are the product, not preferences. Each has tests behind it.
 
 ```
 app/src/lib/       logic that would still matter if the UI were thrown away
-app/src/views/     Notarize · Attest · Verify · Library · Help
+app/src/views/     Home · Notarize · Attest · Verify · Library · Help
+                   (labelled Timestamp · Signatures · Verify · My certificates · How it works;
+                    route ids in src/nav.ts are unchanged and are what bookmarks use)
 app/src/spikes/    M0 risk spikes + fixtures
 app/scripts/       fixture generation, CDP browser drivers
 docs/              m0-spike.md + qtsp-findings.md (evidence), next-session.md (handoff)
@@ -90,7 +92,12 @@ docs/              m0-spike.md + qtsp-findings.md (evidence), next-session.md (h
   `src/lib/fonts/README.md` first, it records two failure modes that cost an hour each.
 - **Times on a certificate are UTC and say so; times on screen are local and say so.** Both go
   through `src/lib/time.ts`. A bare `toLocaleString` leaves two readers in different countries
-  disagreeing about when something happened with no way to tell why.
+  disagreeing about when something happened with no way to tell why. Naming the zone forces the
+  option shape: `dateStyle`/`timeStyle` are a shorthand ECMA-402 forbids combining with any
+  individual component, `timeZoneName` included, and the combination is a **TypeError**, not an
+  ignored option. It threw on every call for months — inside the certificate list's render, which
+  left the list stuck behind "Loading…" while the records sat in memory. Spell the components out.
+  `time.test.ts` pins it.
 - **A certificate is named after the document, not after the file it was built from.**
   `X — Certificate 1.pdf` signed and renamed `X — Certificate 1_sign2.pdf` still yields
   `X — Certificate 2.pdf`. The original name is read from the Certificate 1 PDF's Title metadata,

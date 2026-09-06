@@ -323,8 +323,8 @@ function webManifest(): Plugin {
             description:
               'Self-custodial notarization: hash a file locally, timestamp it on Bitcoin, ' +
               'attest the electronic signatures made over it elsewhere.',
-            theme_color: '#0b1020',
-            background_color: '#0b1020',
+            theme_color: '#07130f',
+            background_color: '#07130f',
             display: 'standalone',
             start_url: base,
             scope: base,

@@ -92,6 +92,18 @@ try {
   await send('Page.navigate', { url: baseUrl });
   await sleep(4000);
 
+  // --- Landing --------------------------------------------------------------
+  // The app opens on the landing page; the working screens are one click away.
+  check(
+    'the landing page renders',
+    (await evaluate(`document.body.innerText.includes('Make any document provable')`)) === true,
+  );
+  await evaluate(
+    `[...document.querySelectorAll('.nav-link')]
+       .find((b) => b.textContent.trim() === 'Timestamp').click()`,
+  );
+  await sleep(700);
+
   // --- Flow A: notarize -----------------------------------------------------
   const { root } = await send('DOM.getDocument', { depth: -1 });
   const { nodeId: input } = await send('DOM.querySelector', {
@@ -101,15 +113,25 @@ try {
   check('file input is present', Boolean(input));
   await send('DOM.setFileInputFiles', { nodeId: input, files: [docPath] });
 
-  // Notify Svelte, which listens for `change` on the input.
+  // CDP's setFileInputFiles fires `change` itself; dispatch again only if the
+  // input is still mounted. Choosing a file advances the flow to the review
+  // step, which unmounts it.
   await evaluate(
     `document.querySelector('.dropzone input[type=file]')
-       .dispatchEvent(new Event('change', { bubbles: true }))`,
+       ?.dispatchEvent(new Event('change', { bubbles: true }))`,
   );
-  await sleep(500);
+  await sleep(800);
   check(
     'app shows the chosen file',
     (await evaluate(`document.body.innerText.includes('contract.txt')`)) === true,
+  );
+
+  // Choosing a file hashes it locally and advances to the review step, where
+  // the digest is shown before anything is sent.
+  check(
+    'the review step shows the digest before anything is sent',
+    (await evaluate('document.body.innerText')).replace(/\s/g, '').includes(expectedDigest),
+    expectedDigest,
   );
 
   await evaluate(
@@ -131,10 +153,11 @@ try {
     text.replace(/\s/g, '').includes(expectedDigest),
     expectedDigest,
   );
+  // `innerText` reflects rendered text, and the status pill is uppercased in CSS.
   check(
     'a timestamp status is reported',
-    /Pending anchor|Confirmed on Bitcoin/.test(text),
-    (text.match(/Pending anchor|Confirmed on Bitcoin/) ?? [])[0],
+    /pending anchor|confirmed on bitcoin/i.test(text),
+    (text.match(/pending anchor|confirmed on bitcoin/i) ?? [])[0],
   );
   check('save buttons are offered', /Save Certificate 1 \(PDF\)/.test(text));
 
@@ -174,8 +197,8 @@ try {
   writeFileSync(otsPath, Buffer.from(otsBytes));
 
   await evaluate(
-    `[...document.querySelectorAll('nav.tabs button')]
-       .find((b) => b.textContent.includes('Verify integrity')).click()`,
+    `[...document.querySelectorAll('.nav-link')]
+       .find((b) => b.textContent.trim() === 'Verify').click()`,
   );
   await sleep(700);
 
@@ -194,25 +217,36 @@ try {
   );
   await sleep(600);
   await evaluate(
-    `[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Verify').click()`,
+    `[...document.querySelectorAll('.flow-panel button')]
+       .find((b) => b.textContent.trim() === 'Verify').click()`,
   );
 
   let verifyText = '';
   for (let i = 0; i < 20; i++) {
     await sleep(1000);
     verifyText = await evaluate('document.body.innerText');
-    if (/Verified|Does not match|Matches, timestamp still pending|Matches, anchor not checked/.test(verifyText)) break;
+    if (/the document matches|the document does not match|timestamp is still pending|anchor was not checked/i.test(verifyText))
+      break;
   }
   check(
     'verifying the original document against its proof succeeds',
-    /Verified|Matches, timestamp still pending|Matches, anchor not checked/.test(verifyText),
-    (verifyText.match(/Verified|Does not match|Matches[^\n]*/) ?? [])[0],
+    /the document matches|timestamp is still pending|anchor was not checked/i.test(verifyText),
+    (verifyText.match(/^(Verified|Matches|Not verified)[^\n]*/im) ?? [])[0],
   );
-  check('verify screen does not report a mismatch', !/Does not match/.test(verifyText));
+  check(
+    'verify screen does not report a mismatch',
+    !/the document does not match/i.test(verifyText),
+  );
 
-  // Tamper: a different document must be rejected.
+  // Tamper: a different document must be rejected. The result step replaces the
+  // drop zones, so go back to step 1 first.
   const tamperedPath = `${docPath}.tampered.txt`;
   writeFileSync(tamperedPath, `${docBody}tampered\n`);
+  await evaluate(
+    `[...document.querySelectorAll('.flow-panel button')]
+       .find((b) => b.textContent.includes('Change files')).click()`,
+  );
+  await sleep(400);
   const doc3 = await send('DOM.getDocument', { depth: -1 });
   const q3 = await send('DOM.querySelectorAll', {
     nodeId: doc3.root.nodeId,
@@ -225,15 +259,16 @@ try {
   );
   await sleep(400);
   await evaluate(
-    `[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Verify').click()`,
+    `[...document.querySelectorAll('.flow-panel button')]
+       .find((b) => b.textContent.trim() === 'Verify').click()`,
   );
   let tamperText = '';
   for (let i = 0; i < 20; i++) {
     await sleep(1000);
     tamperText = await evaluate('document.body.innerText');
-    if (/Does not match|Verified|Matches/.test(tamperText)) break;
+    if (/the document does not match|the document matches/i.test(tamperText)) break;
   }
-  check('a modified document is rejected', /Does not match/.test(tamperText));
+  check('a modified document is rejected', /the document does not match/i.test(tamperText));
 
   check('no uncaught exceptions', consoleErrors.length === 0, consoleErrors.join(' | '));
   ws.close();

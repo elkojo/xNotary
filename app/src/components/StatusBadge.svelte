@@ -7,7 +7,7 @@
   let { status }: Props = $props();
 
   const tone = $derived(
-    status.kind === 'confirmed' ? 'ok' : status.kind === 'pending' ? 'pending' : 'muted',
+    status.kind === 'confirmed' ? 'good' : status.kind === 'pending' ? 'waiting' : 'muted',
   );
   const label = $derived(
     status.kind === 'confirmed'
@@ -18,4 +18,4 @@
   );
 </script>
 
-<span class="badge {tone}">{label}</span>
+<span class="pill {tone}">{label}</span>

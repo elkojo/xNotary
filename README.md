@@ -18,8 +18,9 @@ copy of your documents anywhere but your own device.
 > **Status.** Certificate 1 and Certificate 2 both work end to end. Remaining before release:
 > security review, legal review, onboarding and disclaimer pass. See [Milestones](#milestones).
 
-**Try it:** <https://elkojo.github.io/xNotary/> — or run it locally, see
-[Getting started](#getting-started). Nothing you do there is uploaded.
+**Try it:** <https://xnotary.digital> — which forwards to the site itself at
+<https://elkojo.github.io/xNotary/>, where it is hosted and where its storage lives. Or run it
+locally, see [Getting started](#getting-started). Nothing you do there is uploaded.
 
 ---
 
@@ -166,7 +167,8 @@ src/lib/          the parts that would still matter if the UI were thrown away
   certificate2.ts Certificate 2: signer attestation, agreement checks, timestamp link
   pades.ts        PAdES signature parsing and signer-identity extraction (M2)
   library.ts      the local certificate store (IndexedDB)
-src/views/        Notarize · Attest signatures · Verify integrity · My certificates · How it works
+src/views/        Home · Timestamp · Signatures · Verify · My certificates · How it works
+                  (route ids are still home/notarize/attest/verify/library/help)
 src/spikes/       M0 risk spikes and their fixtures
 scripts/          fixture generation and browser-driven checks
 ```
