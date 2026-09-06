@@ -235,23 +235,29 @@
               <div class="notice bad">{error}</div>
             {/if}
 
-            <div class="notice">
-              <strong>You can sign the document itself.</strong> Have everyone sign the contract
-              rather than the Certificate 1, then drop the signed contract here together with its
-              Certificate 1 (or the <span class="mono">proof.ots</span>). xNotary checks that the
-              timestamped bytes really are a revision of the file they signed, and Certificate 2
-              then says the signatures are over the document — carrying the proof along inside it.
-              Signing the Certificate 1 still works; it just attests to the certificate rather than
-              to the contract.
-            </div>
+            <details class="explain">
+              <summary>Sign the document itself, or its Certificate 1?</summary>
+              <div>
+                Have everyone sign the contract rather than the Certificate 1, then drop the signed
+                contract here together with its Certificate 1 (or the
+                <span class="mono">proof.ots</span>). xNotary checks that the timestamped bytes
+                really are a revision of the file they signed, and Certificate 2 then says the
+                signatures are over the document — carrying the proof along inside it. Signing the
+                Certificate 1 still works; it just attests to the certificate rather than to the
+                contract.
+              </div>
+            </details>
 
-            <div class="notice">
-              <strong>Signing in parallel or in sequence both work.</strong> In parallel, each
-              signer gets their own copy to sign; drop all of them together and their signatures are
-              pooled onto one certificate. In sequence, one file ends up carrying every signature —
-              drop just that. Either way, xNotary first checks the files really are signatures over
-              the same document, and refuses to combine them if they are not.
-            </div>
+            <details class="explain">
+              <summary>Signing in parallel or in sequence</summary>
+              <div>
+                In parallel, each signer gets their own copy to sign; drop all of them together and
+                their signatures are pooled onto one certificate. In sequence, one file ends up
+                carrying every signature — drop just that. Either way, xNotary first checks the
+                files really are signatures over the same document, and refuses to combine them if
+                they are not.
+              </div>
+            </details>
           </div>
         {:else if step === 2 && draft}
           <div class="flow-panel">
@@ -264,7 +270,7 @@
             <div class="review-box">
               {#each draft.sources as s}
                 <div class="review-row">
-                  <span>{s.fileName}</span>
+                  <span class="plain">{s.fileName}</span>
                   <strong>
                     {formatBytes(s.bytes.length)} ·
                     <span class="mono">{groupHex(toHex(s.digest))}</span>
@@ -362,22 +368,19 @@
               {/each}
             </div>
 
-            <div class="notice">
-              For the determination, validate the signed document against the trust list of the
-              framework it was signed under — in the EU, the EU Trusted Lists. Two routes: run
-              <a href={DSS_SOURCE_URL} target="_blank" rel="noopener noreferrer">DSS</a>, the EU's
-              open-source reference implementation, on your own machine, so the document never leaves
-              it; or ask a trust provider for a validation service. In the EU only a qualified
-              provider may give a qualified validation, and only that result carries the presumption
-              eIDAS attaches to it.
-            </div>
-
+            <!--
+              One notice, not two. Both halves have to survive the merge: what
+              xNotary does *not* do (invariant 5), and the trust list named as
+              the framework's rather than as eIDAS's.
+            -->
             <div class="notice warn">
-              xNotary reads these claims from the certificate. It does not check them against any
-              trust list, so it cannot confirm that a signature is a QES — or whatever your own
-              jurisdiction calls its highest tier — and a QES has the legal effect of a handwritten
-              signature only when it is one. xNotary never uploads anything, so this step is yours
-              to take.
+              xNotary only reports what these certificates claim; it checks them against no trust
+              list, so it cannot tell you a signature is a QES — or whatever your jurisdiction calls
+              its highest tier. For that, validate the signed document against the trust list it was
+              issued under: run
+              <a href={DSS_SOURCE_URL} target="_blank" rel="noopener noreferrer">DSS</a> on your own
+              machine, so the document never leaves it, or ask a trust provider. In the EU, only a
+              qualified provider's validation carries the presumption eIDAS attaches.
             </div>
 
             {#if withheld > 0}
@@ -436,15 +439,13 @@
 
             <div class="notice warn">
               <strong>Save it now — xNotary is not keeping a copy.</strong>
-              This certificate exists only in this browser tab. It is not stored on any server, because
-              there is no server, and it is not written to this device either. Close the tab or navigate
-              away and it is gone.
+              This certificate exists only in this browser tab: no server, and nothing written to
+              this device. Close the tab and it is gone.
               {#if saved}
-                <br /><br />Saved. Keep it somewhere you back up — it is your copy and the only one.
+                Saved — keep it somewhere you back up, it is the only copy.
               {:else}
-                <br /><br />Nothing is lost if you do: you can rebuild an identical certificate at
-                any time from the same signed {draft.sources.length > 1 ? 'files' : 'file'}, which
-                is why xNotary sees no reason to hold one for you.
+                Nothing is lost if you do: it rebuilds identically from the same signed
+                {draft.sources.length > 1 ? 'files' : 'file'} at any time.
               {/if}
             </div>
 
@@ -461,8 +462,8 @@
       <aside class="side-card">
         <h3>Before you name anyone</h3>
         <p>
-          A signature inside a document is not consent to be listed in a new one. Nobody appears on
-          Certificate 2 until you say so, and the ones you leave off are still counted.
+          A signature in a document is not consent to be listed in a new one — nobody appears until
+          you say so, and the ones you leave off are still counted.
         </p>
         <div class="side-list">
           <div>Signatures are read, never collected</div>

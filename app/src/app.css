@@ -107,6 +107,9 @@ code {
 }
 
 .nav {
+  /* Also the positioning context the maturity notice falls back to once the
+     bar wraps and the control is no longer near the right edge. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: 20px;
@@ -189,17 +192,34 @@ code {
 }
 
 /*
- * Maturity of the software. Deliberately not a marketing "beta" badge: it is
- * the short form of the band below, and both come out together at M3.
+ * Maturity of the software, and the control that reveals what it means.
+ *
+ * The notice is not displayed — it is one hover, focus or tap away, so it does
+ * not compete with the page but is never more than a gesture from anyone who
+ * wants it. Both label and notice come out together at M3.
  */
+.stage-wrap {
+  position: relative;
+}
+
 .stage {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
   color: #b7c2bc;
+  cursor: help;
   font-size: 12px;
   font-weight: 640;
   white-space: nowrap;
+  transition: color 0.16s ease;
+}
+
+.stage:hover,
+.stage[aria-expanded='true'] {
+  color: var(--white);
 }
 
 .stage::before {
@@ -209,6 +229,29 @@ code {
   border-radius: 50%;
   background: var(--lime);
   box-shadow: 0 0 0 5px rgba(186, 255, 115, 0.08);
+}
+
+.stage-note {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 12px);
+  z-index: 40;
+  width: min(390px, calc(100vw - 40px));
+  padding: 14px 16px;
+  border: 1px solid var(--warn-line);
+  border-radius: 12px;
+  color: #6f5324;
+  background: var(--warn-bg);
+  box-shadow: 0 16px 44px rgba(4, 12, 9, 0.4);
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.6;
+  text-align: left;
+  white-space: normal;
+}
+
+.stage-note strong {
+  color: #573f13;
 }
 
 /* --------------------------------------------------------- banner strips -- */
@@ -773,6 +816,21 @@ code {
   font-weight: 720;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+/*
+ * The label column is small caps, which is fine for a label and wrong for a
+ * value. Where the left column carries a file name, it keeps its own case:
+ * file names are case-sensitive, and one shown in capitals is one a reader
+ * cannot copy.
+ */
+.review-row > span.plain:first-child {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  overflow-wrap: anywhere;
 }
 
 .review-row strong,
@@ -1393,6 +1451,48 @@ code {
 
 /* --------------------------------------------------------------- details -- */
 
+/*
+ * An explainer that is present without being in the way. The screens it lives
+ * on had ~150 words of prose above the fold explaining choices most users do
+ * not have to make; the words are unchanged, they are just one click away.
+ */
+details.explain {
+  margin-top: 12px;
+  border: 1px solid var(--line-dark);
+  border-radius: 12px;
+  background: #fafaf7;
+}
+
+details.explain > summary {
+  padding: 13px 16px;
+  color: #2b5b48;
+  cursor: pointer;
+  list-style: none;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+details.explain > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.explain > summary::before {
+  display: inline-block;
+  width: 14px;
+  content: '▸';
+}
+
+details.explain[open] > summary::before {
+  content: '▾';
+}
+
+details.explain > div {
+  padding: 0 16px 15px;
+  color: #47554e;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
 details.raw {
   margin-top: 16px;
 }
@@ -1539,6 +1639,20 @@ footer.site a {
     order: 3;
     flex: 1 0 100%;
     justify-content: flex-start;
+  }
+  /*
+   * Once the bar wraps, the control sits near the left edge, so a panel
+   * anchored to it hangs off the screen either way. Dropping the wrapper's
+   * positioning re-anchors the panel to `.nav` and it spans the bar instead.
+   */
+  .stage-wrap {
+    position: static;
+  }
+  .stage-note {
+    right: 12px;
+    left: 12px;
+    top: calc(100% + 8px);
+    width: auto;
   }
   .flow-actions .button {
     flex: 1 1 auto;

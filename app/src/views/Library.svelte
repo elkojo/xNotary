@@ -154,8 +154,8 @@
       <div>
         <h1>My certificates</h1>
         <p>
-          The Certificate 1s made in this browser, kept here only so a pending timestamp can be
-          upgraded once Bitcoin catches up. Save anything you want to keep — this is not a backup.
+          Kept in this browser so pending timestamps can be upgraded. Save what you want to keep —
+          this is not a backup.
         </p>
       </div>
       <button class="button dark" onclick={() => go('notarize')}>Timestamp a document</button>
@@ -315,9 +315,8 @@
     {/if}
 
     <div class="storage-note">
-      Nothing here is uploaded to xNotary — there is no server. Clearing this browser's data removes
-      these certificates{#if storage && records.length > 0}, which share {formatBytes(storage.usage)}
-        of roughly {formatBytes(storage.quota)} available to this site{/if}.
+      Nothing here is uploaded — there is no server. Clearing this browser's data removes them{#if storage && records.length > 0}
+        ({formatBytes(storage.usage)} of ~{formatBytes(storage.quota)}){/if}.
     </div>
   </div>
 </section>

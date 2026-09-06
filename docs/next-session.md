@@ -221,6 +221,51 @@ Neither was introduced here; both were reached by driving the real build in a re
 - The mock's library table has a **Signatures** column. There is nothing to put in it: the library
   holds Certificate 1s, which have no signers. It shows **Size** instead.
 
+## The copy pass (2026-09-06, same session)
+
+A second pass over the same interface, on the brief that the screens carried more prose than a
+first-time reader will absorb. Nothing was removed that carried information; what went was
+repetition and words doing no work. Roughly 500 words came off the four working screens.
+
+**The maturity notice moved.** It was a band under the top bar on every screen; it is now revealed
+by the **Public beta** control in the bar, on hover *and on focus*. Focus is what makes it
+reachable without a mouse — tapping the control focuses it, tapping away blurs it — and it avoids a
+hover and a click fighting over one piece of state. Hover alone would have made it unreadable on a
+phone, which is not a notice. See *Next up* item 3.
+
+What was cut, and the reasoning worth keeping:
+
+- **Signatures step 1 carried ~150 words above the fold** explaining two choices most users do not
+  have to make (sign the document or its Certificate 1; parallel or sequential). Both are now
+  `details.explain` — one-line summaries, full text one click away, unchanged. The screen is a
+  heading, two drop zones and two summaries.
+- **The two trust-list notices on step 2 became one**, 135 words → ~70. Both halves had to survive:
+  what xNotary does *not* do (invariant 5), and the trust list named as the framework's rather than
+  as eIDAS's. Read the merged wording before touching it — it is dense because each clause is
+  load-bearing.
+- **The pending timestamp was explained twice** on the Timestamp success step, once in the success
+  paragraph and again in the notice below it. The notice now carries only the action.
+- **Verify's four verdict paragraphs** dropped to ~30 words each, keeping the heading, the one fact
+  that distinguishes the state, and what to do. "Do not sign" is now the emphasised clause on a
+  mismatch rather than a trailing sentence.
+- **Every side card's paragraph restated its own ticks.** They are one line each now.
+- **The same privacy fact appeared three times on Timestamp step 1** — the page-head badge, the
+  panel copy and a tick under the drop zone. The tick went.
+- **How it works was left alone**, deliberately. It is the page people open *because* they want the
+  detail, and the screens that were shortened link to it. Cutting it would move the problem rather
+  than solve it.
+
+Also found while rendering the result: **the label column uppercased a file name.** The small-caps
+label style is right for a label and wrong for a value — `cert1-countersigned.pdf` was displayed as
+`CERT1-COUNTERSIGNED.PDF`, which a reader cannot copy, because file names are case-sensitive.
+`.review-row > span.plain` opts out; use it wherever the left column carries data rather than a
+label.
+
+One trap for whoever next drives Attest from CDP: `DOM.setFileInputFiles` needs an **absolute**
+path. Given a relative one it creates a `File` whose `arrayBuffer()` never settles, so the screen
+hangs with no error — which looks exactly like a bug in the app, and cost a while to rule out.
+`scripts/e2e-flow-a.mjs` is safe because its paths come from `mkdtempSync`.
+
 ## Decisions already made — don't relitigate
 
 - **Bitcoin, not Litecoin.** Investigated and rejected; reasoning in `README.md`
@@ -380,15 +425,20 @@ Still to do on Certificate 2:
    (via `checkStatus`, degrading to `unverified` offline) for the sign-the-document-itself flow.
    Worth unifying: two ways of saying "this was timestamped" on one page will drift.
 
-### 3. Remove the pre-release warnings — **do this at M3, not before**
+### 3. Remove the maturity warnings — **do this at M3, not before**
 
 Two warnings say this build has had no security review and no legal review. They are accurate
 today and must come out the moment they stop being:
 
-1. `app/src/App.svelte` — the `.prerelease` notice above the tabs.
-2. `README.md` — the "⚠️ Pre-release" block at the top.
+1. `app/src/App.svelte` — the **Public beta** control in the top bar and the `.stage-note` it
+   reveals. Both go together: the label without the notice would be a marketing badge.
+2. `README.md` — the "⚠️ Pre-release" block at the top. Note it still says *pre-release* while the
+   app says *public beta*; align them when one of the two is next touched.
 
-Both carry a comment pointing here. Remove them **only** once the security review and the Czech
+Both carry a comment pointing here. The app's notice is no longer a permanent band — as of
+2026-09-06 it opens on hover or focus, so it is one gesture away rather than on every screen.
+That was a deliberate call about noise, not about accuracy: the wording is unchanged, and hiding
+it entirely would not be. Remove them **only** once the security review and the Czech
 eIDAS counsel review are actually done — not when the code merely feels finished. A warning that
 outlives its accuracy trains people to ignore the next one; a warning removed early is worse
 still.

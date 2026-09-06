@@ -118,8 +118,8 @@
           <div class="flow-panel">
             <h2 class="panel-title">Add the document and its certificate</h2>
             <p class="panel-copy">
-              Both are read on this device. Nothing is uploaded — checking a timestamp only queries
-              public block explorers for a block that is already public.
+              Both are read on this device. Checking the timestamp only asks public block explorers
+              about a block that is already public.
             </p>
 
             <div class="verify-uploader">
@@ -172,36 +172,30 @@
                 {#if verdict === 'mismatch'}
                   <h3>Not verified — the document does not match</h3>
                   <p>
-                    <strong>This certificate is not for this document.</strong> The file you supplied
-                    hashes to a different value than the one the proof commits to. Either it was modified
-                    after the certificate was issued, or these two files simply belong to different
-                    documents. Do not sign.
+                    The file hashes to a different value than the proof commits to: it was changed
+                    after the certificate was issued, or these two belong to different documents.
+                    <strong>Do not sign.</strong>
                   </p>
                 {:else if verdict === 'proven'}
                   <h3>Verified — the document matches</h3>
                   <p>
-                    This document is byte-for-byte the one the certificate was issued for, and its
-                    digest was anchored in the Bitcoin blockchain. It provably existed no later than
-                    the attested time below.
+                    Byte for byte, this is the file the certificate was issued for, and its digest
+                    is anchored in Bitcoin. It provably existed no later than the attested time
+                    below.
                   </p>
                 {:else if verdict === 'pending'}
                   <h3>Matches, but the timestamp is still pending</h3>
                   <p>
-                    The document matches the certificate, but the timestamp is not yet anchored in
-                    Bitcoin — the calendars have accepted it and are waiting for a block. Until that
-                    happens the attested time rests on the calendars' promise rather than on the
-                    blockchain. Ask the creator to re-issue the certificate once it confirms, or
-                    check again in a few hours.
+                    The file matches, but the timestamp is not in a Bitcoin block yet, so the time
+                    rests on the calendars' promise rather than the chain. Check again in a few
+                    hours.
                   </p>
                 {:else}
                   <h3>Matches, but the anchor was not checked</h3>
                   <p>
-                    The document matches the certificate, and the proof is attested — but this
-                    device did not confirm that attestation: {outcome.status.kind === 'unverified'
-                      ? outcome.status.reason
-                      : ''}
-                    Check your connection and try again, or verify independently with the reference
-                    client.
+                    The file matches and the proof is attested, but this device did not confirm the
+                    attestation: {outcome.status.kind === 'unverified' ? outcome.status.reason : ''}
+                    Check your connection, or verify with the reference client.
                   </p>
                 {/if}
               </div>
@@ -274,8 +268,8 @@
       <aside class="side-card">
         <h3>What “verified” means</h3>
         <p>
-          That the file matches the fingerprint the certificate commits to, and that the proof can
-          be independently checked against Bitcoin. Nothing more.
+          That the file matches the certificate's fingerprint, and the proof checks out against
+          Bitcoin. Nothing more.
         </p>
         <div class="side-list">
           <div>Exact document match</div>

@@ -164,8 +164,8 @@
           <div class="flow-panel">
             <h2 class="panel-title">Choose the file you want to prove</h2>
             <p class="panel-copy">
-              Its fingerprint is calculated on this device. The document itself is never uploaded —
-              there is no server to upload it to.
+              We calculate its unique fingerprint on this device. The document itself is never
+              uploaded.
             </p>
 
             <FileDrop
@@ -179,8 +179,6 @@
               <p class="field-help">Hashing… {Math.round(hashProgress * 100)}%</p>
             {/if}
 
-            <div class="privacy">Only the document fingerprint is used to create the proof.</div>
-
             {#if error}
               <div class="notice bad"><strong>Could not read that file.</strong> {error}</div>
             {/if}
@@ -189,8 +187,8 @@
           <div class="flow-panel">
             <h2 class="panel-title">Review before creating proof</h2>
             <p class="panel-copy">
-              This fingerprint identifies this exact version of the file. Any change to it, however
-              small, produces a different one.
+              This fingerprint identifies this exact version. Any change to the file produces a
+              different one.
             </p>
 
             <div class="review-box">
@@ -204,10 +202,7 @@
               </div>
               <div class="review-row">
                 <span>Sent</span>
-                <strong>
-                  The 32-byte SHA-256 digest above, and nothing else, to the public OpenTimestamps
-                  calendars.
-                </strong>
+                <strong>Only the digest above, to public OpenTimestamps calendars.</strong>
               </div>
             </div>
 
@@ -318,12 +313,10 @@
 
             {#if result.status.kind === 'pending'}
               <div class="notice warn">
-                <strong>The proof is not yet anchored in Bitcoin.</strong> The calendars have
-                committed to including your digest in a Bitcoin transaction; this usually completes
-                within a few hours. Come back to
+                <strong>Not yet in a Bitcoin block.</strong> Come back to
                 <button class="link-button" onclick={() => go('library')}>My certificates</button>
-                and press <em>Upgrade</em> — the attested time will then be the time of the Bitcoin
-                block, and the certificate will be verifiable by anyone with no calendar involved.
+                in a few hours and press <em>Upgrade</em> — the certificate will then state the
+                block's own time, and verify with no calendar involved.
               </div>
             {/if}
 
@@ -339,10 +332,9 @@
             {/if}
 
             <div class="notice">
-              <strong>Back these up.</strong> xNotary has no server and no copy of your data. The
-              certificate is stored in this browser only. The <code>.ots</code> proof is also
-              embedded inside the PDF, so the PDF alone is enough to verify — but keep the original
-              file, or there is nothing to verify against.
+              <strong>Back these up.</strong> The certificate lives in this browser only — xNotary
+              keeps no copy. The proof is embedded in the PDF, so the PDF alone verifies; keep the
+              original file too, or there is nothing to check it against.
             </div>
 
             <details class="raw">
@@ -360,8 +352,8 @@
       <aside class="side-card">
         <h3>What you get</h3>
         <p>
-          A portable certificate that anyone can verify together with the original document — with
-          the reference OpenTimestamps client, and no xNotary involved.
+          A certificate anyone can verify against the original — with the reference client, no
+          xNotary involved.
         </p>
         <div class="side-list">
           <div>The document's SHA-256 fingerprint</div>

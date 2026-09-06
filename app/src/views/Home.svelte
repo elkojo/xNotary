@@ -14,8 +14,7 @@
       <h1>Make any document provable.</h1>
       <p>
         Create a portable record of what existed, when, and who signed it. Your document stays with
-        you — it is read in this browser and never uploaded, because there is no server to upload it
-        to.
+        you, it is read in this browser and never sent anywhere.
       </p>
       <div class="hero-actions">
         <button class="button primary" onclick={() => go('notarize')}>
@@ -73,8 +72,7 @@
       <p>
         <strong>Proof for people today. Verifiable authority for software tomorrow.</strong><br />
         The same evidence layer could carry remote multiparty agreements, and contracts between
-        authorised software agents. That is where we intend to take it — not something xNotary does
-        yet.
+        authorised software agents.
       </p>
       <span>Our direction</span>
     </div>

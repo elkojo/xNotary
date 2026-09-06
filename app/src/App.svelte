@@ -13,6 +13,14 @@
   }
 
   let view = $state<View>(viewFromHash());
+  /**
+   * The maturity notice is revealed rather than displayed: it opens on hover
+   * and on focus. Focus rather than click is what makes it reachable without a
+   * mouse — tapping the control focuses it, tapping away blurs it — and it
+   * avoids a hover and a click fighting over the same state. A notice nobody
+   * on a touch screen could read would not be a notice.
+   */
+  let stageOpen = $state(false);
   // Bumped when a certificate is stored, so the library reloads on next view.
   let libraryRevision = $state(0);
   let online = $state(navigator.onLine);
@@ -56,25 +64,36 @@
       {/each}
     </nav>
 
-    <span class="stage">Pre-release</span>
+    <!--
+      Maturity of the software, which is a different claim from what the
+      certificates say about themselves. Each certificate already states its own
+      limits precisely; nothing there tells a visitor that the app producing them
+      has not been reviewed. Deliberately not printed on the certificates: those
+      are meant to outlive this period and to verify without xNotary existing.
+      Remove at M3, once both reviews are done — see docs/next-session.md.
+    -->
+    <div class="stage-wrap">
+      <button
+        type="button"
+        class="stage"
+        aria-expanded={stageOpen}
+        aria-describedby="stage-note"
+        onmouseenter={() => (stageOpen = true)}
+        onmouseleave={() => (stageOpen = false)}
+        onfocus={() => (stageOpen = true)}
+        onblur={() => (stageOpen = false)}
+      >
+        Public beta
+      </button>
+      <div id="stage-note" class="stage-note" role="tooltip" hidden={!stageOpen}>
+        <strong>Public beta.</strong> This build has not had a security review, and its wording has
+        not been reviewed by a lawyer. The timestamps it produces are real and independently
+        verifiable — but treat the app itself as unfinished, and don't rely on it for anything that
+        matters yet.
+      </div>
+    </div>
   </div>
 </header>
-
-<!--
-  Maturity of the software, which is a different claim from what the
-  certificates say about themselves. Each certificate already states its own
-  limits precisely; nothing there tells a visitor that the app producing them
-  has not been reviewed. Deliberately not printed on the certificates: those
-  are meant to outlive this period and to verify without xNotary existing.
-  Remove at M3, once both reviews are done — see docs/next-session.md.
--->
-<div class="band">
-  <div>
-    <strong>Pre-release.</strong> This build has not had a security review, and its wording has not
-    been reviewed by a lawyer. The timestamps it produces are real and independently verifiable —
-    but treat the app itself as unfinished, and don't rely on it for anything that matters yet.
-  </div>
-</div>
 
 {#if !online}
   <div class="band">
