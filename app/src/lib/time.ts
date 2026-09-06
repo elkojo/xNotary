@@ -19,12 +19,26 @@ export function utcStamp(d: Date): string {
   return `${iso.slice(0, 10)} ${iso.slice(11, 19)} UTC`;
 }
 
-/** Local time with its zone named, for the screen. */
+/**
+ * Local time with its zone named, for the screen.
+ *
+ * The components are spelled out rather than asked for as `dateStyle` +
+ * `timeStyle`. Those two are a shorthand that ECMA-402 forbids combining with
+ * any individual component option, `timeZoneName` included — the combination is
+ * a TypeError, not a silently ignored option, so it threw on every call. It did
+ * so inside the certificate list's render, which left the whole list stuck
+ * behind "Loading…" while the records sat in memory. Naming the zone is not
+ * optional here (see above), so the components are what has to give.
+ */
 export function localStamp(d: Date | number): string {
   const date = typeof d === 'number' ? new Date(d) : d;
   return date.toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'medium',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
     timeZoneName: 'short',
   });
 }
