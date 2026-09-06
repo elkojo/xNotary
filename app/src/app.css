@@ -1493,6 +1493,33 @@ details.explain > div {
   line-height: 1.6;
 }
 
+/* A list of foldable examples: these summaries are headings, not asides. */
+.case-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.case-list details.explain {
+  margin-top: 0;
+}
+
+.case-list details.explain > summary {
+  padding: 15px 16px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 740;
+}
+
+.case-list details.explain[open] > summary {
+  padding-bottom: 9px;
+}
+
+.case-list details.explain > div {
+  padding-bottom: 17px;
+  font-size: 13px;
+}
+
 details.raw {
   margin-top: 16px;
 }

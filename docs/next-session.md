@@ -261,6 +261,25 @@ label style is right for a label and wrong for a value — `cert1-countersigned.
 `.review-row > span.plain` opts out; use it wherever the left column carries data rather than a
 label.
 
+### Use cases on *How it works* (same day)
+
+A **"What people use it for"** card, second on the page, five foldable cases. Each is there because
+it is the only place one property is shown concretely — the agreement check, the file never leaving
+the device, the recipient needing nothing, the limit on what a timestamp can mean, and a certificate
+outliving this app. Folded by default (`details.explain` inside `.case-list`): five open cases would
+bury the page they introduce.
+
+The section's job is also to say what a *signature* adds over a timestamp — that a trust provider
+checked the person's identity before issuing their certificate, so the name is one an authority
+stood behind. Two things to keep right if this is edited:
+
+- The identity check is the **provider's**, not xNotary's, and it holds only for certificates from
+  one — xNotary accepts self-signed certificates too and flags them. Every sentence here is
+  conditioned on that. Do not compress it into "xNotary verifies who signed"; it does not, and
+  invariant 5 is the reason.
+- The *Preserving a record* case ends "It proves the export existed and is unchanged; not that what
+  it says is true." That sentence is the point of the case, not a disclaimer appended to it.
+
 One trap for whoever next drives Attest from CDP: `DOM.setFileInputFiles` needs an **absolute**
 path. Given a relative one it creates a `File` whose `arrayBuffer()` never settles, so the screen
 hangs with no error — which looks exactly like a bug in the app, and cost a while to rule out.

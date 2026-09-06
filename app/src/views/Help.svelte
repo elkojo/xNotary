@@ -112,6 +112,84 @@
       </div>
     </div>
 
+    <!--
+      Examples, not features. Each one is here because it is the only place a
+      particular property is shown concretely — the agreement check, the file
+      never leaving the device, the recipient needing nothing, the limit on what
+      a timestamp can mean, and a certificate outliving this app. Folded by
+      default: five open cases would bury the page they are meant to introduce.
+    -->
+    <div class="single-card">
+      <h2 class="section-title">What people use it for</h2>
+      <p class="section-copy">
+        Timestamping fixes <em>what</em> a document was and <em>when</em>. It says nothing about
+        <em>who</em> — that is what a signature adds. A trust provider checks a person's identity
+        before issuing their certificate, so a signed document carries a name someone stood behind
+        rather than one typed into a form. Certificate 2 records those names with the authority that
+        issued each, and points you to the check that confirms them.
+      </p>
+
+      <div class="case-list">
+        <details class="explain">
+          <summary>A contract signed in two countries, with no shared platform</summary>
+          <div>
+            Two companies agree terms, and neither wants to run the deal through the other's signing
+            service. Timestamp the final PDF, send it to everyone, and each party signs their own
+            copy in their own tool. Drop the signed copies back in together with the proof:
+            Certificate 2 names who signed, having first established that they all signed the same
+            document. Where a signature comes from a trust provider — one that checked who the
+            person was before issuing their certificate — the page records not just that someone
+            signed, but whom an authority vouched for.
+          </div>
+        </details>
+
+        <details class="explain">
+          <summary>A confidential record, dated before you disclose it</summary>
+          <div>
+            An engineer wants dated evidence that a design existed before a filing or a conversation
+            — without showing it to anyone, us included. The file is hashed on your own machine and
+            only the 32-byte fingerprint is sent, so a Bitcoin block dates a document nobody else
+            has seen. Sign it as well and the record says who made it, not only that it existed,
+            which is usually the point when the question is authorship.
+          </div>
+        </details>
+
+        <details class="explain">
+          <summary>Proving what you delivered</summary>
+          <div>
+            An agency hands over a report, a build or a set of drawings, and both sides want the
+            delivered version fixed. Timestamp it, send it with its Certificate 1, and the client
+            checks the match on the <strong>Verify</strong> screen — no account, no upload, nothing
+            to install. “That isn't what you sent” becomes a question with an answer. If the sender
+            signs the delivery, the certificate also records who sent it; if the client signs their
+            copy back, who accepted it.
+          </div>
+        </details>
+
+        <details class="explain">
+          <summary>Preserving a record before it changes</summary>
+          <div>
+            An investigator exports a chat log, a page or an account statement that may not exist in
+            that form next week. Timestamping fixes both the bytes and the date, so an edited or
+            re-exported copy is visibly a different file. A signature from the person who made the
+            export adds who is standing behind it — the part a timestamp cannot supply. It proves
+            the export existed and is unchanged; not that what it says is true.
+          </div>
+        </details>
+
+        <details class="explain">
+          <summary>A release anyone can still check in ten years</summary>
+          <div>
+            A maintainer timestamps a release artifact and its checksums. Years later, anyone
+            holding the download can confirm it is what was published — with the reference
+            OpenTimestamps client and a Bitcoin node, with no xNotary, no code host and no trust in
+            either. Sign the release too and the same check tells them who published it, not only
+            that the bytes are unchanged. That is the test every certificate here is built to pass.
+          </div>
+        </details>
+      </div>
+    </div>
+
     <div class="single-card">
       <h2 class="section-title">What xNotary does</h2>
       <p class="section-copy">
