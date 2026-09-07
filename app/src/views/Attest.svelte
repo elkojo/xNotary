@@ -339,7 +339,20 @@
               </div>
             {/if}
 
-            <div class="signers" style="margin-top:18px">
+            <!--
+              Shown whether or not anything is unticked. Unticking a box is the
+              moment the misunderstanding is formed, so the correction has to be
+              on screen before it, not conditionally after it.
+            -->
+            <div class="notice" style="margin-top:18px">
+              <strong>Leaving someone off is not anonymization.</strong>
+              The certificate embeds the signed file in full, and their name is inside it — that is
+              where xNotary read it from. Anyone opening the attachment can see it, and it cannot be
+              removed without breaking the signature. Unticking keeps a name off the overview page;
+              it does not take it out of the evidence.
+            </div>
+
+            <div class="signers" style="margin-top:14px">
               {#each draft.signers as s, i}
                 <label class="signer" class:on={consented[i]}>
                   <input type="checkbox" bind:checked={consented[i]} />
@@ -363,6 +376,11 @@
                       {#if s.revision}· covers revision {s.revision.index} of {s.revision.of}{/if}
                     </span>
                     {#each s.warnings as w}<span class="meta">{w}</span>{/each}
+                    {#if !consented[i]}
+                      <span class="meta warn-text"
+                        >Not named on the certificate — still named inside the attached file</span
+                      >
+                    {/if}
                   </div>
                 </label>
               {/each}
@@ -385,10 +403,13 @@
 
             {#if withheld > 0}
               <div class="notice warn">
-                {withheld} signature{withheld === 1 ? '' : 's'} will not be named. The certificate will
-                still say {withheld === 1 ? 'one exists' : `${withheld} exist`}, without identifying
-                {withheld === 1 ? 'them' : 'any of them'} — the signed document is attached in full either
-                way.
+                <strong
+                  >{withheld} signature{withheld === 1 ? '' : 's'} will not be named on the overview —
+                  but {withheld === 1 ? 'that name stays' : 'those names stay'} in the file.</strong
+                >
+                The certificate will say {withheld === 1 ? 'one exists' : `${withheld} exist`} without
+                identifying {withheld === 1 ? 'them' : 'any of them'}, and states on its own face that
+                this is not anonymization.
               </div>
             {/if}
 
@@ -439,8 +460,8 @@
 
             <div class="notice warn">
               <strong>Save it now — xNotary is not keeping a copy.</strong>
-              This certificate exists only in this browser tab: no server, and nothing written to
-              this device. Close the tab and it is gone.
+              This certificate exists only in this browser tab: no xNotary backend, and nothing
+              written to this device. Close the tab and it is gone.
               {#if saved}
                 Saved — keep it somewhere you back up, it is the only copy.
               {:else}
@@ -463,12 +484,13 @@
         <h3>Before you name anyone</h3>
         <p>
           A signature in a document is not consent to be listed in a new one — nobody appears until
-          you say so, and the ones you leave off are still counted.
+          you say so. Leaving someone off keeps them off the overview page; it does not remove them
+          from the signed file the certificate attaches.
         </p>
         <div class="side-list">
           <div>Signatures are read, never collected</div>
           <div>Your signing key never touches xNotary</div>
-          <div>The signed file is attached, not modified</div>
+          <div>The signed file is attached, not modified — names included</div>
           <div>Claims are reported; no legal verdict is given</div>
         </div>
         <p style="margin-top:17px">

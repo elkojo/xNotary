@@ -59,7 +59,7 @@
     <div class="trust-row">
       <span>No document upload</span>
       <span>No account</span>
-      <span>No server</span>
+      <span>No xNotary backend</span>
       <span>Open verification</span>
     </div>
 

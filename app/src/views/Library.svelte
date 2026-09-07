@@ -315,7 +315,7 @@
     {/if}
 
     <div class="storage-note">
-      Nothing here is uploaded — there is no server. Clearing this browser's data removes them{#if storage && records.length > 0}
+      Nothing here is uploaded — there is no xNotary backend. Clearing this browser's data removes them{#if storage && records.length > 0}
         ({formatBytes(storage.usage)} of ~{formatBytes(storage.quota)}){/if}.
     </div>
   </div>

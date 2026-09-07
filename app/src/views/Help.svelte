@@ -85,6 +85,7 @@
             <li>The exact fingerprint of one file</li>
             <li>That it existed no later than a particular Bitcoin block</li>
             <li>Who signed it, among those who consented to be named</li>
+            <li>That further signatures exist, without naming them</li>
             <li>Whether a file you hold still matches</li>
           </ul>
         </div>
@@ -219,7 +220,9 @@
           <div>
             <strong>Certificate 2 — who signed.</strong> Drop in the signed files, confirm who may
             be named, and get a one-page PDF listing them with their issuing authority and signing
-            time, the signed documents embedded inside it. Add the Certificate 1 or its
+            time, the signed documents embedded inside it. Anyone you leave off is disclosed as a
+            count and never named on the page — though the attached file still carries their name,
+            which is not something xNotary can change. Add the Certificate 1 or its
             <span class="mono">proof.ots</span> and it also establishes that the signatures are over
             the timestamped document itself.
           </div>
@@ -374,9 +377,9 @@
     <div class="single-card">
       <h2 class="section-title">What xNotary keeps</h2>
       <p class="section-copy">
-        Nothing, on any server — because there is no server. xNotary is a static page that runs
-        entirely in your browser; there is nowhere for it to put your documents even if it wanted
-        to.
+        Nothing, anywhere — because there is no xNotary backend to keep it on. xNotary is a static
+        page that runs entirely in your browser; there is nowhere for it to put your documents even
+        if it wanted to.
       </p>
       <div class="review-box">
         <div class="review-row">
@@ -468,6 +471,20 @@
           <div>
             xNotary does not yet embed PAdES-LTA/LTV data. Certificates and revocation information
             can expire; signers' own tools often add this.
+          </div>
+        </div>
+        <div class="review-row">
+          <span>Not anonymization</span>
+          <div>
+            Choosing not to name a signatory keeps them off the certificate's overview page. It does
+            not remove them from anything. Certificate 2 embeds the signed document unmodified —
+            that is what makes it evidence — and every signature in it carries the certificate
+            naming its signer, often with an email address and a personal identifier besides. That is
+            where xNotary read the name in the first place, and any PDF reader can open the
+            attachment and read it too. Nothing could strip it either: the certificate sits inside
+            the bytes the signature is computed over, so removing it would break the signature it
+            belongs to. If someone must not be identifiable at all, a certificate over that signed
+            file is the wrong instrument — every Certificate 2 says so on its face.
           </div>
         </div>
         <div class="review-row">

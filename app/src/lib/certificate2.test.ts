@@ -35,6 +35,9 @@ const fixture = (name: string) =>
 
 const GENERATED_AT = new Date('2026-07-28T12:00:00.000Z');
 
+/** Extracted text with the page's line breaks collapsed, for matching prose. */
+const flat = (text: string) => text.replace(/\s+/g, ' ');
+
 /** A synthetic signer, for the cases real fixtures cannot produce. */
 function signer(over: Partial<Certificate2Signer> = {}): Certificate2Signer {
   return {
@@ -448,6 +451,46 @@ describe('consent', () => {
   it('distinguishes no consent from no signatures', async () => {
     const text = await pdfText(await build({ signers: [], withheldCount: 0 }));
     expect(text).toMatch(/No signatures were found/);
+  });
+
+  // A count on its own reads as a redaction. It is not one: the name is in the
+  // signing certificate carried by that signature, inside the document this
+  // certificate embeds unmodified, and it cannot be taken out without breaking
+  // the signature. A signatory who asked to be left off has to be able to learn
+  // that from the certificate itself, not only from the app that made it.
+  it('states that withholding a name is not anonymization', async () => {
+    // Flowed, so any phrase may straddle a line break on the page.
+    const text = flat(await pdfText(await build({ withheldCount: 1 })));
+
+    expect(text).toMatch(/Leaving a signatory unnamed is not anonymization/);
+    expect(text).toMatch(/embedded here unchanged/);
+    expect(text).toMatch(/naming its signer/);
+    expect(text).toMatch(/would break the signature/);
+  });
+
+  it('says it of several withheld signatures without naming any', async () => {
+    const text = flat(await pdfText(await build({ withheldCount: 3 })));
+
+    expect(text).toMatch(/3 further signatures are present/);
+    expect(text).toMatch(/those signatories did not consent/);
+    expect(text).toMatch(/naming their signers/);
+  });
+
+  // Regression: the note's height was never reserved. Signers were drawn up to
+  // a budget that ignored it, so on a full page it was drawn past the bottom
+  // margin — still in the content stream, so this file's own text assertions
+  // passed, while the page showed nothing. Five signatories fit alone; adding a
+  // withheld one has to cost a page rather than cost the note.
+  it('takes a second page rather than crowding the withheld note off the first', async () => {
+    const signers = Array.from({ length: 5 }, (_, i) =>
+      signer({ name: `Signatory Number ${i + 1}` }),
+    );
+
+    expect((await PDFDocument.load(await build({ signers }))).getPageCount()).toBe(1);
+
+    const built = await build({ signers, withheldCount: 1 });
+    expect((await PDFDocument.load(built)).getPageCount()).toBe(2);
+    expect(flat(await pdfText(built))).toMatch(/is not anonymization/);
   });
 });
 

@@ -26,6 +26,12 @@
  *    the consent decision belongs to the UI. Signers who withheld consent are
  *    counted, never named — a certificate that quietly omitted them would
  *    misrepresent the document.
+ *
+ * 4. **Withholding a name is disclosed as not being anonymization.** The name is
+ *    still in the file: it comes from the signing certificate inside the
+ *    attachment, which constraint 1 embeds unmodified and which cannot be
+ *    stripped without breaking the signature. A bare count reads as a
+ *    redaction — see `withheldText`.
  */
 import { PDFDocument } from 'pdf-lib';
 
@@ -43,6 +49,7 @@ import {
   PAGE_W,
   loadFonts,
   drawable,
+  type Fonts,
 } from './pdf-layout';
 
 /**
@@ -722,8 +729,9 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
     ...(input.timestamp ? [PROOF_NAME] : []),
   ];
   const closingHeight = measureClosing(c, attachmentNames);
+  const withheldHeight = measureWithheld(c, fonts, input.withheldCount, many);
   // 26 for the rule that precedes the closing, 16 for the section heading.
-  const budget = c.remaining - closingHeight - 26 - 16;
+  const budget = c.remaining - closingHeight - withheldHeight - 26 - 16;
   const detail = chooseDetail(c, input.signers, budget, ascii);
 
   const count = input.signers.length;
@@ -756,15 +764,15 @@ export async function buildCertificate2(input: Certificate2Input): Promise<Uint8
   }
 
   if (input.withheldCount > 0) {
-    const one = input.withheldCount === 1;
-    c.paragraph(
-      `${input.withheldCount} further signature${one ? ' is' : 's are'} present in the ` +
-        `attached ${many ? 'documents' : 'document'} but ${one ? 'is' : 'are'} not listed here, ` +
-        `because that signatory did not consent to being named. The ` +
-        `signature${one ? '' : 's'} ${one ? 'itself remains' : 'themselves remain'} in the ` +
-        `${many ? 'attachments' : 'attachment'} and can be inspected there.`,
-      { color: MUTED, size: 8.5 },
-    );
+    // Reserved in the budget above, so this can never be the block that runs
+    // off the bottom of the page. A reader who is told a name was withheld but
+    // not that the attachment still carries it is worse served than one who is
+    // told nothing.
+    if (c.remaining < withheldHeight) spill();
+    const { lead, body } = withheldText(input.withheldCount, many);
+    c.paragraph(lead, { font: fonts.bold });
+    c.gap(3);
+    c.paragraph(body);
     c.gap(6);
   }
 
@@ -930,6 +938,40 @@ function closingText(names: readonly string[]): {
     ],
     disclaimer: DISCLAIMER_2,
   };
+}
+
+/**
+ * What the certificate says about signatures whose signer withheld consent.
+ *
+ * A bare count reads as a redaction, and it is not one. xNotary read the
+ * withheld name out of the signing certificate carried by that very signature,
+ * inside the document this certificate embeds unmodified — so the name is
+ * demonstrably still in the file the reader is holding, not merely possibly
+ * there, and saying "may contain" would understate what is known. Nor is there
+ * a version of this that removes it: the certificate sits inside the CMS the
+ * signature is computed over. Printing the count without printing that leaves
+ * the signatory who asked to be left off believing they were anonymized.
+ */
+function withheldText(count: number, many: boolean): { lead: string; body: string } {
+  const one = count === 1;
+  return {
+    lead: 'Leaving a signatory unnamed is not anonymization.',
+    body:
+      `${count} further signature${one ? ' is' : 's are'} present in the attached ` +
+      `${many ? 'documents' : 'document'} but ${one ? 'is' : 'are'} not listed above, because ` +
+      `${one ? 'that signatory did' : 'those signatories did'} not consent to being named. The ` +
+      `attached ${many ? 'documents are' : 'document is'} embedded here unchanged, and ` +
+      `${one ? 'that signature carries' : 'those signatures carry'} the signing ` +
+      `certificate${one ? '' : 's'} naming ${one ? 'its signer' : 'their signers'} — which any ` +
+      `PDF reader can read. Removing ${one ? 'it' : 'them'} would break the ` +
+      `signature${one ? '' : 's'}.`,
+  };
+}
+
+function measureWithheld(c: Cursor, fonts: Fonts, count: number, many: boolean): number {
+  if (count === 0) return 0;
+  const { lead, body } = withheldText(count, many);
+  return c.measureParagraph(lead, { font: fonts.bold }) + 3 + c.measureParagraph(body) + 6;
 }
 
 function measureClosing(c: Cursor, names: readonly string[]): number {

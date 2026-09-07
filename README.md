@@ -113,7 +113,7 @@ down, they are gone — `ltc.calendar.eternitywall.com` and `ltc.calendar.catall
 DNS record at all, as does `litecoin.calendar.opentimestamps.org`, while every Bitcoin calendar
 answers normally with permissive CORS. Stamping needs a calendar, and the only way to get one is
 to run it: a server, plus a funded wallet paying fees indefinitely. That is principle 2 gone, and
-with it the "there is no server" statement on every screen.
+with it the "no xNotary backend" statement on every screen.
 
 **Nobody could verify the result.** `LitecoinBlockHeaderAttestation` does exist in the reference
 Python client (tag `06869a0d73d71b45`) — but its `verify_against_blockheader()` raises
