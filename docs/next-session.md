@@ -11,7 +11,7 @@ What is left before a real release is not code: two reviews, and documents only 
 
 | | |
 |---|---|
-| Live app | <https://elkojo.github.io/xNotary/> — `v0.4.2`. Public address is <https://xnotary.digital>, which **forwards** here: GitHub Pages stays the host, so the origin — and the IndexedDB library scoped to it — does not move |
+| Live app | <https://elkojo.github.io/xNotary/> — `v0.4.3`. Public address is <https://xnotary.digital>, which **forwards** here: GitHub Pages stays the host, so the origin — and the IndexedDB library scoped to it — does not move |
 | Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 8 releases, all marked pre-release |
 | Flow A — Certificate 1 | Working end to end, verified in a real browser against dev, production *and* the deployed site |
 | Verify-integrity screen | Working, including tamper rejection |
