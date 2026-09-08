@@ -4,6 +4,7 @@
   import Home from './views/Home.svelte';
   import Library from './views/Library.svelte';
   import Notarize from './views/Notarize.svelte';
+  import Qanda from './views/Qanda.svelte';
   import Verify from './views/Verify.svelte';
   import { NAV, ROUTES, type View } from './nav';
 
@@ -115,6 +116,8 @@
     <Verify />
   {:else if view === 'library'}
     <Library revision={libraryRevision} {go} />
+  {:else if view === 'qanda'}
+    <Qanda />
   {:else}
     <Help {go} />
   {/if}

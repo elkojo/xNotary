@@ -1,5 +1,5 @@
-/** The five working screens, plus the landing page. */
-export type View = 'home' | 'notarize' | 'attest' | 'verify' | 'library' | 'help';
+/** The six working screens, plus the landing page. */
+export type View = 'home' | 'notarize' | 'attest' | 'verify' | 'library' | 'help' | 'qanda';
 
 /**
  * Route ids are deliberately unchanged from the previous interface even where
@@ -12,6 +12,7 @@ export const NAV: ReadonlyArray<{ id: View; label: string }> = [
   { id: 'verify', label: 'Verify' },
   { id: 'library', label: 'My certificates' },
   { id: 'help', label: 'How it works' },
+  { id: 'qanda', label: 'Q&A' },
 ];
 
 export const ROUTES: readonly View[] = ['home', ...NAV.map((n) => n.id)];
