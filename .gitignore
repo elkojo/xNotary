@@ -22,4 +22,4 @@ coverage/
 # Operational handoff notes dropped in by hand. This repo is public; the
 # operator's name, the Cloudflare split and the deploy process do not belong in
 # it. Whatever is durable from them lives in CLAUDE.md and docs/next-session.md.
-MILAN-AGENT-INSTRUCTIONS.md
+*-AGENT-INSTRUCTIONS.md
