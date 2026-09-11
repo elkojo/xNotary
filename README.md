@@ -21,9 +21,9 @@ copy of your documents anywhere but your own device.
 > "public beta" label coming off. See [Milestones](#milestones) and the
 > [post-MVP roadmap](#post-mvp-roadmap).
 
-**Try it:** <https://xnotary.digital> — which forwards to the site itself at
-<https://elkojo.github.io/xNotary/>, where it is hosted and where its storage lives. Or run it
-locally, see [Getting started](#getting-started). Nothing you do there is uploaded.
+**Try it:** <https://xnotary.digital> — the canonical address, where the app is served and where
+its storage lives. Or run it locally, see [Getting started](#getting-started). Nothing you do
+there is uploaded.
 
 ---
 
@@ -213,7 +213,7 @@ Other commands:
 
 | Command | What it does |
 |---|---|
-| `npm test` | Offline test suite (144 tests), including the PAdES regression suite |
+| `npm test` | Offline test suite (147 tests), including the PAdES regression suite |
 | `npm run check` | Type-check Svelte + TypeScript |
 | `npm run build` | Type-check, then production build to `app/dist` |
 | `npm run spike:ots` | M0 spike against **live** OpenTimestamps calendars |
@@ -256,7 +256,7 @@ Stack: Svelte 5 + Vite 5 + TypeScript, offline-first via a hand-written service 
 - [x] **M2 — Certificate 2.** Signed-PDF ingestion, per-signature consent step, multi-signer
       assembly (parallel + sequential, with agreement checked before pooling), one-page summary,
       external-validator links.
-- [ ] **M3 — Release.** GitHub Pages deploy ✅ · public repo ✅ · licensing and third-party
+- [ ] **M3 — Release.** Deployed on its own domain ✅ · public repo ✅ · licensing and third-party
       notices ✅ · Unicode font embedding, so names in Czech, Greek and Cyrillic print correctly
       ✅ · interface rebuild and copy pass ✅ · onboarding · **security review** ·
       **Czech eIDAS counsel review**.
@@ -302,8 +302,8 @@ In priority order. Nothing here is started; each entry says what it needs, and w
 3. **Flow B — sharing without a server.** Nostr identities, client-side encryption, Blossom
    storage, NIP-44/NIP-59. The point is passing a document and its certificate between parties
    without either of them, or us, running infrastructure.
-4. **nsite / Nostr hosting alongside GitHub Pages.** Removes the last centralised dependency in
-   the delivery path: the page itself.
+4. **nsite / Nostr hosting alongside the static host.** Removes the last centralised dependency
+   in the delivery path: the page itself.
 5. **Bank iD Sign gateway (self-hostable) and an EUDI wallet adapter** (eIDAS 2.0). Note that
    Bank iD SIGN does *not* produce a qualified signature — bank-supplied identity plus Bank iD's
    own qualified *seal* yields an advanced signature. xNotary reads it and says so; it never
@@ -317,13 +317,13 @@ In priority order. Nothing here is started; each entry says what it needs, and w
 
 Smaller, and none of them blocked:
 
-- **Export/import for the certificate library.** IndexedDB is scoped to the origin, which makes
-  this a hard prerequisite for ever moving xNotary to its own domain: without it, every existing
-  user would arrive at an empty library. (`xnotary.digital` currently *forwards* to the Pages
-  site precisely to avoid that.)
-- **A dedicated origin, once export/import exists.** A security upgrade rather than branding:
-  today xNotary shares an origin with every other project on the same Pages account, and any of
-  them can read its IndexedDB. `BASE_PATH` already parameterises the build.
+- **Export/import for the certificate library.** IndexedDB is scoped to the origin, and the move
+  to `xnotary.digital` is what that costs in practice: a certificate saved while the app was
+  served from `elkojo.github.io` stays in that browser under that origin, and does not appear on
+  the new one. Nothing was lost that mattered — the downloaded PDF is the real copy and verifies
+  with the reference client without xNotary at all — but *My certificates* is precisely where
+  that is least obvious, and an export would have made the move invisible rather than merely
+  harmless. It is also the prerequisite for any future origin change.
 - **Unify the two ways Certificate 2 reports a timestamp.** `Certificate2Input.underlying`
   carries an `otsStatus` that nothing populates, while `Certificate2Input.timestamp` is
   populated. Two ways of saying "this was timestamped" on one page will drift.

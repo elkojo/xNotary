@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>xNotary has moved</title>
+    <link rel="canonical" href="https://xnotary.digital/" />
+    <meta http-equiv="refresh" content="0; url=https://xnotary.digital/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      // Every route in xNotary is a hash route, and a meta refresh drops the
+      // fragment — someone arriving on a bookmarked /#/verify would land on the
+      // home screen. Carry it across where scripting is available; the refresh
+      // above is the fallback where it is not, and `replace` keeps the dead URL
+      // out of the back button either way.
+      location.replace('https://xnotary.digital/' + location.hash);
+    </script>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #07130f;
+        color: #e8f2ee;
+        font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', sans-serif;
+        padding: 24px;
+      }
+      a {
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <p>xNotary now lives at <a href="https://xnotary.digital/">https://xnotary.digital/</a>.</p>
+  </body>
+</html>
