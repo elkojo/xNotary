@@ -30,17 +30,26 @@ Bump `version` in `app/package.json` to match → commit → push → tag `v*`. 
 `deploy.yml`; a plain push does not. Nothing in the app reads that version field, so keeping it in
 step is a discipline rather than a mechanism — it drifted from `0.1.0` to `v0.3.0` before anyone
 noticed. The `github-pages` environment has a `v*` tag policy so tags are allowed to deploy — do
-not remove it. After deploying, `gh release create` publishes the release notes; that step is
-manual.
+not remove it.
 
-What the tag does: runs `npm run check` and `npm test`, builds with `BASE_PATH=/`, checks the
-result actually carries `_headers` and `/assets/` rather than a stale base path, and attaches it
-to the run as the **`xnotary-dist`** artifact. Then it republishes the redirect stub to GitHub
-Pages. It does **not** touch production.
+**Write the tag message properly, because it is the release.** `deploy.yml` publishes the GitHub
+release from the tag's own annotation: the subject line becomes the title, the body becomes the
+notes, and the built site is attached as a zip. So tag with `git tag -a`, first line
+`vX.Y.Z — what changed`. A lightweight tag is refused before anything is built or deployed —
+`v0.4.4` is one, which is why it has no release. If the subject omits the `vX.Y.Z — ` prefix the
+job adds it. Re-running a tag refreshes the attached build but never rewrites notes, in case a
+human edited them.
 
-Production is a manual `wrangler pages deploy app/dist` on the operator's Cloudflare account —
-download `xnotary-dist` from the tagged run and deploy those bytes, so what ships is what CI
-tested. There are no Cloudflare credentials in this repo and the Pages project is not connected to
+What the tag does: refuses the tag outright if it carries no message, runs `npm run check` and
+`npm test`, builds with `BASE_PATH=/`, checks the result actually carries `_headers` and
+`/assets/` rather than a stale base path, and attaches it to the run as the **`xnotary-dist`**
+artifact. Then it publishes the release with that build attached, and republishes the redirect
+stub to GitHub Pages. It does **not** touch production.
+
+Production is a manual `wrangler pages deploy` on the operator's Cloudflare account — take the
+zip attached to the release (or `xnotary-dist` from the tagged run) and deploy those bytes, so
+what ships is what CI tested. The release asset is the better source: workflow artifacts expire
+after 90 days and the release does not. There are no Cloudflare credentials in this repo and the Pages project is not connected to
 GitHub; wiring that up needs the operator to ask for it, and until they do, this split is the
 whole mechanism. Do not add a Worker, a Function or a `_redirects` rule that needs one — the
 no-backend principle is not scoped to the app code.
