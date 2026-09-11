@@ -12,6 +12,12 @@ name: Release
 #
 # GitHub Pages serves a redirect stub to the canonical address. It is not a
 # second production instance and must not become one again.
+#
+# It also publishes the GitHub release, from the tag's own annotation. That step
+# used to be a manual `gh release create` and it drifted exactly as you would
+# expect: v0.4.3 has a release, v0.4.4 has none, and v0.4.4 is not even an
+# annotated tag. Automating it makes the tag message the single place a release
+# is described.
 on:
   push:
     tags: ['v*']
@@ -42,6 +48,22 @@ jobs:
           # so the deployed page can link the exact source it was built from
           # (AGPL §13). A shallow checkout would leave it showing a bare SHA.
           fetch-depth: 0
+
+      - name: Check the tag can be released
+        # Runs before the build and before Pages is touched, because the whole
+        # run is downstream of this job. A tag with no message cannot produce
+        # release notes, and discovering that after the stub has already been
+        # republished leaves a half-done release nobody can fix by re-running.
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" != "tag" ]; then
+            echo "::error::$GITHUB_REF_NAME is a lightweight tag, so it carries no message to release from. Delete it, re-tag with 'git tag -a' — first line 'vX.Y.Z — what changed', the rest the notes — and push again."
+            exit 1
+          fi
+          if [ -z "$(git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME")" ]; then
+            echo "::error::$GITHUB_REF_NAME is annotated but its message is empty. The release notes come from that message."
+            exit 1
+          fi
 
       - uses: actions/setup-node@v4
         with:
@@ -79,6 +101,76 @@ jobs:
           # Long enough that a release can still be re-deployed from the bytes
           # that were tested, rather than rebuilt from a moving toolchain.
           retention-days: 90
+
+  release:
+    name: GitHub release
+    needs: production
+    # Only a tag names a version. A workflow_dispatch on a branch has nothing to
+    # release and must not invent one.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The notes are the tag's own annotation, so the tag *object* has to be
+          # here — a shallow checkout brings the commit without the message that
+          # was written for it.
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: xnotary-dist
+          path: dist
+
+      - name: Package the build for the release page
+        # Attaching the built site means whoever deploys it can take it from the
+        # release rather than digging a 90-day artifact out of a workflow run.
+        # It is also the object the AGPL and LGPL notices inside it describe,
+        # published next to the source it was built from.
+        run: cd dist && zip -qr "../xnotary-${GITHUB_REF_NAME}-dist.zip" .
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="$GITHUB_REF_NAME"
+          ZIP="xnotary-$TAG-dist.zip"
+
+          # Re-running a tagged build should attach the rebuilt bytes without
+          # overwriting notes a human may have edited on the release since.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::Release $TAG already exists — refreshing the build, leaving the notes alone"
+            gh release upload "$TAG" "$ZIP" --clobber
+            exit 0
+          fi
+
+          # Subject line is the title, the body is the notes — which is how
+          # every release before this one was written by hand.
+          git tag -l --format='%(contents:subject)' "$TAG" > title.txt
+          git tag -l --format='%(contents:body)' "$TAG" > notes.txt
+
+          # Every release so far is titled "vX.Y.Z — what changed", but the tag
+          # message is not always written that way (v0.4.3 was not). Supply the
+          # prefix when it is missing rather than asking whoever tags to
+          # remember it, and never double it up when it is already there.
+          TITLE="$(cat title.txt)"
+          case "$TITLE" in
+            "$TAG"*) ;;
+            *) TITLE="$TAG — $TITLE" ;;
+          esac
+
+          # --prerelease is not a placeholder. README and CLAUDE.md both say the
+          # "public beta" label stays until the security review and the Czech
+          # eIDAS counsel review are actually done, and a release marked stable
+          # would be the app claiming more than has been established. Drop this
+          # flag when those two land, and not before.
+          gh release create "$TAG" \
+            --title "$TITLE" \
+            --notes-file notes.txt \
+            --prerelease \
+            "$ZIP"
 
   pages-redirect:
     name: Redirect stub on GitHub Pages
