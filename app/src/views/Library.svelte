@@ -154,8 +154,8 @@
       <div>
         <h1>My certificates</h1>
         <p>
-          Kept in this browser so pending timestamps can be upgraded. Save what you want to keep —
-          this is not a backup.
+          Kept in this browser, on this address, so pending timestamps can be upgraded. Save what
+          you want to keep — this is not a backup.
         </p>
       </div>
       <button class="button dark" onclick={() => go('notarize')}>Timestamp a document</button>

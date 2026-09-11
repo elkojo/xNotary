@@ -1,0 +1,25 @@
+# Security headers for the canonical deployment at https://xnotary.digital
+# (Cloudflare Pages). Vite copies public/ verbatim, so these land in dist/ and
+# travel with `wrangler pages deploy app/dist` — the headers are part of the
+# build rather than a setting someone has to remember on the hosting side.
+#
+# This reproduces exactly what production served on 2026-09-11; it is recorded
+# here so a rebuild cannot silently ship without it. GitHub Pages ignores this
+# file, which is fine: that origin only serves a redirect stub now.
+#
+# connect-src is the list that matters. It is the whole network surface of the
+# app — three OpenTimestamps calendars and two block explorers — and nothing
+# else. Adding a host here is adding a party the user has to trust, so don't,
+# unless src/lib/ots.ts genuinely gained one. catallaxy is absent for the same
+# reason it is absent from the calendar list: no CORS header.
+#
+# 'unsafe-inline' in style-src is load-bearing: Svelte emits style attributes
+# (`style="margin:16px 0 0"`), and CSP counts those as inline styles. There is
+# no matching allowance for script-src and there must not be.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://alice.btc.calendar.opentimestamps.org https://bob.btc.calendar.opentimestamps.org https://finney.calendar.eternitywall.com https://blockstream.info https://blockchain.info https://*.blockstream.info; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

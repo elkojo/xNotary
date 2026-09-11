@@ -1,6 +1,6 @@
 # Where things stand — handoff
 
-**Last updated:** 2026-09-06 (end of session) · `main` · everything pushed, tagged and deployed
+**Last updated:** 2026-09-11 · `main` · the app moved to its own domain; a tag is needed to republish the redirect stub, and production is deployed by hand
 
 M0, M1 and M2 are done. Both certificates work end to end, the app is public and live, and
 `pades.ts` has been measured against real qualified signatures rather than only synthetic ones.
@@ -11,7 +11,9 @@ What is left before a real release is not code: two reviews, and documents only 
 
 | | |
 |---|---|
-| Live app | <https://elkojo.github.io/xNotary/> — `v0.4.4`. Public address is <https://xnotary.digital>, which **forwards** here: GitHub Pages stays the host, so the origin — and the IndexedDB library scoped to it — does not move |
+| Live app | <https://xnotary.digital> — `v0.4.4`, served from Cloudflare Pages on the operator's account, built with `BASE_PATH=/`. The apex is canonical; `www` 301s to it, and `xnotary.pages.dev` is the same build under its project name |
+| Old address | <https://elkojo.github.io/xNotary/> — a **redirect stub**, published by `deploy.yml`. Not a mirror and not a fallback. Certificates saved while the app was served from that origin stay in that browser under that origin and do not appear on the new one; the downloaded PDF is the real copy |
+| Security headers | `app/public/_headers` — CSP, `frame-ancestors 'none'`, `nosniff`, `no-referrer`. Vite copies it into `dist/`, so it travels with the deploy. `connect-src` is the app's entire network surface: three calendars, two explorers |
 | Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 8 releases, all marked pre-release |
 | Flow A — Certificate 1 | Working end to end, verified in a real browser against dev, production *and* the deployed site |
 | Verify-integrity screen | Working, including tamper rejection |
@@ -19,15 +21,29 @@ What is left before a real release is not code: two reviews, and documents only 
 | PAdES parsing | Hardened; measured against real PostSignum output (`docs/qtsp-findings.md`) |
 | Certificate 2 | Working — `Signatures` tab, consent gate, one-page A4, sequential *and* parallel signing, and attestation over the *document itself* |
 | Certificate rendering | Liberation subsets embedded; Czech, Greek and Cyrillic names render correctly |
-| Tests | 144 offline, all passing; type-check clean; `npm run e2e` passes Flow A through the new interface |
+| Tests | 147 offline, all passing; type-check clean; `npm run e2e` passes Flow A through the new interface |
 | Licensing | Notices shipped and generated from the real bundle; the one LGPL dependency is linked, not bundled; every build links the source it was built from |
 
-**Deploying:** bump `version` in `app/package.json` to match → commit → push → tag `v*`. The tag
-fires `deploy.yml`; a plain push does not. Nothing in the app reads that version field, so keeping
-it in step is a discipline rather than a mechanism — it drifted from `0.1.0` to `v0.3.0` before
-anyone noticed. The
-`github-pages` environment has a `v*` tag policy so tags are allowed to deploy — do not remove it.
-After deploying, `gh release create` publishes the release notes; that step is manual.
+**Deploying** is two halves now, and only one of them is automatic.
+
+Bump `version` in `app/package.json` to match → commit → push → tag `v*`. The tag fires
+`deploy.yml`; a plain push does not. Nothing in the app reads that version field, so keeping it in
+step is a discipline rather than a mechanism — it drifted from `0.1.0` to `v0.3.0` before anyone
+noticed. The `github-pages` environment has a `v*` tag policy so tags are allowed to deploy — do
+not remove it. After deploying, `gh release create` publishes the release notes; that step is
+manual.
+
+What the tag does: runs `npm run check` and `npm test`, builds with `BASE_PATH=/`, checks the
+result actually carries `_headers` and `/assets/` rather than a stale base path, and attaches it
+to the run as the **`xnotary-dist`** artifact. Then it republishes the redirect stub to GitHub
+Pages. It does **not** touch production.
+
+Production is a manual `wrangler pages deploy app/dist` on the operator's Cloudflare account —
+download `xnotary-dist` from the tagged run and deploy those bytes, so what ships is what CI
+tested. There are no Cloudflare credentials in this repo and the Pages project is not connected to
+GitHub; wiring that up needs the operator to ask for it, and until they do, this split is the
+whole mechanism. Do not add a Worker, a Function or a `_redirects` rule that needs one — the
+no-backend principle is not scoped to the app code.
 
 ## If you are picking this up cold
 
@@ -35,7 +51,7 @@ Read this file, then `CLAUDE.md` (loaded automatically) for the invariants and g
 `docs/qtsp-findings.md` for what real qualified signatures actually contain — that one exists
 because reasoning about the spec was repeatedly wrong and measurement was repeatedly right.
 
-Then `cd app && npm test` (144, offline, ~9s). Green means the tree is sound.
+Then `cd app && npm test` (147, offline, ~9s). Green means the tree is sound.
 
 **Nothing is half-finished.** There is no in-progress branch, no failing test, no partial feature.
 Pick any item under *Next up*; none blocks another.
@@ -285,6 +301,38 @@ path. Given a relative one it creates a `File` whose `arrayBuffer()` never settl
 hangs with no error — which looks exactly like a bug in the app, and cost a while to rule out.
 `scripts/e2e-flow-a.mjs` is safe because its paths come from `mkdtempSync`.
 
+## What this session changed (2026-09-11) — the domain move
+
+xNotary is served from <https://xnotary.digital> now. The domain, its DNS and TLS, and the
+Cloudflare Pages project belong to the operator; the code, the tags, the GitHub Pages content and
+the product copy belong to this repo. That boundary is the reason the deploy is split the way it
+is, and it is worth keeping in mind before "simplifying" the workflow.
+
+**The repo had no security headers.** Production was serving a full CSP — `default-src 'self'`,
+`frame-ancestors 'none'`, and a `connect-src` naming exactly the three calendars and two block
+explorers the app talks to — but that policy existed only on the hosting side, and `git log --all`
+found no `_headers` in any commit. A plain `npm run build` therefore produced a `dist/` with no
+headers at all, and the next hand-run `wrangler pages deploy` could have dropped the CSP without
+anyone noticing. `app/public/_headers` now reproduces that header set byte for byte, checked
+against what the live site returned, and `deploy.yml` fails the build if it goes missing again.
+
+**GitHub Pages was still a second production instance**, serving a complete `v0.4.4` build. Two
+live deployments of a trust product is one too many: they drift, and there is no way for a visitor
+to tell which one is real. It serves `pages-redirect/index.html` now — a meta refresh plus a
+script that carries the hash across, since every route here is a hash route and a bookmarked
+`/#/verify` should not land on the home screen.
+
+**What that costs, stated plainly.** IndexedDB is scoped to an origin. A certificate saved while
+the app was served from `elkojo.github.io` is still on that person's disk, but there is no longer
+an app at that origin to read it, and it will not appear on `xnotary.digital`. Export/import was
+named a hard prerequisite for exactly this and was overruled — see the Post-MVP backlog for the
+reasoning. The mitigation is the product's own design rather than anything added here: the
+downloaded Certificate 1 PDF is the real copy, it embeds its own `.ots`, and it verifies with the
+reference client without xNotary at all.
+
+**Not done, deliberately:** no export/import, no Cloudflare-to-GitHub connection, and nothing that
+needs a Worker or a Function. All three need someone to ask for them first.
+
 ## Decisions already made — don't relitigate
 
 - **Bitcoin, and no other chain.** Litecoin and Bitcoin SV have both been investigated and
@@ -511,12 +559,14 @@ two reviews below. None of the remainder is blocked on code.
   a competing service; it does not let them call it xNotary. For a trust product the name is the
   asset, so registering the mark (CZ or EUIPO) belongs with the domain move, along with a
   trademark policy line in the README.
-- **A new domain is planned.** Two things bite, neither of them licensing: the certificate library
-  lives in IndexedDB scoped to `elkojo.github.io`, so an origin change presents every existing user
-  with an empty library — ship export/import first and leave the old URL redirecting with
-  instructions. And a dedicated origin is a *security* upgrade, not just branding: today xNotary
-  shares an origin with every other project on that Pages account, any of which can read its
-  IndexedDB. `BASE_PATH` already parameterises the build, so a custom domain is just dropping it.
+- **The domain move is done (2026-09-11), and export/import was *not* shipped first.** It was
+  called a hard prerequisite here and was overruled deliberately: for a beta with few users the
+  cost is that someone's *My certificates* list looks empty on the new origin, while their
+  downloaded PDFs — the copies that actually matter — still verify with the reference client. The
+  security half of the argument was the real prize and it landed: xNotary no longer shares an
+  origin with every other project on a Pages account, so nothing else can read its IndexedDB.
+  Export/import is still worth building, now as a normal feature rather than a blocker, and it is
+  a prerequisite for any *future* origin change. See the Engineering items in the README.
 - **Whether to accept pull requests at all is undecided.** Raised and deferred this session. GitHub
   has no switch for it; the workable combination is a stated policy, a workflow that auto-closes
   incoming PRs, and optionally disabling forking. Refusing contributions outright (the SQLite

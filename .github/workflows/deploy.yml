@@ -1,6 +1,17 @@
-name: Deploy to GitHub Pages
+name: Release
 
-# Tag-driven, per the brief: test → build → deploy on tag.
+# Tag-driven: test → build the production artifact → publish the redirect stub.
+#
+# The canonical deployment is https://xnotary.digital, on the operator's
+# Cloudflare Pages account, and this workflow deliberately cannot reach it:
+# there are no Cloudflare credentials here and connecting the Pages project to
+# GitHub is the operator's call, not ours. What it does instead is produce the
+# exact bytes that should be deployed — tested, built with BASE_PATH=/ and with
+# the security headers in place — and attach them to the run for whoever runs
+# `wrangler pages deploy`. The bytes that ship are then the bytes CI tested.
+#
+# GitHub Pages serves a redirect stub to the canonical address. It is not a
+# second production instance and must not become one again.
 on:
   push:
     tags: ['v*']
@@ -18,7 +29,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  production:
+    name: Production artifact for Cloudflare Pages
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,25 +56,56 @@ jobs:
       - run: npm test
 
       - name: Build
-        # GitHub Pages serves a project site from /<repo>/, so the bundle must
-        # be built with that base path. vite.config.ts reads BASE_PATH.
+        # A bare host at the apex, not a project subdirectory — so no base path.
+        # Reverting this to /<repo>/ would break the canonical deployment.
         run: npm run build:only
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/
+          BASE_PATH: /
 
-      - name: Disable Jekyll processing
-        run: touch dist/.nojekyll
+      - name: Check the artifact is the one the apex needs
+        # Two failures this catches, both silent and both user-visible only
+        # after deploying: a build that still carries the Pages base path, and
+        # a dist/ with no security headers because public/_headers went missing.
+        run: |
+          test -f dist/_headers || { echo '::error::dist/_headers is missing — the deployment would ship with no CSP'; exit 1; }
+          grep -q 'frame-ancestors' dist/_headers || { echo '::error::dist/_headers carries no frame-ancestors directive'; exit 1; }
+          grep -q 'src="/assets/' dist/index.html || { echo '::error::dist/index.html does not reference /assets/ — was BASE_PATH set?'; exit 1; }
+          if grep -q '/xNotary/' dist/index.html; then echo '::error::dist/index.html still carries the GitHub Pages base path'; exit 1; fi
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
+          name: xnotary-dist
           path: app/dist
+          # Long enough that a release can still be re-deployed from the bytes
+          # that were tested, rather than rebuilt from a moving toolchain.
+          retention-days: 90
 
-  deploy:
-    needs: build
+  pages-redirect:
+    name: Redirect stub on GitHub Pages
+    # Gated on the tests: a tag that fails them should leave every origin as it
+    # was rather than replace one of them with anything.
+    needs: production
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage the stub
+        # 404.html is a copy of index.html so a path under /xNotary/ redirects
+        # as well as the root does. Copied here rather than committed twice so
+        # the two cannot drift. pages-redirect/README.md stays out of the
+        # artifact — it is documentation for this repo, not a served page.
+        run: |
+          mkdir -p _site
+          cp pages-redirect/index.html _site/index.html
+          cp pages-redirect/index.html _site/404.html
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
       - id: deployment
         uses: actions/deploy-pages@v4

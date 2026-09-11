@@ -273,7 +273,9 @@
             file. Compatible tools can verify a completed standard proof without xNotary. A pending
             proof may still need calendar servers to complete it. A PDF certificate or screenshot
             alone is not a substitute for verification, and the proof cannot recover a lost original
-            document.
+            document. Do not treat <em>My certificates</em> as the place you keep them: that list
+            lives in this browser under this address, xnotary.digital, and clearing your browser
+            data or opening the app from a different address leaves it empty.
           </div>
         </details>
       </div>

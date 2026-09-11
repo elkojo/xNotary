@@ -12,7 +12,7 @@ they are, `docs/qtsp-findings.md` for what real qualified signatures actually co
 Everything runs from `app/`.
 
 ```bash
-npm test          # offline suite (144 tests) — this is what CI runs
+npm test          # offline suite (147 tests) — this is what CI runs
 npm run check     # svelte-check; must be 0 errors before committing
 npm run dev       # http://localhost:5173
 npm run build     # check + production build
@@ -70,6 +70,8 @@ app/src/views/     Home · Notarize · Attest · Verify · Library · Help
                     route ids in src/nav.ts are unchanged and are what bookmarks use)
 app/src/spikes/    M0 risk spikes + fixtures
 app/scripts/       fixture generation, CDP browser drivers
+app/public/        copied verbatim into dist/ — icons, and _headers (the CSP)
+pages-redirect/    what the old GitHub Pages URL serves; not the app
 docs/              m0-spike.md + qtsp-findings.md (evidence), next-session.md (handoff)
 ```
 
@@ -115,6 +117,17 @@ docs/              m0-spike.md + qtsp-findings.md (evidence), next-session.md (h
   imports it by URL, so a user can substitute their own build. Don't fold it back into a chunk,
   hash the filename, or minify it. `docs/relinking.md` records why, and what the alternatives
   cost. `THIRD-PARTY.txt` is generated from the real module graph — don't hand-maintain a list.
+- **The app is served from its own apex, and the build says so.** Production is
+  `https://xnotary.digital` on Cloudflare Pages, built with `BASE_PATH=/`. Reverting that to
+  `/xNotary/` breaks it — that base path belongs to the old GitHub Pages project site, which now
+  serves only the redirect stub in `pages-redirect/`. Two consequences worth holding on to. The
+  security headers live in `app/public/_headers` so they travel inside `dist/` rather than as a
+  setting on the hosting side; they were missing from the repo for exactly that reason once, and
+  `deploy.yml` now fails the build if they go missing again. And the certificate library is
+  IndexedDB scoped to the *origin*, so it did not follow users across the move and will not follow
+  them across the next one — the downloaded PDF is the real copy, which is the whole point of
+  invariant 4. `docs/next-session.md` records who owns which half of the deploy.
+
 - **Calendar list is pinned deliberately** in `src/lib/ots.ts` — `catallaxy` is excluded because
   it serves no CORS header. Don't "fix" it back to the library default.
 - **PDF layout must measure what it draws.** `Cursor` happily draws below the bottom margin:

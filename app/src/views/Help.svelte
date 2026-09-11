@@ -241,6 +241,9 @@
           <div>
             The Certificate 1s made on this device, kept in this browser only so a pending timestamp
             can be upgraded to confirmed once Bitcoin catches up. Nothing else is stored, anywhere.
+            Browsers keep this storage separate per address, so the list belongs to
+            <strong>xnotary.digital</strong> in this browser and nowhere else — not another browser,
+            not another device, and not the same app served from a different address.
           </div>
         </div>
       </div>
