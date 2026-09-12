@@ -21,5 +21,10 @@ coverage/
 
 # Operational handoff notes dropped in by hand. This repo is public; the
 # operator's name, the Cloudflare split and the deploy process do not belong in
-# it. Whatever is durable from them lives in CLAUDE.md and docs/next-session.md.
+# it. Whatever is durable from them lives in docs/next-session.md.
 *-AGENT-INSTRUCTIONS.md
+
+# Working instructions for whoever is building this, not documentation for
+# anyone reading it. The invariants they refer to are in CONTRIBUTING.md, where
+# a contributor would look for them.
+CLAUDE.md

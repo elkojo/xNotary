@@ -173,7 +173,7 @@ jobs:
             *) TITLE="$TAG — $TITLE" ;;
           esac
 
-          # --prerelease is not a placeholder. README and CLAUDE.md both say the
+          # --prerelease is not a placeholder. The README says the
           # "public beta" label stays until the security review and the Czech
           # eIDAS counsel review are actually done, and a release marked stable
           # would be the app claiming more than has been established. Drop this

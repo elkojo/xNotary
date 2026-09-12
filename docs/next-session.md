@@ -56,9 +56,9 @@ no-backend principle is not scoped to the app code.
 
 ## If you are picking this up cold
 
-Read this file, then `CLAUDE.md` (loaded automatically) for the invariants and gotchas, then
-`docs/qtsp-findings.md` for what real qualified signatures actually contain — that one exists
-because reasoning about the spec was repeatedly wrong and measurement was repeatedly right.
+Read this file, then the invariants in `CONTRIBUTING.md`, then `docs/qtsp-findings.md` for what
+real qualified signatures actually contain — that one exists because reasoning about the spec was
+repeatedly wrong and measurement was repeatedly right.
 
 Then `cd app && npm test` (147, offline, ~9s). Green means the tree is sound.
 
@@ -557,7 +557,7 @@ two reviews below. None of the remainder is blocked on code.
   labelled pre-release.
 - **The retention claims need scoping before the archive product exists.** README principle 3 says
   xNotary "keeps no copy of anything, anywhere … a notarization service that cannot leak, subpoena
-  or lose what it never held", and CLAUDE.md invariants 1 and 2 say the same. A paid archive makes
+  or lose what it never held", and invariants 1 and 2 say the same. A paid archive makes
   all of that false on the day it ships unless it is rewritten first: *the app* retains nothing and
   needs no server; the optional archive holds only what the user explicitly sends it. Doing this
   before launch is cheap and after it is not — it is the same class of error as the "collect
