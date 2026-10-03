@@ -6,7 +6,8 @@
   import Notarize from './views/Notarize.svelte';
   import Qanda from './views/Qanda.svelte';
   import Verify from './views/Verify.svelte';
-  import { NAV, ROUTES, type View } from './nav';
+  import { ROUTES, type View } from './nav';
+  import SiteBar from './site/SiteBar.svelte';
 
   function viewFromHash(): View {
     const raw = location.hash.replace(/^#\/?/, '');
@@ -46,55 +47,36 @@
   });
 </script>
 
-<header class="topbar">
-  <div class="nav">
-    <button class="brand" onclick={() => go('home')}>
-      <span class="brand-mark"><span>xN</span></span>
-      <span>xNotary<span class="brand-domain">.digital</span></span>
+<SiteBar current="xnotary" active={view} onnav={(page) => go(page as View)}>
+  <!--
+    Maturity of the software, which is a different claim from what the
+    certificates say about themselves. Each certificate already states its own
+    limits precisely; nothing there tells a visitor that the app producing them
+    has not been reviewed. Deliberately not printed on the certificates: those
+    are meant to outlive this period and to verify without xNotary existing.
+    Remove at M3, once both reviews are done — see docs/next-session.md.
+  -->
+  <div class="stage-wrap">
+    <button
+      type="button"
+      class="stage"
+      aria-expanded={stageOpen}
+      aria-describedby="stage-note"
+      onmouseenter={() => (stageOpen = true)}
+      onmouseleave={() => (stageOpen = false)}
+      onfocus={() => (stageOpen = true)}
+      onblur={() => (stageOpen = false)}
+    >
+      Public beta
     </button>
-
-    <nav class="main-nav">
-      {#each NAV as item}
-        <button
-          class="nav-link"
-          aria-current={view === item.id ? 'page' : undefined}
-          onclick={() => go(item.id)}
-        >
-          {item.label}
-        </button>
-      {/each}
-    </nav>
-
-    <!--
-      Maturity of the software, which is a different claim from what the
-      certificates say about themselves. Each certificate already states its own
-      limits precisely; nothing there tells a visitor that the app producing them
-      has not been reviewed. Deliberately not printed on the certificates: those
-      are meant to outlive this period and to verify without xNotary existing.
-      Remove at M3, once both reviews are done — see docs/next-session.md.
-    -->
-    <div class="stage-wrap">
-      <button
-        type="button"
-        class="stage"
-        aria-expanded={stageOpen}
-        aria-describedby="stage-note"
-        onmouseenter={() => (stageOpen = true)}
-        onmouseleave={() => (stageOpen = false)}
-        onfocus={() => (stageOpen = true)}
-        onblur={() => (stageOpen = false)}
-      >
-        Public beta
-      </button>
-      <div id="stage-note" class="stage-note" role="tooltip" hidden={!stageOpen}>
-        <strong>Public beta.</strong> This build has not had a security review, and its wording has
-        not been reviewed by a lawyer. The timestamps it produces are real and independently
-        verifiable — but treat the app itself as unfinished, and don't rely on it for anything that
-        matters yet.
-      </div>
+    <div id="stage-note" class="stage-note" role="tooltip" hidden={!stageOpen}>
+      <strong>Public beta.</strong> This build has not had a security review, and its wording has
+      not been reviewed by a lawyer. The timestamps it produces are real and independently
+      verifiable — but treat the app itself as unfinished, and don't rely on it for anything that
+      matters yet.
     </div>
   </div>
-</header>
+</SiteBar>
 
 {#if !online}
   <div class="band">

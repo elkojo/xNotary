@@ -149,6 +149,14 @@
   --bad-pill-bg: #fbe3e0;
   --bad-solid: #b95148;
 
+  /* Shared site bar, its menus and the front page (src/site/) */
+  --accent-line: rgba(186, 255, 115, 0.35);
+  --menu-bg: var(--bg-soft);
+  --menu-fg2: #8d9c95;
+  --menu-hover: rgba(255, 255, 255, 0.05);
+  --menu-shadow: rgba(0, 0, 0, 0.45);
+  --tag-bg: rgba(255, 255, 255, 0.06);
+
   --radius: 16px;
 
   color-scheme: dark;

@@ -11,9 +11,9 @@ What is left before a real release is not code: two reviews, and documents only 
 
 | | |
 |---|---|
-| Live app | <https://xnotary.digital> — `v0.4.4`, served from Cloudflare Pages on the operator's account, built with `BASE_PATH=/`. The apex is canonical; `www` 301s to it, and `xnotary.pages.dev` is the same build under its project name |
+| Live app | <https://xnotary.digital/xnotary/> — served from Cloudflare Pages on the operator's account. Since 0.5.0 `dist/` is the whole site: the xNotary.digital front page at `/` (`app/hub/`) and xNotary at `/xnotary/`; the front page forwards old `/#/…` links there. The apex is canonical; `www` 301s to it, and `xnotary.pages.dev` is the same build under its project name |
 | Old address | <https://elkojo.github.io/xNotary/> — a **redirect stub**, published by `deploy.yml`. Not a mirror and not a fallback. Certificates saved while the app was served from that origin stay in that browser under that origin and do not appear on the new one; the downloaded PDF is the real copy |
-| Security headers | `app/public/_headers` — CSP, `frame-ancestors 'none'`, `nosniff`, `no-referrer`. Vite copies it into `dist/`, so it travels with the deploy. `connect-src` is the app's entire network surface: three calendars, two explorers |
+| Security headers | `app/hub/public/_headers` — CSP per path (`/*` for the front page, `/xnotary/*` for the app, detaching the general one with `! Content-Security-Policy`), `frame-ancestors 'none'`, `nosniff`, `no-referrer`. Vite copies it into `dist/`, so it travels with the deploy. `connect-src` is the app's entire network surface: three calendars, two explorers |
 | Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 8 releases, all marked pre-release |
 | Flow A — Certificate 1 | Working end to end, verified in a real browser against dev, production *and* the deployed site |
 | Verify-integrity screen | Working, including tamper rejection |
@@ -41,8 +41,8 @@ job adds it. Re-running a tag refreshes the attached build but never rewrites no
 human edited them.
 
 What the tag does: refuses the tag outright if it carries no message, runs `npm run check` and
-`npm test`, builds with `BASE_PATH=/`, checks the result actually carries `_headers` and
-`/assets/` rather than a stale base path, and attaches it to the run as the **`xnotary-dist`**
+`npm test`, builds the whole site, checks the result carries `_headers` with its per-path CSP,
+the front page at `/`, xNotary at `/xnotary/` and the root `sw.js` that retires the pre-0.5.0 worker, and attaches it to the run as the **`xnotary-dist`**
 artifact. Then it publishes the release with that build attached, and republishes the redirect
 stub to GitHub Pages. It does **not** touch production.
 
