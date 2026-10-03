@@ -44,16 +44,56 @@
   --bad-bg: #fff1ef;
   --bad-line: #e9c5c0;
 
-  /* Dark surface, in detail — top bar, landing, footer */
-  --topbar-bg: rgba(7, 19, 15, 0.94);
-  --brand-mark-line: rgba(186, 255, 115, 0.55);
-  --brand-mark-bg: rgba(186, 255, 115, 0.05);
+  /* Top bar — its own surface, so it can stay dark when the pages are light */
+  --bar-bg: rgba(7, 19, 15, 0.94);
+  --bar-fg: #f8faf6;
+  --bar-fg2: #acbab3;
+  --bar-line: rgba(222, 234, 226, 0.14);
+  --bar-rule: 1px solid rgba(222, 234, 226, 0.14);
+  --bar-hover: rgba(255, 255, 255, 0.045);
+  --bar-accent: #baff73;
+  --bar-current-fg: #baff73;
+  --bar-current-bg: rgba(186, 255, 115, 0.075);
+  --bar-chip: rgba(255, 255, 255, 0.035);
+  --bar-chip-hover-line: rgba(186, 255, 115, 0.35);
+  --bar-mark-line: rgba(186, 255, 115, 0.55);
+  --bar-mark-fg: #baff73;
+  --bar-mark-bg: rgba(186, 255, 115, 0.05);
+  --bar-focus: #59e6bd;
+  --caret: #8d9c95;
+  --task-fg: #baff73;
+  --task-line: rgba(186, 255, 115, 0.35);
+  --task-hover-fg: #baff73;
+  --task-hover-bg: rgba(186, 255, 115, 0.075);
+  --task-hover-line: rgba(186, 255, 115, 0.35);
   --brand-domain: #9aaba3;
-  --nav-fg: #acbab3;
-  --nav-hover-bg: rgba(255, 255, 255, 0.045);
-  --nav-current-bg: rgba(186, 255, 115, 0.075);
   --stage-fg: #b7c2bc;
   --stage-halo: rgba(186, 255, 115, 0.08);
+
+  /* Brand marks on the page (cards, menus, tags) */
+  --mark-line: rgba(186, 255, 115, 0.55);
+  --mark-fg: #baff73;
+  --mark-bg: rgba(186, 255, 115, 0.05);
+
+  /* Footer */
+  --footer-bg: #07130f;
+  --footer-rule: 1px solid rgba(222, 234, 226, 0.14);
+  --footer-focus: #59e6bd;
+
+  /* Focus ring on the pages */
+  --focus: #59e6bd;
+
+  /* Buttons */
+  --primary-bg: #baff73;
+  --primary-fg: #0d1a14;
+  --primary-line: transparent;
+  --primary-hover: #c9ff91;
+  --dark-btn-bg: #173f32;
+  --dark-btn-fg: #fff;
+  --dark-btn-line: transparent;
+  --dark-btn-hover: #205441;
+
+  /* Landing surface, in detail */
   --hero-glow: rgba(89, 230, 189, 0.1);
   --hero-fg: #bac6c0;
   --glass: rgba(255, 255, 255, 0.035);
@@ -67,14 +107,12 @@
   --future-fg: #c4cec9;
   --vision-fg: #dfe8e3;
   --vision-fg-soft: #9fb0a7;
+  --vision-bg: #0b1b16;
   --footer-fg: #8d9c95;
   --footer-link: #b6c5be;
 
-  /* Buttons */
-  --on-lime: #0d1a14;
-  --lime-hover: #c9ff91;
+  /* Text on solid fills (status icons) */
   --on-solid: #fff;
-  --green-hover: #205441;
   --ghost-dark-hover-line: #6f9183;
 
   /* Paper surface, in detail — every product screen */
@@ -149,10 +187,17 @@
   --bad-pill-bg: #fbe3e0;
   --bad-solid: #b95148;
 
-  /* Shared site bar, its menus and the front page (src/site/) */
+  /* Shared site bar menus and the front page (src/site/) */
   --accent-line: rgba(186, 255, 115, 0.35);
-  --menu-bg: var(--bg-soft);
+  --menu-bg: #0b1b16;
+  --menu-fg: #f8faf6;
+  --menu-line: rgba(222, 234, 226, 0.14);
+  --menu-current-bg: rgba(186, 255, 115, 0.075);
   --menu-fg2: #8d9c95;
+  --hub-fg: #acbab3;
+  --hub-fg3: #8d9c95;
+  --chip-bg: transparent;
+  --marker: transparent;
   --menu-hover: rgba(255, 255, 255, 0.05);
   --menu-shadow: rgba(0, 0, 0, 0.45);
   --tag-bg: rgba(255, 255, 255, 0.06);
@@ -208,8 +253,14 @@ code {
 }
 
 :focus-visible {
-  outline: 2px solid var(--mint);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+.topbar :focus-visible {
+  outline-color: var(--bar-focus);
+}
+footer.site :focus-visible {
+  outline-color: var(--footer-focus);
 }
 
 /* ---------------------------------------------------------------- top bar -- */
@@ -218,8 +269,9 @@ code {
   position: sticky;
   top: 0;
   z-index: 20;
-  border-bottom: 1px solid var(--line);
-  background: var(--topbar-bg);
+  border-bottom: var(--bar-rule);
+  color: var(--bar-fg);
+  background: var(--bar-bg);
   backdrop-filter: blur(18px);
 }
 
@@ -256,10 +308,10 @@ code {
   height: 30px;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid var(--brand-mark-line);
+  border: 1px solid var(--mark-line);
   border-radius: 8px;
-  color: var(--lime);
-  background: var(--brand-mark-bg);
+  color: var(--mark-fg);
+  background: var(--mark-bg);
   font-size: 13px;
   font-weight: 850;
   transform: rotate(45deg);
@@ -288,7 +340,7 @@ code {
   padding: 0 15px;
   border: 0;
   border-radius: 9px;
-  color: var(--nav-fg);
+  color: var(--bar-fg2);
   background: transparent;
   cursor: pointer;
   font-size: 13px;
@@ -299,13 +351,13 @@ code {
 }
 
 .nav-link:hover {
-  color: var(--white);
-  background: var(--nav-hover-bg);
+  color: var(--bar-fg);
+  background: var(--bar-hover);
 }
 
 .nav-link[aria-current='page'] {
-  color: var(--lime);
-  background: var(--nav-current-bg);
+  color: var(--bar-current-fg);
+  background: var(--bar-current-bg);
 }
 
 /*
@@ -336,7 +388,7 @@ code {
 
 .stage:hover,
 .stage[aria-expanded='true'] {
-  color: var(--white);
+  color: var(--bar-fg);
 }
 
 .stage::before {
@@ -344,7 +396,7 @@ code {
   height: 7px;
   content: '';
   border-radius: 50%;
-  background: var(--lime);
+  background: var(--bar-accent);
   box-shadow: 0 0 0 5px var(--stage-halo);
 }
 
@@ -426,11 +478,12 @@ code {
 }
 
 .button.primary {
-  color: var(--on-lime);
-  background: var(--lime);
+  border-color: var(--primary-line);
+  color: var(--primary-fg);
+  background: var(--primary-bg);
 }
 .button.primary:hover:not(:disabled) {
-  background: var(--lime-hover);
+  background: var(--primary-hover);
 }
 
 .button.secondary {
@@ -443,11 +496,12 @@ code {
 
 /* The primary action on paper. */
 .button.dark {
-  color: var(--on-solid);
-  background: var(--green);
+  border-color: var(--dark-btn-line);
+  color: var(--dark-btn-fg);
+  background: var(--dark-btn-bg);
 }
 .button.dark:hover:not(:disabled) {
-  background: var(--green-hover);
+  background: var(--dark-btn-hover);
 }
 
 .button.ghost-dark {
@@ -1529,7 +1583,7 @@ code {
   padding: 22px 24px;
   border-radius: 12px;
   color: var(--vision-fg);
-  background: var(--bg-soft);
+  background: var(--vision-bg);
   flex-wrap: wrap;
 }
 
@@ -1695,9 +1749,9 @@ details.raw pre {
 /* ----------------------------------------------------------------- footer -- */
 
 footer.site {
-  border-top: 1px solid var(--line);
+  border-top: var(--footer-rule);
   color: var(--footer-fg);
-  background: var(--bg);
+  background: var(--footer-bg);
   font-size: 12px;
 }
 

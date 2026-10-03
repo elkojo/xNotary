@@ -18,10 +18,10 @@ a.task-item {
 a.nav-link {
   display: inline-flex;
   align-items: center;
-  color: var(--nav-fg);
+  color: var(--bar-fg2);
 }
 a.nav-link[aria-current='page'] {
-  color: var(--lime);
+  color: var(--bar-current-fg);
 }
 
 .brand.small {
@@ -37,7 +37,7 @@ a.nav-link[aria-current='page'] {
 .bar-divider {
   width: 1px;
   height: 26px;
-  background: var(--line);
+  background: var(--bar-line);
 }
 
 /* ------------------------------------------------------- service switcher -- */
@@ -51,9 +51,9 @@ a.nav-link[aria-current='page'] {
   gap: 9px;
   height: 38px;
   padding: 0 12px 0 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--bar-line);
   border-radius: 10px;
-  background: var(--glass);
+  background: var(--bar-chip);
   cursor: pointer;
   font-size: 14px;
   font-weight: 740;
@@ -61,7 +61,13 @@ a.nav-link[aria-current='page'] {
 }
 .switcher:hover,
 .switcher[aria-expanded='true'] {
-  border-color: var(--accent-line);
+  border-color: var(--bar-chip-hover-line);
+}
+.nav > .brand .brand-mark,
+.switcher .brand-mark {
+  border-color: var(--bar-mark-line);
+  color: var(--bar-mark-fg);
+  background: var(--bar-mark-bg);
 }
 .switcher .brand-mark {
   width: 22px;
@@ -71,7 +77,7 @@ a.nav-link[aria-current='page'] {
 }
 .caret {
   margin-left: 2px;
-  color: var(--footer-fg);
+  color: var(--caret);
   font-size: 10px;
 }
 
@@ -82,11 +88,14 @@ a.nav-link[aria-current='page'] {
   z-index: 50;
   width: 340px;
   padding: 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--menu-line);
   border-radius: 14px;
-  color: var(--white);
+  color: var(--menu-fg);
   background: var(--menu-bg);
   box-shadow: 0 20px 50px var(--menu-shadow);
+}
+.topbar .menu :focus-visible {
+  outline-color: var(--focus);
 }
 .menu.right {
   right: 0;
@@ -105,7 +114,7 @@ a.nav-link[aria-current='page'] {
   background: var(--menu-hover);
 }
 .menu-item[aria-current='page'] {
-  background: var(--nav-current-bg);
+  background: var(--menu-current-bg);
 }
 .menu-item .brand-mark {
   width: 26px;
@@ -130,7 +139,7 @@ a.nav-link[aria-current='page'] {
 .menu-foot {
   margin-top: 6px;
   padding: 10px 10px 4px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--menu-line);
 }
 .menu-foot a {
   font-size: 12px;
@@ -149,9 +158,9 @@ a.nav-link[aria-current='page'] {
   gap: 8px;
   height: 38px;
   padding: 0 14px;
-  border: 1px solid var(--accent-line);
+  border: 1px solid var(--task-line);
   border-radius: 10px;
-  color: var(--lime);
+  color: var(--task-fg);
   background: transparent;
   cursor: pointer;
   font-size: 13px;
@@ -160,7 +169,9 @@ a.nav-link[aria-current='page'] {
 }
 .task-btn:hover,
 .task-btn[aria-expanded='true'] {
-  background: var(--nav-current-bg);
+  border-color: var(--task-hover-line);
+  color: var(--task-hover-fg);
+  background: var(--task-hover-bg);
 }
 .task-menu {
   width: 560px;
@@ -221,17 +232,17 @@ a.nav-link[aria-current='page'] {
 
 /* ------------------------------------------------------------ front page -- */
 
-/* The marker stroke arrives with the family theme; until then it is plain text. */
+/* A highlighter stroke behind one word of a headline — one per page at most. */
 mark.hlm {
   color: inherit;
-  background: none;
+  background: linear-gradient(transparent 58%, var(--marker) 58%, var(--marker) 90%, transparent 90%);
 }
 .hub .hero h1 {
   font-size: clamp(36px, 6.4vw, 62px);
 }
 .hint {
   margin: 26px 0 0;
-  color: var(--nav-fg);
+  color: var(--hub-fg);
   font-size: 14px;
 }
 .hint button {
@@ -294,7 +305,7 @@ a.product-card:hover {
 }
 .product-card p {
   margin: 18px 0 16px;
-  color: var(--nav-fg);
+  color: var(--hub-fg);
   font-size: 13.5px;
   line-height: 1.6;
 }
@@ -308,7 +319,8 @@ a.product-card:hover {
   padding: 5px 10px;
   border: 1px solid var(--line);
   border-radius: 99px;
-  color: var(--nav-fg);
+  color: var(--hub-fg);
+  background: var(--chip-bg);
   font-size: 12px;
   font-weight: 620;
 }
@@ -318,7 +330,7 @@ a.product-card:hover {
 }
 .product-card.soon h2,
 .product-card.soon p {
-  color: var(--footer-fg);
+  color: var(--hub-fg3);
 }
 
 footer.site .family-links {
