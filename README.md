@@ -2,6 +2,11 @@
 
 **[elkojo.github.io/xSignature](https://elkojo.github.io/xSignature/)**
 
+> **This repository is frozen.** The site above stays online as a standalone utility,
+> exactly as it is. Development continues in [elkojo/xNotary](https://github.com/elkojo/xNotary)
+> under `xsignature/`, where the full history was carried over and where xSignature is
+> served as part of [xnotary.digital](https://xnotary.digital/xsignature/).
+
 Type your name in a handwriting face, or draw it freehand, and export a clean
 transparent PNG or a true vector SVG. Put that signature onto a PDF, and read a
 PDF back to see whether it has been changed since it was stamped. Everything
