@@ -23,6 +23,16 @@
 # unless src/lib/ots.ts genuinely gained one. catallaxy is absent for the same
 # reason it is absent from the calendar list: no CORS header.
 #
+# For /xsignature/*, connect-src is `'self' https:` — decided deliberately
+# (decision D2 in the unification plan). xSignature's one network request is
+# the opt-in RFC 3161 timestamp, and its "Another one" option lets the user
+# type any timestamp authority's address, which no fixed list can name. That
+# is broader than xNotary's list, and since the origin is shared it is broad
+# for the whole origin's storage if xSignature's code were ever compromised;
+# the feature was judged worth it. Its default authorities are listed in
+# xsignature/app/hosts-in-build.txt. PDF.js runs in a worker loaded from this
+# origin, and previews and downloads are blob: URLs.
+#
 # 'unsafe-inline' in style-src is load-bearing: Svelte emits style attributes
 # (`style="margin:16px 0 0"`), and CSP counts those as inline styles. There is
 # no matching allowance for script-src and there must not be.
@@ -37,3 +47,7 @@
 /xnotary/*
   ! Content-Security-Policy
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://alice.btc.calendar.opentimestamps.org https://bob.btc.calendar.opentimestamps.org https://finney.calendar.eternitywall.com https://blockstream.info https://blockchain.info https://*.blockstream.info; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'
+
+/xsignature/*
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https:; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'

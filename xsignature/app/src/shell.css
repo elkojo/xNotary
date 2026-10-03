@@ -1,10 +1,10 @@
 /*
  * Styling that belongs to the shell rather than to any one screen.
  *
- * `app.css` is xNotary's, copied across byte for byte and kept that way so the
- * family resemblance stays a resemblance rather than a fork. Anything this app
- * adds to the chrome around the screens goes here instead, where it can be read
- * as this app's own.
+ * The family's stylesheet is xNotary's `app/src/app.css`, imported as it is —
+ * one copy for the whole site — together with the shared bar's `site.css`.
+ * Anything this app adds to the chrome around the screens goes here instead,
+ * where it can be read as this app's own.
  */
 
 /*

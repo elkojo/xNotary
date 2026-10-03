@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
@@ -21,7 +22,13 @@ const { version } = JSON.parse(readFileSync(new URL('./package.json', import.met
  * the parent's own vite.config.ts stays untouched.
  */
 export default defineConfig({
-  base: process.env.BASE_PATH ?? '/',
+  // xSignature lives at /xsignature/ on xnotary.digital. BASE_PATH overrides it.
+  base: process.env.BASE_PATH ?? '/xsignature/',
+  // The shared bar (app/src/site/) is compiled into this app from outside its
+  // root. Both must use this app's copy of Svelte: two runtimes in one page
+  // do not work.
+  resolve: { dedupe: ['svelte'] },
+  server: { fs: { allow: [fileURLToPath(new URL('../../', import.meta.url))] } },
   define: {
     // A literal, so it is in the bundle rather than fetched from anywhere.
     __APP_VERSION__: JSON.stringify(version),

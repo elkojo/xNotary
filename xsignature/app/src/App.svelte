@@ -1,11 +1,12 @@
 <script lang="ts">
   /**
-   * The shell: top bar, paper working surface, footer. It holds the chrome that
+   * The shell: the xNotary.digital bar, paper working surface, footer. It holds the chrome that
    * is the same on every screen, and routes. Everything the app actually does
    * lives in the view it renders.
    */
   import Signature from './views/Signature.svelte';
-  import { NAV, ROUTES, titleFor, type View } from './nav';
+  import SiteBar from '../../../app/src/site/SiteBar.svelte';
+  import { ROUTES, titleFor, type View } from './nav';
 
   /**
    * The document screen is fetched when it is first opened, not before.
@@ -51,26 +52,7 @@
   });
 </script>
 
-<header class="topbar">
-  <div class="nav">
-    <button class="brand" onclick={() => go('signature')}>
-      <span class="brand-mark"><span>xS</span></span>
-      <span>xSignature</span>
-    </button>
-
-    <nav class="main-nav">
-      {#each NAV as item}
-        <button
-          class="nav-link"
-          aria-current={view === item.id ? 'page' : undefined}
-          onclick={() => go(item.id)}
-        >
-          {item.label}
-        </button>
-      {/each}
-    </nav>
-  </div>
-</header>
+<SiteBar current="xsignature" active={view} onnav={(page) => go(page as View)} />
 
 {#snippet loading()}
   <section class="product-view">

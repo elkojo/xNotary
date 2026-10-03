@@ -25,6 +25,8 @@ copy of your documents anywhere but your own device.
 its storage lives. Or run it locally, see [Getting started](#getting-started). Nothing you do
 there is uploaded.
 
+This repository is the whole of [xnotary.digital](https://xnotary.digital): the front page (`app/hub/`), xNotary (`app/`) and, since 2026-10, [xSignature](xsignature/README.md) (`xsignature/`), which makes signature images and signs and checks PDFs. Its history came along with it.
+
 ---
 
 ## What it produces

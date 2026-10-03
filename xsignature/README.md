@@ -1,11 +1,10 @@
 # xSignature
 
-**[elkojo.github.io/xSignature](https://elkojo.github.io/xSignature/)**
+**[xnotary.digital/xsignature](https://xnotary.digital/xsignature/)**
 
-> **This repository is frozen.** The site above stays online as a standalone utility,
-> exactly as it is. Development continues in [elkojo/xNotary](https://github.com/elkojo/xNotary)
-> under `xsignature/`, where the full history was carried over and where xSignature is
-> served as part of [xnotary.digital](https://xnotary.digital/xsignature/).
+Part of the xNotary.digital family since 2026-10. The code and its full history moved
+here from [elkojo/xSignature](https://github.com/elkojo/xSignature), which is frozen; its
+GitHub Pages site stays online as a standalone copy and is no longer updated.
 
 Type your name in a handwriting face, or draw it freehand, and export a clean
 transparent PNG or a true vector SVG. Put that signature onto a PDF, and read a
@@ -27,12 +26,13 @@ Three screens:
   about itself, and whether the certificates needed to trace it back are there.
   When they are not, they can be supplied and checked on the spot.
 
-xSignature is a standalone app. It has no backend of its own and talks to no
-other application: the page loads, and from then on everything it does happens
-on your machine. The single exception is the timestamp, which is opt-in, off by
-default, and described under [Privacy](#privacy). It shares its design language
-and its privacy posture with [xNotary](https://xnotary.digital), and nothing
-else — no shared account, no shared storage, no traffic between them.
+xSignature has no backend of its own and talks to no other application: the
+page loads, and from then on everything it does happens on your machine. The
+single exception is the timestamp, which is opt-in, off by default, and
+described under [Privacy](#privacy). It is one of the services on
+[xnotary.digital](https://xnotary.digital), and shares that site's bar, its
+design language and its privacy posture with xNotary — nothing functional: no
+shared account, no data passed between the two, no traffic between them.
 
 ## Two different claims
 
@@ -214,12 +214,13 @@ npm run dev
 ```
 
 `npm test` runs the unit suite and `npm run typecheck` runs `svelte-check`.
-`npx vite build` produces a static site in `app/dist`; set `BASE_PATH` when it
-is served from a subdirectory, as the deployed copy is:
-
-```
-BASE_PATH=/xSignature/ npx vite build
-```
+`npx vite build` produces a static site in `app/dist`, built for
+`/xsignature/` (set `BASE_PATH` to serve it elsewhere). The deployed site is
+built from the repository root's `app/`: `npm run build:only` there builds the
+xNotary.digital front page, xNotary and xSignature into one `app/dist/`, and
+needs `npm install` to have been run in both `app/` and `xsignature/app/`.
+The shared bar and the family stylesheet come from `app/src/` and are compiled
+into this app; it has no copy of its own.
 
 Two things the unit suite cannot reach, because they need a browser rather than
 node — rasterising to a canvas, and the pointer handling behind draw mode — have

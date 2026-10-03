@@ -80,7 +80,7 @@
               class="menu-item"
               href={s.href}
               aria-current={s.id === current ? 'page' : undefined}
-              onclick={(e) => within(e, s.id, 'home')}
+              onclick={(e) => within(e, s.id, s.home)}
             >
               <span class="brand-mark"><span>{s.mark}</span></span>
               <span>

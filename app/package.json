@@ -11,7 +11,7 @@
     "dev": "vite",
     "dev:hub": "vite -c vite.hub.config.ts",
     "build": "svelte-check --tsconfig ./tsconfig.json && npm run build:only",
-    "build:only": "vite build -c vite.hub.config.ts && vite build",
+    "build:only": "vite build -c vite.hub.config.ts && vite build && npm --prefix ../xsignature/app run build:only -- --outDir ../../app/dist/xsignature --emptyOutDir",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
