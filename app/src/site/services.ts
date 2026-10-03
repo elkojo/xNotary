@@ -1,13 +1,15 @@
 import { NAV } from '../nav';
+import { NAV as XSIGNATURE_NAV } from '../../../xsignature/app/src/nav';
 
 /**
  * The xNotary.digital family, as the shared bar, the task menu and the front
  * page see it. One entry per service, so the switcher, the "I want to…" menu
  * and the front-page cards cannot drift apart: they all read this.
  *
- * `href` is where the service lives. A service that is not on this origin yet
- * is `external` and is linked out with a ↗ rather than pretending to be part
- * of the site (xSignature, until it moves to /xsignature/).
+ * `href` is where the service lives and `home` its first screen. A service
+ * that is not on this origin is `external` and is linked out with a ↗ rather
+ * than pretending to be part of the site. Each service's tabs are its own
+ * routing table, imported, so a renamed screen cannot leave a stale label here.
  */
 export type ServiceId = 'xnotary' | 'xsignature';
 
@@ -17,6 +19,7 @@ export interface Service {
   readonly mark: string;
   readonly href: string;
   readonly external: boolean;
+  readonly home: string;
   readonly tagline: string;
   readonly description: string;
   readonly tabs: ReadonlyArray<{ readonly id: string; readonly label: string }>;
@@ -29,6 +32,7 @@ export const SERVICES: readonly Service[] = [
     mark: 'xN',
     href: '/xnotary/',
     external: false,
+    home: 'home',
     tagline: 'Timestamp a document in Bitcoin and certify who signed it.',
     description:
       'Prove that an exact file existed no later than a particular Bitcoin block, and record who ' +
@@ -39,17 +43,14 @@ export const SERVICES: readonly Service[] = [
     id: 'xsignature',
     name: 'xSignature',
     mark: 'xS',
-    href: 'https://elkojo.github.io/xSignature/',
-    external: true,
+    href: '/xsignature/',
+    external: false,
+    home: 'signature',
     tagline: 'Make a signature image, sign a PDF, check a signed PDF.',
     description:
       'Type or draw a signature and export a PNG or SVG, put it on a PDF — optionally with your ' +
       'own certificate and a timestamp — and read a PDF back to see what it claims.',
-    tabs: [
-      { id: 'signature', label: 'Signature image' },
-      { id: 'document', label: 'Sign a document' },
-      { id: 'check', label: 'Check a PDF' },
-    ],
+    tabs: XSIGNATURE_NAV,
   },
 ];
 

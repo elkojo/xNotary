@@ -1,6 +1,6 @@
 {
   "name": "xnotary",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
@@ -11,7 +11,7 @@
     "dev": "vite",
     "dev:hub": "vite -c vite.hub.config.ts",
     "build": "svelte-check --tsconfig ./tsconfig.json && npm run build:only",
-    "build:only": "vite build -c vite.hub.config.ts && vite build",
+    "build:only": "vite build -c vite.hub.config.ts && vite build && npm --prefix ../xsignature/app run build:only -- --outDir ../../app/dist/xsignature --emptyOutDir",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",

@@ -1,0 +1,467 @@
+/*
+ * The classes xSignature needs that app.css does not already have.
+ *
+ * Everything this app can express in the existing vocabulary — .product-view,
+ * .flow-shell, .stepper, .flow-panel, .side-card, .notice, .field, .input,
+ * .button — does so. What is left over is specific to looking at a signature
+ * while you make it, and is built from the same custom properties.
+ */
+
+/*
+ * The preview.
+ *
+ * A window frame, not a card: the checkerboard says "this part is transparent",
+ * which is the single most important fact about the file being made and the one
+ * thing a plain white box would actively hide.
+ */
+.ink-stage {
+  display: grid;
+  place-items: center;
+  min-height: 190px;
+  margin-top: 18px;
+  padding: 22px;
+  border: 1px solid var(--line-dark);
+  border-radius: 12px;
+  background-color: var(--card);
+  background-image:
+    linear-gradient(45deg, var(--check) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--check) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--check) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--check) 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+}
+
+/* The signature itself, sized to the stage rather than to its own units. */
+.ink-stage svg {
+  max-width: 100%;
+  max-height: 150px;
+  height: auto;
+}
+
+/* Waiting for a font, or waiting for a name. */
+.ink-stage .empty-ink {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+/*
+ * The measurements under the preview. Deliberately plain text rather than a
+ * badge: it is a fact about the file, not a status to react to.
+ */
+.ink-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 12px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.ink-facts strong {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+@media (max-width: 560px) {
+  .ink-stage {
+    min-height: 150px;
+    padding: 14px;
+  }
+}
+
+/*
+ * A dark backdrop for the preview.
+ *
+ * Not a theme and not a setting that reaches the file — the export is
+ * unchanged either way. It exists because white ink on a white checkerboard
+ * shows nothing, and an ink swatch that appears to do nothing is worse than no
+ * swatch at all.
+ */
+.ink-stage.dark {
+  border-color: var(--stage-dark-line);
+  background-color: var(--stage-dark-bg);
+  background-image:
+    linear-gradient(45deg, var(--stage-dark-check) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--stage-dark-check) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--stage-dark-check) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--stage-dark-check) 75%);
+}
+
+.ink-stage.dark .empty-ink {
+  color: var(--stage-dark-fg);
+}
+
+.stage-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.stage-hint {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.stage-toggle {
+  padding: 5px 11px;
+  border: 1px solid var(--line-dark);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 650;
+  background: var(--card);
+  cursor: pointer;
+}
+
+.stage-toggle:hover {
+  border-color: var(--control-hover-line);
+  color: var(--ink);
+}
+
+/* A label for a group of buttons, where .field label would be wrong: these
+   controls are not one input, so there is nothing for a label to point at. */
+.field-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.face-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 8px;
+}
+
+.face-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-dark);
+  border-radius: 10px;
+  text-align: left;
+  background: var(--card);
+  cursor: pointer;
+}
+
+.face-option strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.face-option span {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.face-option:hover {
+  border-color: var(--control-hover-line);
+}
+
+.face-option.selected {
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice {
+  padding: 9px 16px;
+  border: 1px solid var(--line-dark);
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 650;
+  background: var(--card);
+  cursor: pointer;
+}
+
+.choice:hover {
+  border-color: var(--control-hover-line);
+}
+
+.choice.selected {
+  border-color: var(--dark-btn-line);
+  color: var(--dark-btn-fg);
+  background: var(--dark-btn-bg);
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+/*
+ * The swatch is the colour. The ring that marks the selected one sits outside
+ * it rather than on top, so it reads the same on white ink as on black.
+ */
+.swatch {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line-dark);
+  border-radius: 9px;
+  background: var(--swatch);
+  cursor: pointer;
+}
+
+.swatch:hover {
+  transform: translateY(-1px);
+}
+
+.swatch.selected {
+  /*
+   * A ring drawn with box-shadow rather than outline, deliberately: outline is
+   * what :focus-visible uses, and a swatch that is both selected and focused
+   * would otherwise show one ring doing two jobs. Keyboard users need to see
+   * which swatch they are on, not only which one is chosen.
+   */
+  box-shadow:
+    0 0 0 2px var(--card),
+    0 0 0 4px var(--green);
+}
+
+.hex-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.hex-row label {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.hex-input {
+  width: 130px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.hex-input.bad {
+  border-color: var(--bad-line);
+  background: var(--bad-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swatch:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .face-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .hex-row {
+    flex-wrap: wrap;
+  }
+}
+
+/* Type or draw. Two ways in to the same pipeline. */
+.mode-tabs {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 18px;
+  padding: 4px;
+  border: 1px solid var(--line-dark);
+  border-radius: 11px;
+  background: var(--tabs-bg);
+}
+
+.mode-tab {
+  padding: 7px 20px;
+  border: none;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  font-weight: 650;
+  background: transparent;
+  cursor: pointer;
+}
+
+.mode-tab:hover {
+  color: var(--ink);
+}
+
+.mode-tab.selected {
+  color: var(--ink);
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--line-dark);
+}
+
+/*
+ * The drawing surface.
+ *
+ * Same checkerboard as the preview, for the same reason: what is being made is
+ * a transparent image, and a white canvas would quietly imply otherwise. The
+ * ruled baseline is the one piece of furniture worth having — people sign on a
+ * line, and without one signatures drift.
+ */
+.pad {
+  display: block;
+  width: 100%;
+  height: 210px;
+  border: 1px solid var(--line-dark);
+  border-radius: 12px;
+  background-color: var(--card);
+  background-image:
+    linear-gradient(to bottom, transparent calc(72% - 1px), var(--check-rule) 72%, transparent calc(72% + 1px)),
+    linear-gradient(45deg, var(--check) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--check) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--check) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--check) 75%);
+  background-size:
+    100% 100%,
+    16px 16px,
+    16px 16px,
+    16px 16px,
+    16px 16px;
+  background-position:
+    0 0,
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.pad.dark {
+  border-color: var(--stage-dark-line);
+  background-color: var(--stage-dark-bg);
+  background-image:
+    linear-gradient(to bottom, transparent calc(72% - 1px), var(--stage-dark-rule) 72%, transparent calc(72% + 1px)),
+    linear-gradient(45deg, var(--stage-dark-check) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--stage-dark-check) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--stage-dark-check) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--stage-dark-check) 75%);
+}
+
+.pad-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.pad-tools .field-help {
+  margin: 0;
+}
+
+.pad-buttons {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.stage-toggle:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.stage-toggle:disabled:hover {
+  border-color: var(--line-dark);
+  color: var(--ink-soft);
+}
+
+@media (max-width: 560px) {
+  .pad {
+    height: 170px;
+  }
+
+  .pad-tools {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/*
+ * The secondary actions, kept together.
+ *
+ * .flow-actions spreads its children apart, which reads correctly with two
+ * buttons and wrongly with three — the middle one ends up floating. Grouping
+ * keeps "go back / do something else" on the left and the action that finishes
+ * the job on the right, which is the arrangement the rest of the app uses.
+ */
+.action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  /* Two rows of two: saves above, copies below, each pair sharing a width. */
+  .flow-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .action-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .action-group .button,
+  .flow-actions > .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .mode-tabs {
+    display: flex;
+    width: 100%;
+  }
+
+  .mode-tab {
+    flex: 1;
+  }
+
+  .choice-row {
+    gap: 6px;
+  }
+
+  .ink-facts {
+    gap: 4px 12px;
+    font-size: 12.5px;
+  }
+}
+
+/*
+ * The stepper is navigation here, not a disabled progress read-out, so it has
+ * to look like something you can press.
+ */
+.stepper .step {
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/*
+ * Room for the sticky top bar when a panel is scrolled to.
+ *
+ * Without this the stepper takes you to a heading that is sitting underneath
+ * the header, which looks like the click went to the wrong place.
+ */
+.flow-panel {
+  scroll-margin-top: 92px;
+}
