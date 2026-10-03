@@ -1,6 +1,6 @@
 # Where things stand — handoff
 
-**Last updated:** 2026-09-11 · `main` · the app moved to its own domain; a tag is needed to republish the redirect stub, and production is deployed by hand
+**Last updated:** 2026-10-03 · `main` · v0.6.0 (front page, xNotary at `/xnotary/`, xSignature at `/xsignature/`) is tagged and released but **not deployed yet**; more local changes come first, and the operator then deploys a later tag (v0.6.x or v0.7.0)
 
 M0, M1 and M2 are done. Both certificates work end to end, the app is public and live, and
 `pades.ts` has been measured against real qualified signatures rather than only synthetic ones.
@@ -11,8 +11,8 @@ What is left before a real release is not code: two reviews, and documents only 
 
 | | |
 |---|---|
-| Live app | <https://xnotary.digital/xnotary/> — served from Cloudflare Pages on the operator's account. Since 0.5.0 `dist/` is the whole site: the xNotary.digital front page at `/` (`app/hub/`) and xNotary at `/xnotary/`; the front page forwards old `/#/…` links there. The apex is canonical; `www` 301s to it, and `xnotary.pages.dev` is the same build under its project name |
-| xSignature | `xsignature/app` — joined this repository with its history in 2026-10 and is served at <https://xnotary.digital/xsignature/> with the shared bar. `npm run build:only` in `app/` builds it into `dist/xsignature/`, so both `app/` and `xsignature/app/` need `npm ci`; CI runs its typecheck, tests, host allow-list and font-licence checks. Its CSP is the `/xsignature/*` rule (`connect-src 'self' https:`). The old repo `elkojo/xSignature` is frozen; its GitHub Pages site stays up as a standalone copy |
+| Live app | <https://xnotary.digital/xnotary/> — served from Cloudflare Pages on the operator's account. **Production still runs the pre-0.6.0 build** (checked 2026-10-03: `/xsignature/` answers with xNotary's page). Since 0.5.0 `dist/` is the whole site: the xNotary.digital front page at `/` (`app/hub/`) and xNotary at `/xnotary/`; the front page forwards old `/#/…` links there. The apex is canonical; `www` 301s to it, and `xnotary.pages.dev` is the same build under its project name |
+| xSignature | `xsignature/app` — joined this repository with its history in 2026-10 and is built to be served at <https://xnotary.digital/xsignature/> with the shared bar — live once the operator deploys a 0.6.0-or-later release. `npm run build:only` in `app/` builds it into `dist/xsignature/`, so both `app/` and `xsignature/app/` need `npm ci`; CI runs its typecheck, tests, host allow-list and font-licence checks. Its CSP is the `/xsignature/*` rule (`connect-src 'self' https:`). The old repo `elkojo/xSignature` is frozen; its GitHub Pages site stays up as a standalone copy |
 | Old address | <https://elkojo.github.io/xNotary/> — a **redirect stub**, published by `deploy.yml`. Not a mirror and not a fallback. Certificates saved while the app was served from that origin stay in that browser under that origin and do not appear on the new one; the downloaded PDF is the real copy |
 | Security headers | `app/hub/public/_headers` — CSP per path (`/*` for the front page, `/xnotary/*` for the app, detaching the general one with `! Content-Security-Policy`), `frame-ancestors 'none'`, `nosniff`, `no-referrer`. Vite copies it into `dist/`, so it travels with the deploy. `connect-src` is the app's entire network surface: three calendars, two explorers |
 | Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 8 releases, all marked pre-release |
