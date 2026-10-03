@@ -36,16 +36,6 @@
 }
 
 /*
- * The brand mark sits on the bar, which stays dark when the pages are light.
- * (xNotary.digital's shared bar carries the same rule.)
- */
-.nav > .brand .brand-mark {
-  border-color: var(--bar-mark-line);
-  color: var(--bar-mark-fg);
-  background: var(--bar-mark-bg);
-}
-
-/*
  * The version, under the footer text.
  *
  * Quieter than the prose above it, because it is a fact for somebody checking
