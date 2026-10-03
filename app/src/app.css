@@ -1,16 +1,15 @@
 /*
  * xNotary design system.
  *
- * Two surfaces, deliberately different:
+ * The xNotary.digital family look, shared with the front page and the other
+ * services: a black bar closed by a yellow rule, warm-white pages with white
+ * cards and black type, and yellow used like a highlighter — the current tab,
+ * the buttons, the brand mark, one marked word in a headline. Documents are
+ * what this is about, and a document is a light thing; the bar and the footer
+ * frame it.
  *
- *   - The landing view is dark (--bg) with a lime accent. It is the face of the
- *     product and the only page a visitor sees before deciding to trust it.
- *   - Every working screen is "paper" (--paper) with white cards. Documents are
- *     what this app is about, and a document is a light thing.
- *
- * The appearance is fixed rather than following prefers-color-scheme: the two
- * surfaces carry meaning here (you are reading about it / you are working on a
- * document), and inverting one of them breaks that.
+ * The appearance is fixed rather than following prefers-color-scheme: the
+ * surfaces carry meaning here, and inverting one of them breaks that.
  *
  * Every colour lives in :root below; the rules only ever say var(--…). A theme
  * is therefore a set of token values and nothing else. Semantic tones (ok, warn,
@@ -18,20 +17,23 @@
  */
 
 :root {
-  /* Dark surface — landing, top bar, footer */
-  --bg: #07130f;
-  --bg-soft: #0b1b16;
-  --white: #f8faf6;
-  --line: rgba(222, 234, 226, 0.14);
-  --lime: #baff73;
-  --mint: #59e6bd;
-  --green: #173f32;
+  /* Landing surface — the front page and xNotary's own home.
+     The names are historical (this surface was dark green with a lime accent):
+     --white is its text and --lime its accent. They are kept because other
+     family apps copy this file and refer to them. */
+  --bg: #fffdf6;
+  --bg-soft: #161616;
+  --white: #111111;
+  --line: rgba(17, 17, 17, 0.22);
+  --lime: #111111;
+  --mint: #111111;
+  --green: #111111;
 
   /* Paper surface — every product screen */
-  --paper: #f4f3ed;
-  --ink: #10201a;
-  --ink-soft: #5e6a65;
-  --line-dark: rgba(16, 32, 26, 0.13);
+  --paper: #fffdf6;
+  --ink: #111111;
+  --ink-soft: #3a3527;
+  --line-dark: rgba(17, 17, 17, 0.16);
 
   /* Semantic tones, on paper */
   --ok: #236048;
@@ -44,86 +46,125 @@
   --bad-bg: #fff1ef;
   --bad-line: #e9c5c0;
 
-  /* Dark surface, in detail — top bar, landing, footer */
-  --topbar-bg: rgba(7, 19, 15, 0.94);
-  --brand-mark-line: rgba(186, 255, 115, 0.55);
-  --brand-mark-bg: rgba(186, 255, 115, 0.05);
-  --brand-domain: #9aaba3;
-  --nav-fg: #acbab3;
-  --nav-hover-bg: rgba(255, 255, 255, 0.045);
-  --nav-current-bg: rgba(186, 255, 115, 0.075);
-  --stage-fg: #b7c2bc;
-  --stage-halo: rgba(186, 255, 115, 0.08);
-  --hero-glow: rgba(89, 230, 189, 0.1);
-  --hero-fg: #bac6c0;
-  --glass: rgba(255, 255, 255, 0.035);
-  --glass-hover: rgba(255, 255, 255, 0.055);
-  --glass-line: rgba(255, 255, 255, 0.14);
-  --glass-line-hover: rgba(255, 255, 255, 0.26);
-  --service-hover-line: rgba(186, 255, 115, 0.32);
-  --service-number: #789087;
-  --service-fg: #9eaea6;
-  --trust-fg: #84978e;
-  --future-fg: #c4cec9;
-  --vision-fg: #dfe8e3;
-  --vision-fg-soft: #9fb0a7;
-  --footer-fg: #8d9c95;
-  --footer-link: #b6c5be;
+  /* Top bar — its own surface, so it can stay dark when the pages are light */
+  --bar-bg: #161616;
+  --bar-fg: #f2efe6;
+  --bar-fg2: #c9c3b0;
+  --bar-line: rgba(255, 255, 255, 0.18);
+  --bar-rule: 3px solid #ffd84d;
+  --bar-hover: rgba(255, 255, 255, 0.08);
+  --bar-accent: #ffd84d;
+  --bar-current-fg: #111111;
+  --bar-current-bg: #ffd84d;
+  --bar-chip: rgba(255, 255, 255, 0.06);
+  --bar-chip-hover-line: #f2efe6;
+  --bar-mark-line: #ffd84d;
+  --bar-mark-fg: #ffd84d;
+  --bar-mark-bg: transparent;
+  --bar-focus: #ffd84d;
+  --caret: #c9c3b0;
+  --task-fg: #ffd84d;
+  --task-line: #ffd84d;
+  --task-hover-fg: #111111;
+  --task-hover-bg: #ffd84d;
+  --task-hover-line: #ffd84d;
+  --brand-domain: #c9c3b0;
+  --stage-fg: #c9c3b0;
+  --stage-halo: rgba(255, 216, 77, 0.18);
+
+  /* Brand marks on the page (cards, menus, tags) */
+  --mark-line: #111111;
+  --mark-fg: #111111;
+  --mark-bg: transparent;
+
+  /* Footer */
+  --footer-bg: #161616;
+  --footer-rule: none;
+  --footer-focus: #ffd84d;
+
+  /* Focus ring on the pages */
+  --focus: #111111;
 
   /* Buttons */
-  --on-lime: #0d1a14;
-  --lime-hover: #c9ff91;
+  --primary-bg: #ffd84d;
+  --primary-fg: #111111;
+  --primary-line: #111111;
+  --primary-hover: #ffcf26;
+  --dark-btn-bg: #ffd84d;
+  --dark-btn-fg: #111111;
+  --dark-btn-line: #111111;
+  --dark-btn-hover: #ffcf26;
+
+  /* Landing surface, in detail */
+  --hero-glow: transparent;
+  --hero-fg: #2a2618;
+  --glass: #ffffff;
+  --glass-hover: #ffffff;
+  --glass-line: rgba(17, 17, 17, 0.45);
+  --glass-line-hover: #111111;
+  --service-hover-line: #111111;
+  --service-number: #57513f;
+  --service-fg: #3a3527;
+  --trust-fg: #3a3527;
+  --future-fg: #2a2618;
+  --vision-fg: #f2efe6;
+  --vision-fg-soft: #c9c3b0;
+  --vision-bg: #161616;
+  --vision-accent: #ffd84d;
+  --footer-fg: #c9c3b0;
+  --footer-link: #ffd84d;
+
+  /* Text on solid fills (status icons) */
   --on-solid: #fff;
-  --green-hover: #205441;
-  --ghost-dark-hover-line: #6f9183;
+  --ghost-dark-hover-line: #111111;
 
   /* Paper surface, in detail — every product screen */
-  --card: #fff;
-  --card-shadow: rgba(25, 42, 35, 0.055);
-  --well: #fafaf7;
-  --link: #1f6b50;
-  --link-hover: #14503b;
-  --link-button: #286c51;
-  --secure-fg: #477061;
-  --secure-mark: #2d9f72;
-  --step-fg: #8a9490;
-  --step-done: #32805f;
-  --drop-line: #aab7b1;
-  --drop-over-bg: #f1f6f3;
-  --drop-fg: #75817c;
-  --selected-line: #3d7a63;
-  --selected-bg: #f1f7f4;
-  --file-icon-line: #99aca3;
-  --file-icon-shadow: #e3e9e5;
-  --privacy-fg: #65746e;
-  --privacy-mark: #207957;
-  --faint: #7a8580;
-  --quiet: #65736d;
-  --note-fg: #47554e;
-  --input-line: #c7cfcb;
-  --focus-line: #537e6d;
-  --focus-ring: rgba(57, 129, 99, 0.09);
-  --field-help: #7c8782;
-  --side-fg: #56655e;
-  --side-mark: #25815e;
-  --pill-muted-fg: #5c6a64;
-  --pill-muted-bg: #e8ebe7;
-  --result-fg: #607068;
-  --signer-hover-line: #9fb2a9;
-  --meta-fg: #7a8680;
-  --search-line: #cbd2ce;
-  --search-bg: #fafaf8;
-  --table-head-fg: #7b8781;
-  --table-head-bg: #f7f7f3;
-  --hash-fg: #84908a;
-  --table-value: #52615a;
-  --more-hover-bg: #f0f2ef;
-  --storage-mark: #2d7b5d;
-  --how-number: #2e7258;
-  --boundary-fg: #58665f;
-  --explain-summary: #2b5b48;
-  --progress-track: #e6eae7;
-  --popover-shadow: rgba(4, 12, 9, 0.4);
+  --card: #ffffff;
+  --card-shadow: rgba(40, 32, 0, 0.06);
+  --well: #fbf8ee;
+  --link: #111111;
+  --link-hover: #3a3527;
+  --link-button: #111111;
+  --secure-fg: #3a3527;
+  --secure-mark: #111111;
+  --step-fg: #6b6450;
+  --step-done: #3a3527;
+  --drop-line: #8f8668;
+  --drop-over-bg: #fff3c4;
+  --drop-fg: #57513f;
+  --selected-line: #111111;
+  --selected-bg: #fff3c4;
+  --file-icon-line: #8f8668;
+  --file-icon-shadow: #ede6cf;
+  --privacy-fg: #57513f;
+  --privacy-mark: #111111;
+  --faint: #6b6450;
+  --quiet: #57513f;
+  --note-fg: #3a3527;
+  --input-line: #b5ad94;
+  --focus-line: #111111;
+  --focus-ring: rgba(255, 216, 77, 0.45);
+  --field-help: #6b6450;
+  --side-fg: #3a3527;
+  --side-mark: #111111;
+  --pill-muted-fg: #57513f;
+  --pill-muted-bg: #eee9da;
+  --result-fg: #3a3527;
+  --signer-hover-line: #8f8668;
+  --meta-fg: #6b6450;
+  --search-line: #b5ad94;
+  --search-bg: #ffffff;
+  --table-head-fg: #57513f;
+  --table-head-bg: #f7f3e6;
+  --hash-fg: #6b6450;
+  --table-value: #3a3527;
+  --more-hover-bg: #f3eedd;
+  --storage-mark: #111111;
+  --how-number: #111111;
+  --boundary-fg: #3a3527;
+  --explain-summary: #111111;
+  --progress-track: #e9e3cf;
+  --popover-shadow: rgba(40, 32, 0, 0.22);
 
   /* Semantic tones, deeper shades */
   --ok-text: #2b5b48;
@@ -149,9 +190,24 @@
   --bad-pill-bg: #fbe3e0;
   --bad-solid: #b95148;
 
+  /* Shared site bar menus and the front page (src/site/) */
+  --accent-line: #111111;
+  --menu-bg: #fffdf6;
+  --menu-fg: #111111;
+  --menu-line: rgba(17, 17, 17, 0.3);
+  --menu-current-bg: #fff3c4;
+  --menu-fg2: #57513f;
+  --hub-fg: #3a3527;
+  --hub-fg3: #6b6450;
+  --chip-bg: #fff3c4;
+  --marker: #ffd84d;
+  --menu-hover: #fff3c4;
+  --menu-shadow: rgba(40, 32, 0, 0.22);
+  --tag-bg: #f3eedd;
+
   --radius: 16px;
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * {
@@ -200,8 +256,14 @@ code {
 }
 
 :focus-visible {
-  outline: 2px solid var(--mint);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+.topbar :focus-visible {
+  outline-color: var(--bar-focus);
+}
+footer.site :focus-visible {
+  outline-color: var(--footer-focus);
 }
 
 /* ---------------------------------------------------------------- top bar -- */
@@ -210,8 +272,9 @@ code {
   position: sticky;
   top: 0;
   z-index: 20;
-  border-bottom: 1px solid var(--line);
-  background: var(--topbar-bg);
+  border-bottom: var(--bar-rule);
+  color: var(--bar-fg);
+  background: var(--bar-bg);
   backdrop-filter: blur(18px);
 }
 
@@ -248,10 +311,10 @@ code {
   height: 30px;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid var(--brand-mark-line);
+  border: 1px solid var(--mark-line);
   border-radius: 8px;
-  color: var(--lime);
-  background: var(--brand-mark-bg);
+  color: var(--mark-fg);
+  background: var(--mark-bg);
   font-size: 13px;
   font-weight: 850;
   transform: rotate(45deg);
@@ -280,7 +343,7 @@ code {
   padding: 0 15px;
   border: 0;
   border-radius: 9px;
-  color: var(--nav-fg);
+  color: var(--bar-fg2);
   background: transparent;
   cursor: pointer;
   font-size: 13px;
@@ -291,13 +354,13 @@ code {
 }
 
 .nav-link:hover {
-  color: var(--white);
-  background: var(--nav-hover-bg);
+  color: var(--bar-fg);
+  background: var(--bar-hover);
 }
 
 .nav-link[aria-current='page'] {
-  color: var(--lime);
-  background: var(--nav-current-bg);
+  color: var(--bar-current-fg);
+  background: var(--bar-current-bg);
 }
 
 /*
@@ -328,7 +391,7 @@ code {
 
 .stage:hover,
 .stage[aria-expanded='true'] {
-  color: var(--white);
+  color: var(--bar-fg);
 }
 
 .stage::before {
@@ -336,7 +399,7 @@ code {
   height: 7px;
   content: '';
   border-radius: 50%;
-  background: var(--lime);
+  background: var(--bar-accent);
   box-shadow: 0 0 0 5px var(--stage-halo);
 }
 
@@ -418,11 +481,12 @@ code {
 }
 
 .button.primary {
-  color: var(--on-lime);
-  background: var(--lime);
+  border-color: var(--primary-line);
+  color: var(--primary-fg);
+  background: var(--primary-bg);
 }
 .button.primary:hover:not(:disabled) {
-  background: var(--lime-hover);
+  background: var(--primary-hover);
 }
 
 .button.secondary {
@@ -435,11 +499,12 @@ code {
 
 /* The primary action on paper. */
 .button.dark {
-  color: var(--on-solid);
-  background: var(--green);
+  border-color: var(--dark-btn-line);
+  color: var(--dark-btn-fg);
+  background: var(--dark-btn-bg);
 }
 .button.dark:hover:not(:disabled) {
-  background: var(--green-hover);
+  background: var(--dark-btn-hover);
 }
 
 .button.ghost-dark {
@@ -1521,7 +1586,7 @@ code {
   padding: 22px 24px;
   border-radius: 12px;
   color: var(--vision-fg);
-  background: var(--bg-soft);
+  background: var(--vision-bg);
   flex-wrap: wrap;
 }
 
@@ -1542,7 +1607,7 @@ code {
 }
 
 .vision-strip > span {
-  color: var(--lime);
+  color: var(--vision-accent);
   font-size: 12px;
   font-weight: 750;
 }
@@ -1687,9 +1752,9 @@ details.raw pre {
 /* ----------------------------------------------------------------- footer -- */
 
 footer.site {
-  border-top: 1px solid var(--line);
+  border-top: var(--footer-rule);
   color: var(--footer-fg);
-  background: var(--bg);
+  background: var(--footer-bg);
   font-size: 12px;
 }
 

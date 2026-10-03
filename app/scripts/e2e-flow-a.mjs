@@ -17,7 +17,7 @@ import { WebSocket } from 'ws';
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
-const baseUrl = process.argv[2] ?? 'http://localhost:5173';
+const baseUrl = process.argv[2] ?? 'http://localhost:5173/xnotary/';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // A unique document, so every run exercises a genuine calendar round-trip.
@@ -198,7 +198,7 @@ try {
 
   await evaluate(
     `[...document.querySelectorAll('.nav-link')]
-       .find((b) => b.textContent.trim() === 'Verify').click()`,
+       .find((b) => b.textContent.trim() === 'Verify proof').click()`,
   );
   await sleep(700);
 

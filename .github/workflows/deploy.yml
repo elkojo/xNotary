@@ -6,8 +6,8 @@ name: Release
 # Cloudflare Pages account, and this workflow deliberately cannot reach it:
 # there are no Cloudflare credentials here and connecting the Pages project to
 # GitHub is the operator's call, not ours. What it does instead is produce the
-# exact bytes that should be deployed — tested, built with BASE_PATH=/ and with
-# the security headers in place — and attach them to the run for whoever runs
+# exact bytes that should be deployed — tested, built as the whole site (the
+# front page at /, xNotary at /xnotary/) and with the security headers in place — and attach them to the run for whoever runs
 # `wrangler pages deploy`. The bytes that ship are then the bytes CI tested.
 #
 # GitHub Pages serves a redirect stub to the canonical address. It is not a
@@ -86,21 +86,26 @@ jobs:
       - run: npm test
 
       - name: Build
-        # A bare host at the apex, not a project subdirectory — so no base path.
-        # Reverting this to /<repo>/ would break the canonical deployment.
+        # The whole site: the front page into dist/, xNotary into dist/xnotary/.
+        # No BASE_PATH — /xnotary/ is the default, and setting it to anything
+        # else would move xNotary out from under its front page and its CSP rule.
         run: npm run build:only
-        env:
-          BASE_PATH: /
 
-      - name: Check the artifact is the one the apex needs
-        # Two failures this catches, both silent and both user-visible only
-        # after deploying: a build that still carries the Pages base path, and
-        # a dist/ with no security headers because public/_headers went missing.
+      - name: Check the artifact is the site the apex needs
+        # Failures this catches, all silent and all user-visible only after
+        # deploying: a dist/ with no security headers because _headers went
+        # missing, a CSP rule for /xnotary/ that would be merged into the
+        # front page's instead of replacing it, xNotary built for the wrong
+        # path, and the root /sw.js missing — without it, visitors who still
+        # have the pre-0.5.0 worker would keep the old app at / for good.
         run: |
           test -f dist/_headers || { echo '::error::dist/_headers is missing — the deployment would ship with no CSP'; exit 1; }
           grep -q 'frame-ancestors' dist/_headers || { echo '::error::dist/_headers carries no frame-ancestors directive'; exit 1; }
-          grep -q 'src="/assets/' dist/index.html || { echo '::error::dist/index.html does not reference /assets/ — was BASE_PATH set?'; exit 1; }
-          if grep -q '/xNotary/' dist/index.html; then echo '::error::dist/index.html still carries the GitHub Pages base path'; exit 1; fi
+          grep -A1 '^/xnotary/\*' dist/_headers | grep -q '! Content-Security-Policy' || { echo '::error::the /xnotary/* rule does not detach the general CSP'; exit 1; }
+          grep -q 'src="/assets/' dist/index.html || { echo '::error::dist/index.html is not the front page built for /'; exit 1; }
+          grep -q 'src="/xnotary/assets/' dist/xnotary/index.html || { echo '::error::dist/xnotary/index.html does not reference /xnotary/assets/ — was BASE_PATH overridden?'; exit 1; }
+          if grep -q '/xNotary/' dist/xnotary/index.html; then echo '::error::xNotary still carries the GitHub Pages base path'; exit 1; fi
+          grep -q 'registration.unregister' dist/sw.js || { echo '::error::dist/sw.js, which retires the pre-0.5.0 worker, is missing'; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:

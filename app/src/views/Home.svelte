@@ -39,7 +39,7 @@
       <button class="service-card" onclick={() => go('attest')}>
         <span class="service-number">02</span>
         <span class="service-arrow" aria-hidden="true">↗</span>
-        <h2>Signatures</h2>
+        <h2>Certify signers</h2>
         <p>
           Sign in your own tool, with a provider you already trust, then bring the signed file back
           here to record who signed the exact document.
@@ -48,7 +48,7 @@
       <button class="service-card" onclick={() => go('verify')}>
         <span class="service-number">03</span>
         <span class="service-arrow" aria-hidden="true">↗</span>
-        <h2>Verify</h2>
+        <h2>Verify proof</h2>
         <p>
           Check a document against its certificate and its Bitcoin anchor — here, or with the
           reference client and no xNotary at all.

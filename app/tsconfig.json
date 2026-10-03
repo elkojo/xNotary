@@ -14,6 +14,6 @@
     "noUnusedParameters": true,
     "types": ["vite/client", "vitest/globals"]
   },
-  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"],
+  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte", "hub/**/*.ts", "hub/**/*.svelte"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

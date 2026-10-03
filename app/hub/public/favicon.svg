@@ -3,5 +3,5 @@
   <rect x="12.5" y="12.5" width="39" height="39" rx="8" transform="rotate(45 32 32)"
         fill="none" stroke="#ffd84d" stroke-width="1.8"/>
   <text x="32" y="32" fill="#ffd84d" font-family="Helvetica,Arial,sans-serif"
-        font-size="20" font-weight="700" text-anchor="middle" dominant-baseline="central">xN</text>
+        font-size="24" font-weight="700" text-anchor="middle" dominant-baseline="central">x</text>
 </svg>

@@ -1,0 +1,6 @@
+# Static redirects for Cloudflare Pages — no Worker, no Function.
+#
+# The fragment (#/verify) is not sent to the server, but browsers carry it
+# across a redirect, so an old /xNotary/#/verify still lands on the screen.
+/xNotary    /xnotary/         301
+/xNotary/*  /xnotary/:splat   301

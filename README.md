@@ -21,7 +21,7 @@ copy of your documents anywhere but your own device.
 > "public beta" label coming off. See [Milestones](#milestones) and the
 > [post-MVP roadmap](#post-mvp-roadmap).
 
-**Try it:** <https://xnotary.digital> — the canonical address, where the app is served and where
+**Try it:** <https://xnotary.digital/xnotary/> — the canonical address, where the app is served and where
 its storage lives. Or run it locally, see [Getting started](#getting-started). Nothing you do
 there is uploaded.
 

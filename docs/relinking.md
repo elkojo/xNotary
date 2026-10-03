@@ -60,9 +60,9 @@ If the app was installed as a PWA, clear its cache first — the service worker 
 
 Against the production build (`npm run build:only`):
 
-- `assets/index-*.js` contains `from"/vendor/opentimestamps.js"` and no library code.
-- `sw.js` precaches `/vendor/opentimestamps.js`.
-- Both hold under `BASE_PATH=/xNotary/`, which rewrites the import to
-  `/xNotary/vendor/opentimestamps.js`.
+- `xnotary/assets/index-*.js` contains `from"/xnotary/vendor/opentimestamps.js"` and no library code.
+- `xnotary/sw.js` precaches `/xnotary/vendor/opentimestamps.js`.
+- Both follow `BASE_PATH`: since 0.5.0 xNotary is built for `/xnotary/` by default, which is where
+  the file to replace now lives on xnotary.digital.
 - `npm run e2e` passes Flow A end to end against the built bundle — stamping against live
   calendars through the externally linked module.

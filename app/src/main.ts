@@ -2,6 +2,7 @@ import { mount } from 'svelte';
 
 import App from './App.svelte';
 import './app.css';
+import './site/site.css';
 
 // Offline-first: the shell is precached so verification of an already-saved
 // certificate keeps working with no network. See vite.config.ts.

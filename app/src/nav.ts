@@ -8,8 +8,8 @@ export type View = 'home' | 'notarize' | 'attest' | 'verify' | 'library' | 'help
  */
 export const NAV: ReadonlyArray<{ id: View; label: string }> = [
   { id: 'notarize', label: 'Timestamp' },
-  { id: 'attest', label: 'Signatures' },
-  { id: 'verify', label: 'Verify' },
+  { id: 'attest', label: 'Certify signers' },
+  { id: 'verify', label: 'Verify proof' },
   { id: 'library', label: 'My certificates' },
   { id: 'help', label: 'How it works' },
   { id: 'qanda', label: 'Q&A' },
