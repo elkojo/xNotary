@@ -1,0 +1,43 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+.vite/
+coverage/
+type-dump.svg
+draw-dump.svg
+
+# Working instructions for this project, kept out of the published repository.
+# They are notes to whoever (or whatever) is building it, not documentation for
+# anyone reading the source. What a contributor needs is in README.md.
+CLAUDE.md
+
+# Key material, which never belongs in this repository.
+#
+# Test certificates live on the machine that is building the app and nowhere
+# else. A .p12 carries a private key; committing one publishes it, and a public
+# AGPL repository is the worst possible place for that to happen. The rule is
+# the extension rather than the filename, so a new test file is covered before
+# anyone remembers to add it.
+*.p12
+*.pfx
+*.jks
+*.pem
+*.key
+
+# Documents used for testing, which live in the project root.
+#
+# A signed PDF carries the signer's certificate in the clear — name, email
+# address and personal identifier included — so committing one publishes them.
+# Anchored to the root so the committed fixtures under app/src stay tracked:
+# those are deliberate, and signed by throwaway keys.
+/*.pdf
+
+# And documents dropped in the root to try something out. A signature image is
+# somebody's signature; a .svg of one in a public repository is that signature
+# published. Anchored to the root so app/public/favicon.svg and the bundled
+# assets stay tracked.
+/*.svg
+/*.png
+/*.jpg
+/*.jpeg

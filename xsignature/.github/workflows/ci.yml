@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Pinned to 18 to match the floor declared in app/package.json.
+          node-version: '18'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Test
+        # The whole suite is offline by design: this app makes no network
+        # requests at all, so there is nothing to hold back from CI.
+        run: npm test
+
+      - name: Build
+        run: npx vite build
+
+      - name: Check no third-party host crept into the build
+        # The promise the interface makes, enforced rather than trusted. This
+        # app is allowed exactly one network request — the document timestamp —
+        # and a blocklist of known CDNs would only catch the hosts somebody
+        # thought to list. So every host the build mentions is compared against
+        # hosts-in-build.txt, and anything not written down there fails here.
+        run: |
+          grep -ohE 'https?://[a-zA-Z0-9._-]+' \
+            dist/assets/*.js dist/assets/*.css dist/*.html 2>/dev/null \
+            | sed -E 's|https?://||' | sort -u > /tmp/found-hosts.txt
+          grep -vE '^\s*(#|$)' hosts-in-build.txt | awk '{print $1}' | sort -u > /tmp/allowed-hosts.txt
+          if ! comm -23 /tmp/found-hosts.txt /tmp/allowed-hosts.txt | grep -q .; then
+            echo "every host in the build is accounted for"
+          else
+            echo '::error::the build mentions a host that is not in hosts-in-build.txt:'
+            comm -23 /tmp/found-hosts.txt /tmp/allowed-hosts.txt
+            echo 'If this is a new network request, it needs to be justified against'
+            echo 'the no-backend rule in CLAUDE.md before it is added to that file.'
+            exit 1
+          fi
+
+      - name: Check every bundled font ships its licence
+        # The OFL requires the licence to travel with the font. It is committed
+        # beside each .ttf; this catches a face added without one.
+        #
+        # Every .ttf anywhere under src/, not just the signature faces: the
+        # appearance block's text face lives in its own directory, and a check
+        # that only knows one directory would not have noticed it.
+        run: |
+          found=0
+          while IFS= read -r ttf; do
+            found=$((found + 1))
+            licence="${ttf%.ttf}.OFL.txt"
+            test -f "$licence" || { echo "::error::$ttf has no licence beside it"; exit 1; }
+          done < <(find src -name '*.ttf')
+          test "$found" -gt 0 || { echo '::error::no bundled fonts found — has the layout moved?'; exit 1; }
+          echo "$found bundled fonts, each with its licence"
+

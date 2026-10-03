@@ -1,0 +1,472 @@
+/*
+ * Styling particular to the document screen. app.css is vendored from xNotary
+ * and kept unedited, so anything new lives here.
+ */
+
+.picked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: baseline;
+  padding: 14px 16px;
+  border: 1px solid var(--line-dark);
+  border-radius: 12px;
+  background: var(--well);
+}
+
+.picked-name {
+  color: var(--ink);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.picked-facts {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.drop-hint {
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/*
+ * The page preview, and the signature sitting on top of it.
+ *
+ * The overlay is positioned in the same pixels the preview was drawn at, from
+ * the same rectangle the stamp is computed from — so what is dragged here is
+ * what lands on the page, rather than an approximation of it.
+ */
+.sheet {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 4px;
+}
+
+.sheet-stage {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--line-dark);
+  border-radius: 6px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.sheet-stage canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.overlay {
+  position: absolute;
+  padding: 0;
+  border: 1px dashed transparent;
+  background: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+.overlay:hover,
+.overlay:focus-visible {
+  border-color: var(--selected-line);
+  outline: none;
+}
+
+.overlay:active {
+  cursor: grabbing;
+}
+
+.overlay svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/*
+ * The block preview.
+ *
+ * Drawn from the same layout function that lays out the real thing, at the
+ * size it is shown, so what is dragged is the shape that lands on the page.
+ * Its own faint border, because a block has an extent a loose signature does
+ * not: knowing where it ends is the whole reason for previewing it.
+ */
+.overlay.block {
+  border-style: solid;
+  border-color: var(--line-dark);
+  background: var(--overlay-bg);
+  /*
+   * A form XObject is clipped to its bounding box, so the page clips too. The
+   * preview has to clip the same way or it can show text that the saved file
+   * cuts off — which is the preview lying about the one thing it is for.
+   */
+  overflow: hidden;
+}
+
+.overlay.block:hover,
+.overlay.block:focus-visible {
+  border-color: var(--selected-line);
+}
+
+.block-ink {
+  position: absolute;
+  pointer-events: none;
+}
+
+.block-ink img,
+.block-ink svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.block-line {
+  position: absolute;
+  color: var(--ink);
+  white-space: nowrap;
+  line-height: 0;
+  pointer-events: none;
+}
+
+/*
+ * What is already on the page, outlined.
+ *
+ * Not decoration. An earlier signature block is painted into the preview by the
+ * renderer like any other ink, and nothing about it says it is an annotation
+ * that must not be covered — so a second signer drags a box straight over it
+ * and a validator reports overlapping annotations on the result. The outline is
+ * the missing fact, and it turns red when the block being placed is on it.
+ *
+ * Pointer events off throughout: this marks ground, it does not take drags. The
+ * signature overlay sits above it and stays draggable.
+ */
+.taken {
+  position: absolute;
+  border: 1px dashed var(--taken-line);
+  border-radius: 3px;
+  background: var(--taken-bg);
+  pointer-events: none;
+}
+
+.taken.hit {
+  border-color: var(--bad);
+  border-style: solid;
+  background: var(--taken-hit-bg);
+}
+
+/*
+ * Sat inside the box once, and covered the first line of the very block it was
+ * naming. It goes above instead: what is marked is ground to keep off, and
+ * hiding part of it to say so defeats the point.
+ */
+.taken-label {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: -1px;
+  max-width: 100%;
+  padding: 1px 5px;
+  border-radius: 3px 3px 3px 0;
+  background: var(--taken-label-bg);
+  color: var(--paper);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.taken.hit .taken-label {
+  background: var(--bad);
+}
+
+.slider {
+  width: 100%;
+  max-width: 320px;
+  padding: 0;
+  accent-color: var(--green);
+}
+
+/* The timestamp: the one part of this app that reaches off the device. */
+.timestamp-field {
+  padding-top: 4px;
+}
+
+/* Specific enough to beat `.field label`, which stacks its children. */
+.field label.check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.field label.check input[type='checkbox'] {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--green);
+  flex: none;
+}
+
+.field label.check strong {
+  display: block;
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.check-note {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  /*
+   * Reset, not a choice. A note inside a `<label>` inherits the label's 720,
+   * which left it heavier than the `strong` heading above it at 650. This is
+   * `.field-note`'s weight — the same note in the same voice, told apart only
+   * by which element it happens to sit inside.
+   */
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/*
+ * What actually leaves the device, itemised. Set out as separate lines rather
+ * than buried in a paragraph, because a disclosure nobody reads is not one.
+ */
+.outgoing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 9px 0;
+}
+
+.outgoing-list code {
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * An address the reader may go and open.
+ *
+ * Set like the digest beside it — monospace, wrapping anywhere — because a
+ * distribution URL is a string to be read exactly rather than prose. Underlined
+ * on purpose: the app never follows it, so the affordance has to read
+ * unmistakably as the reader's own to take.
+ */
+.outgoing-list a {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.authority-list {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.field-note {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+/* Readings off a checked document: label on the left, value on the right. */
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.facts > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: baseline;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line-dark);
+  font-size: 13.5px;
+}
+
+.facts > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.facts span {
+  min-width: 108px;
+  color: var(--ink-soft);
+}
+
+.facts strong,
+.facts code {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.side-foot {
+  margin: 14px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+/* The signature brought in from the other screen, shown as it will be placed. */
+.signature-preview {
+  display: grid;
+  min-height: 84px;
+  place-items: center;
+  padding: 14px;
+  margin-top: 10px;
+  border: 1px solid var(--line-dark);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+/*
+ * Checks behind a picture, so a background that is not transparent is visible
+ * before it is placed rather than after it has covered the document.
+ */
+.signature-preview.checks {
+  background-image:
+    linear-gradient(45deg, var(--check) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--check) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--check) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--check) 75%);
+  background-size: 14px 14px;
+  background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+}
+
+.signature-preview svg,
+.signature-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 120px;
+}
+
+.overlay img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--line-dark);
+  border-radius: 4px;
+  background: var(--well);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+/*
+ * "Optional", beside a step's number.
+ *
+ * Steps 4 and 5 are both things the reader asks for rather than things the app
+ * does on its own, and a numbered step reads like an instruction unless it says
+ * otherwise. Sized off the heading so it stays proportionate as that clamps.
+ */
+.panel-optional {
+  display: inline-block;
+  transform: translateY(-0.18em);
+  margin-left: 4px;
+  padding: 3px 9px;
+  border: 1px solid var(--line-dark);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/*
+ * Three short fields on one row.
+ *
+ * Name, reason and location are a few words each and were stacked full width,
+ * which put a third of a screen between the first and the block they describe.
+ * The children keep their own `.field` margin, so the row carries none of its
+ * own.
+ */
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 14px;
+}
+
+@media (max-width: 620px) {
+  .field-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Sits under the label rather than under an input, so it leads instead of
+   explaining after the fact. */
+.authority-note {
+  margin: -2px 0 10px;
+}
+
+/*
+ * Touch.
+ *
+ * The first breakpoint this file has had. Nothing here changes the layout —
+ * the panel was built from `.field`, `.face-option` and `.facts`, which already
+ * stack, and it holds up at 360px without help. What it does not have is
+ * targets a thumb can hit: the action buttons come out at 36px and the slider
+ * track at 16px, against the 44px both Apple and Google ask for.
+ *
+ * Matched to `app.css`'s own 720px breakpoint rather than a narrower one, so
+ * there is one place where this app decides it is on a small screen.
+ */
+@media (max-width: 720px) {
+  .sheet .overlay {
+    /* Easier to grab, without changing where the signature actually lands. */
+    outline-offset: 2px;
+  }
+
+  .action-group .button,
+  .action-group .button.small {
+    min-height: 44px;
+  }
+
+  .slider {
+    max-width: none;
+    height: 28px;
+  }
+
+  /*
+   * A range input draws its own thumb, and the default one is small. Both
+   * engines need telling separately — there is no shorthand that covers them.
+   */
+  .slider::-webkit-slider-thumb {
+    width: 26px;
+    height: 26px;
+  }
+
+  .slider::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border: none;
+  }
+
+  /*
+   * A file input is the platform's own control and cannot be restyled far, but
+   * it can be given room: at this width the button and the filename otherwise
+   * share a line too narrow for either.
+   */
+  .field input[type='file'] {
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+}

@@ -1,0 +1,334 @@
+/**
+ * What a certificate says about itself.
+ *
+ * Every other check in this module is the app deciding something. This is the
+ * opposite: it reads statements the certificate authority put *inside* the
+ * certificate and reports them as claims, without endorsing any of them. The
+ * distinction is the whole point, and the interface has to keep it — "this
+ * certificate declares itself qualified" is a fact about the file; "this
+ * signature is qualified" is a judgement, and not one this app is entitled to.
+ *
+ * It is worth reading all the same, because one particular combination settles
+ * a question this app has so far only asserted. A certificate may declare
+ * itself qualified under eIDAS (`QcCompliance`) and separately declare that its
+ * private key lives on a qualified signature creation device (`QcSSCD`). A
+ * *qualified electronic signature* needs both. A key in a file a browser can
+ * read is by definition not on such a device — so a certificate with
+ * QcCompliance and no QcSSCD is exactly the case this app handles, and saying
+ * so out of the certificate's own extension is better evidence than repeating
+ * the claim in prose.
+ *
+ * Nothing here needs a network, a trust store, or anything that has to be kept
+ * up to date. It is parsing.
+ */
+import * as asn1js from 'asn1js';
+import type { Certificate } from 'pkijs';
+
+/** ETSI's qualified-certificate statements, `0.4.0.1862.1.x`. */
+const QC_COMPLIANCE = '0.4.0.1862.1.1';
+const QC_LIMIT_VALUE = '0.4.0.1862.1.2';
+const QC_RETENTION = '0.4.0.1862.1.3';
+const QC_SSCD = '0.4.0.1862.1.4';
+const QC_TYPE = '0.4.0.1862.1.6';
+
+const QC_TYPES: Record<string, Purpose> = {
+  '0.4.0.1862.1.6.1': 'signature',
+  '0.4.0.1862.1.6.2': 'seal',
+  '0.4.0.1862.1.6.3': 'website',
+};
+
+const QC_STATEMENTS_EXTENSION = '1.3.6.1.5.5.7.1.3';
+const KEY_USAGE_EXTENSION = '2.5.29.15';
+const AUTHORITY_INFO_ACCESS_EXTENSION = '1.3.6.1.5.5.7.1.1';
+const CRL_DISTRIBUTION_POINTS_EXTENSION = '2.5.29.31';
+/** `id-ad-caIssuers`: where the certificate above this one can be fetched. */
+const CA_ISSUERS = '1.3.6.1.5.5.7.48.2';
+/** `id-ad-ocsp`: where this certificate's revocation status can be asked. */
+const OCSP = '1.3.6.1.5.5.7.48.1';
+
+/** What the certificate is for, when it says. */
+export type Purpose =
+  /** A natural person's electronic signature. */
+  | 'signature'
+  /** A legal person's electronic seal. */
+  | 'seal'
+  /** Website authentication, which is not for signing documents at all. */
+  | 'website';
+
+export interface CertificateClaims {
+  /** It declares itself a qualified certificate under eIDAS. */
+  readonly qualified: boolean;
+  /**
+   * It declares that the private key lives on a qualified device.
+   *
+   * Never true for a key this app can use: a file a browser can read is one
+   * that can be copied, which is the opposite of what the declaration means.
+   */
+  readonly onQualifiedDevice: boolean;
+  readonly purpose: Purpose | null;
+  /** Years the authority undertakes to keep its records, when it says. */
+  readonly retentionYears: number | null;
+  /** A transaction value limit, when one is declared. */
+  readonly limit: { readonly value: number; readonly currency: string } | null;
+  /**
+   * Where the issuing certificate can be fetched, when the certificate says.
+   *
+   * The `caIssuers` address out of Authority Information Access. It matters for
+   * a signature that carries only the signer's own certificate: the chain is
+   * not missing so much as not enclosed, and this is the address a reader goes
+   * to for the rest of it. Naming it turns "a reader may not be able to check
+   * this" into something the reader can act on.
+   *
+   * **Read, never fetched.** This app makes one network request and it is the
+   * timestamp. Resolving this address would be a second one. It is shown so
+   * that a person can go and get the file, not so that the app can.
+   */
+  readonly issuerUrl: string | null;
+  /**
+   * Where this certificate's revocation status could be asked, and read from.
+   *
+   * The OCSP responder and the certificate revocation lists the authority
+   * publishes. **Neither is ever contacted.** They are here to be named: the
+   * app tells a reader that its signature carries no revocation data and that
+   * checking it means a request, and naming the request it is declining to make
+   * is more use than describing one in the abstract.
+   *
+   * A certificate usually offers one responder and several list mirrors.
+   */
+  readonly ocspUrl: string | null;
+  readonly crlUrls: readonly string[];
+  /** Whether the key may be used to sign at all, per the key usage extension. */
+  readonly keyUsage: {
+    readonly digitalSignature: boolean;
+    /** Also called contentCommitment: signing as an act of agreement. */
+    readonly nonRepudiation: boolean;
+    /** False when the extension is absent, which places no restriction. */
+    readonly stated: boolean;
+  };
+}
+
+/** Everything one certificate declares, or nothing when it declares nothing. */
+export function claimsOf(certificate: Certificate): CertificateClaims {
+  const statements = qcStatements(certificate);
+
+  return {
+    qualified: statements.has(QC_COMPLIANCE),
+    onQualifiedDevice: statements.has(QC_SSCD),
+    purpose: purposeFrom(statements.get(QC_TYPE)),
+    retentionYears: integerFrom(statements.get(QC_RETENTION)),
+    limit: limitFrom(statements.get(QC_LIMIT_VALUE)),
+    issuerUrl: accessUrlOf(certificate, CA_ISSUERS),
+    ocspUrl: accessUrlOf(certificate, OCSP),
+    crlUrls: crlUrlsOf(certificate),
+    keyUsage: keyUsageOf(certificate),
+  };
+}
+
+/**
+ * The statements, by identifier, each with whatever it carried alongside.
+ *
+ * `QCStatements ::= SEQUENCE OF QCStatement`, and each `QCStatement` is a
+ * `SEQUENCE { statementId OID, statementInfo ANY OPTIONAL }`. Parsed as that
+ * rather than by hunting for identifiers anywhere in the bytes: the type
+ * identifiers live *inside* another statement's information, so a blind search
+ * would report a purpose that was never declared at the top level.
+ */
+function qcStatements(certificate: Certificate): Map<string, asn1js.AsnType | undefined> {
+  const found = new Map<string, asn1js.AsnType | undefined>();
+
+  const extension = certificate.extensions?.find((e) => e.extnID === QC_STATEMENTS_EXTENSION);
+  if (!extension) return found;
+
+  try {
+    const parsed = asn1js.fromBER(
+      extension.extnValue.valueBlock.valueHexView.slice().buffer as ArrayBuffer,
+    );
+    const sequence = parsed.result as asn1js.Sequence;
+
+    for (const statement of sequence.valueBlock.value) {
+      const parts = (statement as asn1js.Sequence).valueBlock?.value ?? [];
+      const id = parts[0];
+      if (id instanceof asn1js.ObjectIdentifier) {
+        found.set(id.valueBlock.toString(), parts[1]);
+      }
+    }
+  } catch {
+    // A malformed extension is not a claim. Reporting nothing is right.
+  }
+
+  return found;
+}
+
+function purposeFrom(info: asn1js.AsnType | undefined): Purpose | null {
+  const values = (info as asn1js.Sequence | undefined)?.valueBlock?.value ?? [];
+  for (const value of values) {
+    if (value instanceof asn1js.ObjectIdentifier) {
+      const purpose = QC_TYPES[value.valueBlock.toString()];
+      if (purpose) return purpose;
+    }
+  }
+  return null;
+}
+
+function integerFrom(info: asn1js.AsnType | undefined): number | null {
+  if (info instanceof asn1js.Integer) {
+    const value = Number(info.valueBlock.toString());
+    return Number.isFinite(value) ? value : null;
+  }
+  return null;
+}
+
+/** `QcEuLimitValue ::= SEQUENCE { currency, amount INTEGER, exponent INTEGER }`. */
+function limitFrom(info: asn1js.AsnType | undefined): CertificateClaims['limit'] {
+  const parts = (info as asn1js.Sequence | undefined)?.valueBlock?.value ?? [];
+  if (parts.length < 3) return null;
+
+  const currency = parts[0];
+  const amount = Number((parts[1] as asn1js.Integer)?.valueBlock?.toString());
+  const exponent = Number((parts[2] as asn1js.Integer)?.valueBlock?.toString());
+  if (!Number.isFinite(amount) || !Number.isFinite(exponent)) return null;
+
+  const name =
+    currency instanceof asn1js.PrintableString
+      ? (currency.valueBlock.value as string)
+      : String((currency as asn1js.Integer)?.valueBlock?.toString() ?? '');
+
+  return { value: amount * 10 ** exponent, currency: name };
+}
+
+/**
+ * The key usage bits that decide whether this key may sign.
+ *
+ * The extension is a BIT STRING, most significant bit first: bit 0 is
+ * `digitalSignature` and bit 1 is `nonRepudiation`. Absent, it places no
+ * restriction at all, which is reported as `stated: false` rather than as two
+ * falses — "this certificate forbids signing" and "this certificate says
+ * nothing about signing" are different, and only one is worth warning about.
+ */
+/**
+ * A URI from Authority Information Access, for one access method.
+ *
+ * `AuthorityInfoAccessSyntax ::= SEQUENCE OF AccessDescription`, and an
+ * `AccessDescription ::= SEQUENCE { accessMethod OID, accessLocation GeneralName }`.
+ * One extension usually carries two: where the issuing certificate is
+ * published, and where this certificate's revocation may be asked about. They
+ * are read the same way and used for opposite purposes — the first is an
+ * address a reader is invited to open, the second is one this app names in
+ * order to say it is not calling it.
+ */
+function accessUrlOf(certificate: Certificate, method: string): string | null {
+  const extension = certificate.extensions?.find(
+    (e) => e.extnID === AUTHORITY_INFO_ACCESS_EXTENSION,
+  );
+  if (!extension) return null;
+
+  try {
+    const parsed = asn1js.fromBER(
+      extension.extnValue.valueBlock.valueHexView.slice().buffer as ArrayBuffer,
+    );
+    const descriptions = (parsed.result as asn1js.Sequence).valueBlock.value ?? [];
+
+    for (const description of descriptions) {
+      const parts = (description as asn1js.Sequence).valueBlock?.value ?? [];
+      const id = parts[0];
+      if (!(id instanceof asn1js.ObjectIdentifier)) continue;
+      if (id.valueBlock.toString() !== method) continue;
+
+      const url = uriFrom(parts[1]);
+      if (url) return url;
+    }
+  } catch {
+    // A malformed extension is not a claim. Reporting nothing is right.
+  }
+
+  return null;
+}
+
+/**
+ * Every CRL address the certificate publishes.
+ *
+ * `CRLDistributionPoints ::= SEQUENCE OF DistributionPoint`, and the part
+ * wanted is nested three deep: a `DistributionPoint` holds an optional
+ * `distributionPoint` at context tag 0, which is a `DistributionPointName`
+ * whose `fullName` arm is context tag 0 again, holding `GeneralNames`. Only
+ * that path is followed — a name relative to the CRL issuer is not an address.
+ *
+ * Several, because authorities publish mirrors, and a list of one mirror would
+ * misrepresent a certificate that offers three.
+ */
+function crlUrlsOf(certificate: Certificate): string[] {
+  const extension = certificate.extensions?.find(
+    (e) => e.extnID === CRL_DISTRIBUTION_POINTS_EXTENSION,
+  );
+  if (!extension) return [];
+
+  const found: string[] = [];
+  try {
+    const parsed = asn1js.fromBER(
+      extension.extnValue.valueBlock.valueHexView.slice().buffer as ArrayBuffer,
+    );
+    const points = (parsed.result as asn1js.Sequence).valueBlock.value ?? [];
+
+    for (const point of points) {
+      const name = childAt(point, 0);
+      const fullName = name && childAt(name, 0);
+      if (!fullName) continue;
+
+      for (const general of (fullName as asn1js.Constructed).valueBlock?.value ?? []) {
+        const url = uriFrom(general);
+        if (url && !found.includes(url)) found.push(url);
+      }
+    }
+  } catch {
+    // As above: unreadable is not a claim.
+  }
+
+  return found;
+}
+
+/** The child of a constructed value carrying a given context tag. */
+function childAt(value: unknown, tagNumber: number): asn1js.AsnType | undefined {
+  const children = (value as asn1js.Constructed).valueBlock?.value ?? [];
+  return children.find(
+    (child) => child.idBlock.tagClass === 3 && child.idBlock.tagNumber === tagNumber,
+  );
+}
+
+/**
+ * A `GeneralName` as an address, when it is one this app would show.
+ *
+ * GeneralName is a CHOICE, so the tag says which arm: context tag 6 is the URI,
+ * and it is an IA5String, so it arrives primitive. A directory name or an email
+ * address is not somewhere a reader can be sent. Only http and https, because
+ * this value comes out of a file and ends up rendered as a link — a
+ * `javascript:` or `data:` URL in a certificate is not a place to fetch a
+ * certificate from.
+ */
+function uriFrom(value: unknown): string | null {
+  if (!(value instanceof asn1js.Primitive)) return null;
+  if (value.idBlock.tagClass !== 3 || value.idBlock.tagNumber !== 6) return null;
+
+  const url = new TextDecoder().decode(value.valueBlock.valueHexView);
+  return /^https?:\/\//i.test(url) ? url : null;
+}
+
+function keyUsageOf(certificate: Certificate): CertificateClaims['keyUsage'] {
+  const extension = certificate.extensions?.find((e) => e.extnID === KEY_USAGE_EXTENSION);
+  if (!extension) return { digitalSignature: false, nonRepudiation: false, stated: false };
+
+  try {
+    const parsed = asn1js.fromBER(
+      extension.extnValue.valueBlock.valueHexView.slice().buffer as ArrayBuffer,
+    );
+    const bits = new Uint8Array((parsed.result as asn1js.BitString).valueBlock.valueHexView);
+    const first = bits[0] ?? 0;
+
+    return {
+      digitalSignature: (first & 0b1000_0000) !== 0,
+      nonRepudiation: (first & 0b0100_0000) !== 0,
+      stated: true,
+    };
+  } catch {
+    return { digitalSignature: false, nonRepudiation: false, stated: false };
+  }
+}
