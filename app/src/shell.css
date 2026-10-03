@@ -8,6 +8,34 @@
  */
 
 /*
+ * This app's own colours. app.css holds the family's; these are the few
+ * things only xSignature draws — its previews and stages — kept as tokens in
+ * the same way, so a change of family theme does not have to hunt for them.
+ */
+:root {
+  /* Transparency checkerboard and the signing line on a light stage */
+  --check: #eceae1;
+  --check-rule: #d8d5c8;
+  /* The dark stage: white ink needs something to be seen against. Dark in
+     every theme — it is a preview backdrop, not the page. */
+  --stage-dark-bg: #161616;
+  --stage-dark-check: #222222;
+  --stage-dark-line: rgba(255, 255, 255, 0.18);
+  --stage-dark-rule: #3d3d3d;
+  --stage-dark-fg: #a8a08a;
+  /* Controls and the document sheet */
+  --control-hover-line: #8f8668;
+  --tabs-bg: #f3eedd;
+  --overlay-bg: rgba(255, 255, 255, 0.72);
+  --taken-line: rgba(17, 17, 17, 0.38);
+  --taken-bg: rgba(17, 17, 17, 0.045);
+  --taken-hit-bg: rgba(168, 57, 47, 0.1);
+  --taken-label-bg: rgba(17, 17, 17, 0.62);
+  /* The version line, on the footer */
+  --site-version: #a8a08a;
+}
+
+/*
  * The version, under the footer text.
  *
  * Quieter than the prose above it, because it is a fact for somebody checking
@@ -16,6 +44,6 @@
  */
 .site-version {
   margin-top: 14px;
-  color: #64736c;
+  color: var(--site-version);
   font-variant-numeric: tabular-nums;
 }

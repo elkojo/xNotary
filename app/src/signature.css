@@ -22,12 +22,12 @@
   padding: 22px;
   border: 1px solid var(--line-dark);
   border-radius: 12px;
-  background-color: #fff;
+  background-color: var(--card);
   background-image:
-    linear-gradient(45deg, #eceae1 25%, transparent 25%),
-    linear-gradient(-45deg, #eceae1 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #eceae1 75%),
-    linear-gradient(-45deg, transparent 75%, #eceae1 75%);
+    linear-gradient(45deg, var(--check) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--check) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--check) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--check) 75%);
   background-size: 16px 16px;
   background-position:
     0 0,
@@ -84,17 +84,17 @@
  * swatch at all.
  */
 .ink-stage.dark {
-  border-color: rgba(222, 234, 226, 0.18);
-  background-color: var(--bg);
+  border-color: var(--stage-dark-line);
+  background-color: var(--stage-dark-bg);
   background-image:
-    linear-gradient(45deg, #12241d 25%, transparent 25%),
-    linear-gradient(-45deg, #12241d 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #12241d 75%),
-    linear-gradient(-45deg, transparent 75%, #12241d 75%);
+    linear-gradient(45deg, var(--stage-dark-check) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--stage-dark-check) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--stage-dark-check) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--stage-dark-check) 75%);
 }
 
 .ink-stage.dark .empty-ink {
-  color: #8fa39b;
+  color: var(--stage-dark-fg);
 }
 
 .stage-tools {
@@ -117,12 +117,12 @@
   color: var(--ink-soft);
   font-size: 12.5px;
   font-weight: 650;
-  background: #fff;
+  background: var(--card);
   cursor: pointer;
 }
 
 .stage-toggle:hover {
-  border-color: #a8b4ae;
+  border-color: var(--control-hover-line);
   color: var(--ink);
 }
 
@@ -149,7 +149,7 @@
   border: 1px solid var(--line-dark);
   border-radius: 10px;
   text-align: left;
-  background: #fff;
+  background: var(--card);
   cursor: pointer;
 }
 
@@ -164,7 +164,7 @@
 }
 
 .face-option:hover {
-  border-color: #a8b4ae;
+  border-color: var(--control-hover-line);
 }
 
 .face-option.selected {
@@ -184,18 +184,18 @@
   border-radius: 9px;
   font-size: 13.5px;
   font-weight: 650;
-  background: #fff;
+  background: var(--card);
   cursor: pointer;
 }
 
 .choice:hover {
-  border-color: #a8b4ae;
+  border-color: var(--control-hover-line);
 }
 
 .choice.selected {
-  border-color: var(--green);
-  color: var(--white);
-  background: var(--green);
+  border-color: var(--dark-btn-line);
+  color: var(--dark-btn-fg);
+  background: var(--dark-btn-bg);
 }
 
 .swatches {
@@ -229,7 +229,7 @@
    * which swatch they are on, not only which one is chosen.
    */
   box-shadow:
-    0 0 0 2px #fff,
+    0 0 0 2px var(--card),
     0 0 0 4px var(--green);
 }
 
@@ -280,7 +280,7 @@
   padding: 4px;
   border: 1px solid var(--line-dark);
   border-radius: 11px;
-  background: #efeee7;
+  background: var(--tabs-bg);
 }
 
 .mode-tab {
@@ -300,7 +300,7 @@
 
 .mode-tab.selected {
   color: var(--ink);
-  background: #fff;
+  background: var(--card);
   box-shadow: 0 0 0 1px var(--line-dark);
 }
 
@@ -318,13 +318,13 @@
   height: 210px;
   border: 1px solid var(--line-dark);
   border-radius: 12px;
-  background-color: #fff;
+  background-color: var(--card);
   background-image:
-    linear-gradient(to bottom, transparent calc(72% - 1px), #d8d5c8 72%, transparent calc(72% + 1px)),
-    linear-gradient(45deg, #eceae1 25%, transparent 25%),
-    linear-gradient(-45deg, #eceae1 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #eceae1 75%),
-    linear-gradient(-45deg, transparent 75%, #eceae1 75%);
+    linear-gradient(to bottom, transparent calc(72% - 1px), var(--check-rule) 72%, transparent calc(72% + 1px)),
+    linear-gradient(45deg, var(--check) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--check) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--check) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--check) 75%);
   background-size:
     100% 100%,
     16px 16px,
@@ -342,14 +342,14 @@
 }
 
 .pad.dark {
-  border-color: rgba(222, 234, 226, 0.18);
-  background-color: var(--bg);
+  border-color: var(--stage-dark-line);
+  background-color: var(--stage-dark-bg);
   background-image:
-    linear-gradient(to bottom, transparent calc(72% - 1px), #2a4238 72%, transparent calc(72% + 1px)),
-    linear-gradient(45deg, #12241d 25%, transparent 25%),
-    linear-gradient(-45deg, #12241d 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #12241d 75%),
-    linear-gradient(-45deg, transparent 75%, #12241d 75%);
+    linear-gradient(to bottom, transparent calc(72% - 1px), var(--stage-dark-rule) 72%, transparent calc(72% + 1px)),
+    linear-gradient(45deg, var(--stage-dark-check) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--stage-dark-check) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--stage-dark-check) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--stage-dark-check) 75%);
 }
 
 .pad-tools {
