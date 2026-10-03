@@ -319,6 +319,14 @@ footer.site :focus-visible {
   font-weight: 850;
   transform: rotate(45deg);
 }
+/* On the bar, which stays dark when the pages are light, the mark takes the
+   bar's colours. Here rather than with the shared bar, so that an app which
+   copies this file and has a bar of its own gets it too. */
+.nav > .brand .brand-mark {
+  border-color: var(--bar-mark-line);
+  color: var(--bar-mark-fg);
+  background: var(--bar-mark-bg);
+}
 
 .brand-mark span {
   transform: rotate(-45deg);
