@@ -317,8 +317,8 @@ function webManifest(): Plugin {
             description:
               'Self-custodial notarization: hash a file locally, timestamp it on Bitcoin, ' +
               'attest the electronic signatures made over it elsewhere.',
-            theme_color: '#07130f',
-            background_color: '#07130f',
+            theme_color: '#161616',
+            background_color: '#161616',
             display: 'standalone',
             // The identity installs made before 0.5.0 already have: their
             // start_url was the site root. Keeping it lets browsers update
