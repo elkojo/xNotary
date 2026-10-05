@@ -19,7 +19,7 @@
       <div class="hero">
         <div class="eyebrow">Independent document tools</div>
         <h1>Documents you can <mark class="hlm">prove.</mark></h1>
-        <p>Free tools that work on your document in this browser. Every result checks without us.</p>
+        <p>Tools that respect your freedom and work on your document in your browser.</p>
         <p class="hint">
           Not sure which tool?
           <button
