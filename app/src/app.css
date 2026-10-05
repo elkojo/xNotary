@@ -1001,6 +1001,14 @@ footer.site :focus-visible {
   font-size: 14px;
 }
 
+/* "or click to choose one — …": says the whole zone is the button. */
+.drop-hint {
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .dropzone p,
 .dropzone .meta {
   margin: 0 0 4px;

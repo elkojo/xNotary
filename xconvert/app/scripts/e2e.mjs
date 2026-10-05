@@ -109,6 +109,7 @@ try {
   const pending = new Map();
   const problems = [];
   let workers = 0;
+  let fileChoosers = 0;
   ws.on('message', (raw) => {
     const m = JSON.parse(raw);
     if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
@@ -119,6 +120,7 @@ try {
       }
       workers += 1;
     }
+    if (m.method === 'Page.fileChooserOpened') fileChoosers += 1;
     if (m.method === 'Runtime.exceptionThrown') problems.push(`exception: ${m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text}`);
     if (m.method === 'Log.entryAdded' && /Content Security Policy|Refused to/i.test(m.params.entry.text)) problems.push(`csp: ${m.params.entry.text}`);
     if (m.method === 'Network.requestWillBeSent') {
@@ -164,6 +166,16 @@ try {
   await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
   await send('Page.navigate', { url: BASE });
   check('the page loads', await waitFor(`document.body.innerText.includes('Drop a document here')`, 15000));
+
+  // 0. A real click on the drop zone opens the file chooser. It once opened an ⓘ bubble instead:
+  //    a click on a <label> goes to its first control, and the ⓘ button came before the input.
+  await send('Page.setInterceptFileChooserDialog', { enabled: true });
+  const zone = await ev(`(() => { const r = document.querySelector('.dropzone').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+  for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: zone.x, y: zone.y, button: 'left', clickCount: 1 });
+  for (let i = 0; i < 25 && !fileChoosers; i++) await sleep(100);
+  check('clicking the drop zone opens the file chooser', fileChoosers > 0);
+  check('…and pins no ⓘ bubble', !(await ev(`!!document.querySelector('.info-mark[aria-expanded=true]')`)));
+  await send('Page.setInterceptFileChooserDialog', { enabled: false });
 
   // 1. DOCX → PDF/A
   await pick('smlouva.docx');
