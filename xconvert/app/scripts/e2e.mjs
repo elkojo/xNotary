@@ -63,8 +63,29 @@ const BASE = `http://localhost:${server.address().port}/xconvert/`;
 
 // --- Chrome over CDP -----------------------------------------------------------------------
 const downloads = mkdtempSync(join(tmpdir(), 'xconvert-e2e-dl-'));
+// On CI (GitHub's Ubuntu 24.04 runners), unprivileged user namespaces are restricted and
+// Chrome's sandbox cannot start; the page loaded here is our own site, from localhost.
 const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=9337', '--no-first-run',
-  `--user-data-dir=${mkdtempSync(join(tmpdir(), 'xconvert-e2e-'))}`, 'about:blank'], { stdio: 'ignore' });
+  ...(process.env.CI ? ['--no-sandbox'] : []),
+  `--user-data-dir=${mkdtempSync(join(tmpdir(), 'xconvert-e2e-'))}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+let chromeErrors = '';
+chrome.stderr.on('data', (chunk) => (chromeErrors += chunk));
+
+/** Chrome's DevTools endpoint, once it answers — not after a guessed delay. */
+async function devtoolsPage() {
+  const end = Date.now() + 30000;
+  while (Date.now() < end) {
+    if (chrome.exitCode !== null) break;
+    try {
+      const page = (await (await fetch('http://127.0.0.1:9337/json/list')).json()).find((t) => t.type === 'page');
+      if (page) return page;
+    } catch {
+      // not listening yet
+    }
+    await sleep(250);
+  }
+  throw new Error(`Chrome did not start (exit ${chrome.exitCode}). Its output:\n${chromeErrors.slice(-2000)}`);
+}
 
 const failures = [];
 const check = (name, ok, detail = '') => {
@@ -81,8 +102,7 @@ const requireVerapdf = process.env.REQUIRE_VERAPDF === '1';
 const hasPdftotext = (() => { try { execFileSync('which', ['pdftotext']); return true; } catch { return false; } })();
 
 try {
-  await sleep(2500);
-  const target = (await (await fetch('http://127.0.0.1:9337/json/list')).json()).find((t) => t.type === 'page');
+  const target = await devtoolsPage();
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((r) => ws.once('open', r));
   let id = 0;
