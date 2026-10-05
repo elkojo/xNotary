@@ -2,7 +2,8 @@
   /** The shell: the xNotary.digital bar, the screen, the footer. */
   import SiteBar from '../../../app/src/site/SiteBar.svelte';
   import Convert from './views/Convert.svelte';
-  import { NAV, ROUTES, type View } from './nav';
+  import Licences from './views/Licences.svelte';
+  import { ROUTES, titleFor, type View } from './nav';
 
   function viewFromHash(): View {
     const raw = location.hash.replace(/^#\/?/, '');
@@ -18,7 +19,7 @@
   }
 
   $effect(() => {
-    document.title = (NAV.find((item) => item.id === view) ?? NAV[0]).title;
+    document.title = titleFor(view);
   });
 
   $effect(() => {
@@ -31,7 +32,11 @@
 <SiteBar current="xconvert" active={view} onnav={(page) => go(page as View)} />
 
 <main>
-  <Convert />
+  {#if view === 'licences'}
+    <Licences />
+  {:else}
+    <Convert />
+  {/if}
 </main>
 
 <footer class="site">
@@ -41,6 +46,7 @@
       AGPL-3.0</a
     >, built on <a href="https://pandoc.org" target="_blank" rel="noopener noreferrer">pandoc</a> and
     <a href="https://typst.app" target="_blank" rel="noopener noreferrer">Typst</a>.
+    <a href="#/licences">Licences and source</a>.
     <div class="site-version">Version {__APP_VERSION__}</div>
   </div>
 </footer>

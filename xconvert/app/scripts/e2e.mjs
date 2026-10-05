@@ -205,6 +205,16 @@ try {
   await pick('.e2e-poznamky.txt');
   check('plain text is refused, with a way forward', await waitFor(`document.body.innerText.includes('Rename it to .md')`, 5000));
 
+  // 5. Licences: every notice the page links to is really served
+  await send('Page.navigate', { url: `${BASE}#/licences` });
+  await waitFor(`document.body.innerText.includes('Licences and source')`, 10000);
+  const links = await ev(`[...document.querySelectorAll('main a[href]')].map((a) => a.href).filter((h) => h.startsWith(location.origin))`);
+  const broken = [];
+  for (const href of links) if ((await fetch(href)).status !== 200) broken.push(href);
+  check('every licence the page links to is served', links.length >= 6 && broken.length === 0, broken.join(' ') || `${links.length} links`);
+  const notices = await (await fetch(`${BASE}THIRD-PARTY.txt`)).text();
+  check('THIRD-PARTY.txt names pandoc, Typst and the worker’s own code', ['pandoc 3.12', 'Typst 0.15.1', '@bjorn3/browser_wasi_shim', 'svelte'].every((n) => notices.includes(n)));
+
   check('the converter worker was watched too', workers > 0);
   check('no CSP violation, exception or outside request', problems.length === 0, problems.join(' | '));
 } finally {

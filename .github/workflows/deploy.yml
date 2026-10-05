@@ -190,9 +190,11 @@ jobs:
           grep -q 'src="/xconvert/assets/' dist/xconvert/index.html || { echo '::error::dist/xconvert/index.html does not reference /xconvert/assets/'; exit 1; }
           grep -A1 '^/xconvert/\*' dist/_headers | grep -q '! Content-Security-Policy' || { echo '::error::the /xconvert/* rule does not detach the general CSP'; exit 1; }
           grep -A2 '^/xconvert/\*' dist/_headers | grep -q "connect-src 'self';" || { echo '::error::the /xconvert/* rule lets xConvert connect beyond this origin'; exit 1; }
-          for f in pandoc.wasm.gz typst-pdf.wasm.gz licences/pandoc-COPYING.md licences/fonts-NOTICE.txt; do
+          for f in pandoc.wasm.gz typst-pdf.wasm.gz licences/pandoc-COPYING.md licences/pandoc-COPYRIGHT.txt licences/fonts-NOTICE.txt licences/typst-pdf-THIRD-PARTY.txt; do
             test -s "dist/xconvert/vendor/$f" || { echo "::error::dist/xconvert/vendor/$f is missing"; exit 1; }
           done
+          test -s dist/xconvert/THIRD-PARTY.txt || { echo '::error::dist/xconvert/THIRD-PARTY.txt is missing'; exit 1; }
+          test -s dist/xconvert/licences/pandoc-wasm-loader-MIT.txt || { echo "::error::the pandoc loader's MIT notice is missing"; exit 1; }
           grep -q 'registration.unregister' dist/sw.js || { echo '::error::dist/sw.js, which retires the pre-0.5.0 worker, is missing'; exit 1; }
 
       - uses: actions/upload-artifact@v4

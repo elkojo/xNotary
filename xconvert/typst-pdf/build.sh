@@ -13,3 +13,4 @@ const imports = WebAssembly.Module.imports(m);
 if (imports.length) { console.error("typst-pdf must import nothing, but imports:", imports); process.exit(1); }
 console.log("typst-pdf: no imports;", (require("fs").statSync(process.argv[1]).size / 1048576).toFixed(1), "MiB");
 ' "$WASM"
+node licences.mjs

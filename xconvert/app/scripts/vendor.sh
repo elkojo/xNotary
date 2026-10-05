@@ -55,5 +55,6 @@ cp "$CACHE/typst-assets-NOTICE" "$OUT/licences/fonts-NOTICE.txt"
 
 ../typst-pdf/build.sh
 gzip -9 -n -c ../typst-pdf/target/wasm32-unknown-unknown/release/xconvert_typst_pdf.wasm > "$OUT/typst-pdf.wasm.gz"
+cp ../typst-pdf/target/THIRD-PARTY.txt "$OUT/licences/typst-pdf-THIRD-PARTY.txt"
 
 find "$OUT" -type f -printf '%s\t%P\n' | sort -k2
