@@ -2,8 +2,11 @@
 
 ## Pick up here (2026-10-05)
 
-**Open: [PR #12](https://github.com/elkojo/xNotary/pull/12)**, branch `less-text-and-xconvert-spike`,
-not merged. It holds two pieces of work:
+**v0.7.0 is tagged and released** ([release](https://github.com/elkojo/xNotary/releases/tag/v0.7.0),
+`xnotary-v0.7.0-dist.zip` attached) but **not deployed**. The operator deploys that zip to
+Cloudflare Pages; agents never touch the Cloudflare account.
+
+v0.7.0 contains PR #12, merged:
 
 1. **Less text on every page.** ⓘ bubbles (`app/src/site/Info.svelte`), "How it works" and "Q&A"
    merged into one Help page, qualified timestamp authorities in xSignature (Izenpe default),
@@ -13,19 +16,16 @@ not merged. It holds two pieces of work:
    are done. The design record is `docs/xconvert-spike.md`; the rules are in `xconvert/CLAUDE.md`
    (gitignored, local only).
 
-**CI on PR #12 is green** (run 37355547290). Getting there took four fixes, because these CI steps
-had never run on GitHub before:
+Its CI steps had never run on GitHub before, and getting them green took four fixes:
 - an unlisted host in `hosts-in-build.txt`;
 - Chrome not starting on the runner (now polled, with `--no-sandbox` on CI only);
 - the e2e polling a page that had not finished navigating;
 - **a real bug: Letter paper failed every PDF conversion.** Typst names it `us-letter`. It was
   found only because the runner's locale is en-US. The e2e now chooses A4 and Letter explicitly
   and checks each page size.
-- GitHub also warns that `actions/*@v4` run on deprecated Node 20, and that `ubuntu-latest`
-  moves to Ubuntu 26 on 2026-10-19. Neither blocks; bumping the actions is a small follow-up.
 
-**After CI is green:** merge only when the user says so. Then version, tag and release as below.
-The operator deploys; agents never touch the Cloudflare account.
+GitHub also warns that `actions/*@v4` run on deprecated Node 20, and that `ubuntu-latest` moves to
+Ubuntu 26 on 2026-10-19. Neither blocks; bumping the actions is a small follow-up.
 
 **Still unchecked for xConvert:**
 - a real phone;
@@ -40,7 +40,7 @@ The operator deploys; agents never touch the Cloudflare account.
 4. `npm run verapdf:install` (needs Java), then `npm run e2e`.
 
 
-**Last updated:** 2026-10-05 (see *Pick up here*); below as of 2026-10-03 · `main` · v0.6.0 (front page, xNotary at `/xnotary/`, xSignature at `/xsignature/`) is tagged and released but **not deployed yet**; more local changes come first, and the operator then deploys a later tag (v0.6.x or v0.7.0)
+**Last updated:** 2026-10-05 (see *Pick up here*); below as of 2026-10-03 · `main` · v0.6.0 (front page, xNotary at `/xnotary/`, xSignature at `/xsignature/`) was tagged and released but never deployed; v0.7.0 (2026-10-05) supersedes it as the tag to deploy
 
 M0, M1 and M2 are done. Both certificates work end to end, the app is public and live, and
 `pades.ts` has been measured against real qualified signatures rather than only synthetic ones.
@@ -55,7 +55,7 @@ What is left before a real release is not code: two reviews, and documents only 
 | xSignature | `xsignature/app` — joined this repository with its history in 2026-10 and is built to be served at <https://xnotary.digital/xsignature/> with the shared bar — live once the operator deploys a 0.6.0-or-later release. `npm run build:only` in `app/` builds it into `dist/xsignature/`, so both `app/` and `xsignature/app/` need `npm ci`; CI runs its typecheck, tests, host allow-list and font-licence checks. Its CSP is the `/xsignature/*` rule (`connect-src 'self' https:`). The old repo `elkojo/xSignature` is frozen; its GitHub Pages site stays up as a standalone copy |
 | Old address | <https://elkojo.github.io/xNotary/> — a **redirect stub**, published by `deploy.yml`. Not a mirror and not a fallback. Certificates saved while the app was served from that origin stay in that browser under that origin and do not appear on the new one; the downloaded PDF is the real copy |
 | Security headers | `app/hub/public/_headers` — CSP per path (`/*` for the front page, `/xnotary/*` for the app, detaching the general one with `! Content-Security-Policy`), `frame-ancestors 'none'`, `nosniff`, `no-referrer`. Vite copies it into `dist/`, so it travels with the deploy. `connect-src` is the app's entire network surface: three calendars, two explorers |
-| Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 8 releases, all marked pre-release |
+| Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 19 releases, all marked pre-release |
 | Flow A — Certificate 1 | Working end to end, verified in a real browser against dev, production *and* the deployed site |
 | Verify-integrity screen | Working, including tamper rejection |
 | Certificate library | Working, with pending → confirmed upgrade |
