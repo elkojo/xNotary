@@ -135,7 +135,11 @@ try {
   };
   const waitFor = async (expression, ms = 60000) => {
     const end = Date.now() + ms;
-    while (Date.now() < end) { if (await ev(expression)) return true; await sleep(200); }
+    while (Date.now() < end) {
+      // Mid-navigation the document may have no body yet: that is "not yet", not a failure.
+      try { if (await ev(expression)) return true; } catch { /* retry */ }
+      await sleep(200);
+    }
     return false;
   };
   const text = () => ev('document.body.innerText');
@@ -159,7 +163,7 @@ try {
   await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
   await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
   await send('Page.navigate', { url: BASE });
-  await waitFor(`document.body.innerText.includes('Drop a document here')`, 15000);
+  check('the page loads', await waitFor(`document.body.innerText.includes('Drop a document here')`, 15000));
 
   // 1. DOCX → PDF/A
   await pick('smlouva.docx');
