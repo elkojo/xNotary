@@ -93,11 +93,29 @@ real phone before release.
 Poppler prints `Syntax Error: Suspects object is wrong type (boolean)` for Typst's PDFs; the
 spec defines `/Suspects` as a boolean and veraPDF raises nothing, so this is poppler's.
 
+## Checked in step 5: a converted PDF/A, then signed
+
+A PDF/A from xConvert, run through xSignature's own library code on each of Sign a
+document's paths (throwaway keys from its test fixtures), then veraPDF 1.30.2:
+
+| Path | veraPDF 2b | Signature read back |
+|---|---|---|
+| Picture only, vector outlines (whole file re-saved by pdf-lib) | PASS | — |
+| Picture only, transparent PNG | PASS | — |
+| Certificate, invisible (incremental update) | PASS | intact |
+| Certificate, visible block with Czech text (incremental update) | PASS | intact |
+
+The re-save keeps PDF/A because xSignature opens files with `updateMetadata: false`, so
+pdf-lib does not rewrite the Info dictionary out of step with the XMP. xNotary's Timestamp
+never modifies the file — it hashes it — so needs no test of its own. xSignature's RFC 3161
+document timestamp is the same incremental path as the certificate signature, but needs the
+network, and was not run.
+
+Word drawings Typst cannot draw (EMF, WMF, TIFF, BMP) no longer stop the PDF: a pandoc Lua
+filter replaces each with a visible note and a warning. Lua is in pandoc's wasm build.
+
 ## Not yet checked
 
-- A converted PDF/A through **xSignature's Sign a document** and **xNotary's Timestamp**.
-  Signing appends an incremental update, which PDF/A permits; whether the result still passes
-  veraPDF is a step-5 test.
 - A real phone.
 - Inputs beyond the two fixtures: Word's own DOCX (not LibreOffice's), tracked changes,
   comments, headers and footers, right-to-left text, CJK (the bundled faces have none).

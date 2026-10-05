@@ -227,7 +227,27 @@ try {
     check('veraPDF passes that PDF too', out.startsWith('PASS'), out.trim().split('\n')[0]);
   }
 
-  // 5. Licences: every notice the page links to is really served
+  // 6. Offline: after a conversion, everything needed is cached; cut the network, reload, convert
+  check('a service worker controls the page', await waitFor(`navigator.serviceWorker.controller !== null`, 10000));
+  const cached = await ev(`(async () => {
+    const out = [];
+    for (const key of await caches.keys()) for (const r of await (await caches.open(key)).keys()) out.push(key + ' ' + new URL(r.url).pathname);
+    return out;
+  })()`);
+  check('both converters are in the converter cache', ['vendor/pandoc.wasm.gz', 'vendor/typst-pdf.wasm.gz'].every((f) => cached.some((c) => /\/vendor:[0-9a-f]{16} /.test(c) && c.endsWith(f))),
+    cached.filter((c) => c.includes('vendor')).join(', '));
+  await send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+  await send('Page.reload', { ignoreCache: false });
+  check('offline, the page still loads', await waitFor(`document.body.innerText.includes('Drop a document here')`, 15000));
+  await pick('smlouva.docx');
+  await waitFor(`document.body.innerText.includes('Convert to')`, 5000);
+  await ev(`[...document.querySelectorAll('.choice')].find((b) => b.textContent.includes('PDF/A')).click()`);
+  await click('Convert to PDF/A');
+  check('offline, a document still converts to PDF/A', await waitFor(`document.body.innerText.includes('Converted')`, 60000),
+    await ev(`(document.querySelector('details.raw pre')?.textContent ?? '').slice(0, 300)`));
+  await send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+
+  // 7. Licences: every notice the page links to is really served
   await send('Page.navigate', { url: `${BASE}#/licences` });
   await waitFor(`document.body.innerText.includes('Licences and source')`, 10000);
   const links = await ev(`[...document.querySelectorAll('main a[href]')].map((a) => a.href).filter((h) => h.startsWith(location.origin))`);

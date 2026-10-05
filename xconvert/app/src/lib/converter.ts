@@ -20,11 +20,30 @@ type Without<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 type Pending = { resolve: (m: FromWorker) => void; reject: (e: Error) => void; onProgress?: (p: Progress) => void };
 
 let worker: Worker | null = null;
+
+/**
+ * Waits, briefly, for the service worker to control this page.
+ *
+ * A worker started before that is not covered by it, and would fetch the converters past
+ * the cache — so on a first visit they would never be kept for offline use. Two seconds at
+ * most: without a service worker xConvert still works, from the network.
+ */
+async function controlled(): Promise<void> {
+  if (!('serviceWorker' in navigator) || !import.meta.env.PROD || navigator.serviceWorker.controller) return;
+  await Promise.race([
+    new Promise<void>((resolve) => navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true })),
+    new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+  ]);
+}
+let starting: Promise<Worker> | null = null;
 let nextId = 1;
 const pending = new Map<number, Pending>();
 
-function start(): Worker {
-  if (worker) return worker;
+function start(): Promise<Worker> {
+  return (starting ??= controlled().then(create));
+}
+
+function create(): Worker {
   worker = new Worker(new URL('../worker.ts', import.meta.url), { type: 'module' });
   worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
     const waiting = pending.get(data.id);
@@ -38,6 +57,7 @@ function start(): Worker {
     for (const waiting of pending.values()) waiting.reject(new ConverterError('The converter stopped.', event.message));
     pending.clear();
     worker = null;
+    starting = null;
   };
   return worker;
 }
@@ -46,7 +66,7 @@ function ask(message: Without<ToWorker, 'id'>, onProgress?: (p: Progress) => voi
   const id = nextId++;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject, onProgress });
-    start().postMessage({ ...message, id } as ToWorker, transfer);
+    start().then((w) => w.postMessage({ ...message, id } as ToWorker, transfer), reject);
   });
 }
 
