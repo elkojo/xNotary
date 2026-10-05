@@ -8,6 +8,7 @@
    */
   import FileDrop from '../components/FileDrop.svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
+  import Info from '../site/Info.svelte';
   import { extractOtsAttachment } from '../lib/certificate1';
   import { formatBytes } from '../lib/download';
   import { bytesEqual, groupHex, sha256File, toHex } from '../lib/hash';
@@ -97,12 +98,13 @@
     <div class="page-head">
       <div>
         <h1>Verify a document</h1>
-        <p>
-          Check whether a file matches its certificate, and whether that certificate's timestamp is
-          really anchored in Bitcoin.
-        </p>
       </div>
-      <span class="secure-note">Checked in this browser</span>
+      <span class="secure-note"
+        >Checked in this browser<Info more="#/help/verified"
+          >Both files are read on this device. Checking the timestamp only asks public block
+          explorers about a block that is already public.</Info
+        ></span
+      >
     </div>
 
     <div class="flow-shell">
@@ -117,16 +119,12 @@
         {#if step === 1}
           <div class="flow-panel">
             <h2 class="panel-title">Add the document and its certificate</h2>
-            <p class="panel-copy">
-              Both are read on this device. Checking the timestamp only asks public block explorers
-              about a block that is already public.
-            </p>
 
             <div class="verify-uploader">
               <FileDrop
                 compact
                 label="Original document"
-                hint="The file the certificate was issued for"
+hint="The file it was issued for"
                 file={documentFile}
                 onselect={(f) => {
                   documentFile = f;
@@ -137,7 +135,7 @@
                 compact
                 icon="◇"
                 label="Certificate 1, or the .ots proof"
-                hint="The PDF is enough — the proof is embedded in it"
+hint="The PDF is enough"
                 accept=".pdf,.ots"
                 file={proofFile}
                 onselect={(f) => {
@@ -172,30 +170,30 @@
                 {#if verdict === 'mismatch'}
                   <h3>Not verified — the document does not match</h3>
                   <p>
-                    The file hashes to a different value than the proof commits to: it was changed
-                    after the certificate was issued, or these two belong to different documents.
+                    It was changed after the certificate was issued, or belongs to another one.
                     <strong>Do not sign.</strong>
                   </p>
                 {:else if verdict === 'proven'}
                   <h3>Verified — the document matches</h3>
                   <p>
-                    Byte for byte, this is the file the certificate was issued for, and its digest
-                    is anchored in Bitcoin. It provably existed no later than the attested time
-                    below.
+                    Byte for byte, and anchored in Bitcoin: it existed no later than the attested time
+                    below.<Info more="#/help/verified"
+                      >Nothing more: not who signed it — that is Certificate 2 — nor whether what it
+                      says is true.</Info
+                    >
                   </p>
                 {:else if verdict === 'pending'}
                   <h3>Matches, but the timestamp is still pending</h3>
                   <p>
-                    The file matches, but the timestamp is not in a Bitcoin block yet, so the time
-                    rests on the calendars' promise rather than the chain. Check again in a few
-                    hours.
+                    Not in a Bitcoin block yet, so the time rests on the calendars' promise. Check
+                    again in a few hours.
                   </p>
                 {:else}
                   <h3>Matches, but the anchor was not checked</h3>
                   <p>
-                    The file matches and the proof is attested, but this device did not confirm the
-                    attestation: {outcome.status.kind === 'unverified' ? outcome.status.reason : ''}
-                    Check your connection, or verify with the reference client.
+                    This device could not confirm the attestation:
+                    {outcome.status.kind === 'unverified' ? outcome.status.reason : ''} Check your
+                    connection, or verify without xNotary below.
                   </p>
                 {/if}
               </div>
@@ -238,12 +236,14 @@
               {/if}
             </div>
 
-            <div class="notice">
-              Want to check this without trusting xNotary? Install the reference client
-              (<code>pip install opentimestamps-client</code>) and run
-              <code>ots verify -f "{documentFile?.name}" proof.ots</code>. The instructions are also
-              printed on the certificate itself.
-            </div>
+            <details class="raw">
+              <summary>Verify without xNotary</summary>
+              <p class="field-help">
+                Install the reference client (<code>pip install opentimestamps-client</code>) and run
+                <code>ots verify -f "{documentFile?.name}" proof.ots</code>. The certificate prints
+                the same instructions.
+              </p>
+            </details>
 
             <details class="raw">
               <summary>OpenTimestamps proof tree</summary>
@@ -264,20 +264,6 @@
           </div>
         {/if}
       </div>
-
-      <aside class="side-card">
-        <h3>What “verified” means</h3>
-        <p>
-          That the file matches the certificate's fingerprint, and the proof checks out against
-          Bitcoin. Nothing more.
-        </p>
-        <div class="side-list">
-          <div>Exact document match</div>
-          <div>Timestamp status, as far as it was checked</div>
-          <div>Nothing about who signed — that is Certificate 2</div>
-          <div>Nothing about what the document says or means</div>
-        </div>
-      </aside>
     </div>
   </div>
 </section>

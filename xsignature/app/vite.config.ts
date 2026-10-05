@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 
 /**
  * The version, read from package.json at build time.
@@ -21,6 +21,25 @@ const { version } = JSON.parse(readFileSync(new URL('./package.json', import.met
  * `app/src/signature.css` that move; nothing in this file goes with them, and
  * the parent's own vite.config.ts stays untouched.
  */
+/**
+ * Publishes xsignature/THIRD-PARTY.md with the build, as THIRD-PARTY.md beside index.html,
+ * so the notices travel with the code they cover and the front page's index can link them.
+ * It is the reviewed, hand-kept list: update it when a dependency changes.
+ */
+function publishNotices(): Plugin {
+  return {
+    name: 'xsignature-publish-notices',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'THIRD-PARTY.md',
+        source: readFileSync(new URL('../THIRD-PARTY.md', import.meta.url), 'utf8'),
+      });
+    },
+  };
+}
+
 export default defineConfig({
   // xSignature lives at /xsignature/ on xnotary.digital. BASE_PATH overrides it.
   base: process.env.BASE_PATH ?? '/xsignature/',
@@ -33,7 +52,7 @@ export default defineConfig({
     // A literal, so it is in the bundle rather than fetched from anywhere.
     __APP_VERSION__: JSON.stringify(version),
   },
-  plugins: [svelte()],
+  plugins: [svelte(), publishNotices()],
   build: {
     target: 'es2022',
     sourcemap: true,

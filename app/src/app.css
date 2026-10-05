@@ -434,6 +434,82 @@ footer.site :focus-visible {
   color: var(--warn-strong);
 }
 
+/* ------------------------------------------------------------ info bubble -- */
+
+/* See src/site/Info.svelte. Inline, so it can sit at the end of a sentence. */
+.info {
+  display: inline-block;
+  vertical-align: 1px;
+  margin-left: 4px;
+  line-height: 1;
+}
+
+.info-mark {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: help;
+  font: italic 700 10px/1 Georgia, 'Times New Roman', serif;
+  opacity: 0.75;
+}
+
+.info-mark:hover,
+.info-mark[aria-expanded='true'] {
+  opacity: 1;
+  color: var(--ink);
+}
+
+.info-bubble {
+  position: fixed;
+  z-index: 60;
+  width: max-content;
+  max-width: min(340px, calc(100vw - 24px));
+  padding: 12px 14px;
+  border: 1px solid var(--line-dark);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 0 16px 44px var(--popover-shadow);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-style: normal;
+  font-weight: 450;
+  letter-spacing: 0;
+  line-height: 1.55;
+  text-align: left;
+  text-transform: none;
+  white-space: normal;
+}
+
+/* Bridges the gap to the mark, so moving the pointer onto the bubble keeps it open. */
+.info-bubble::before,
+.info-bubble::after {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 10px;
+  content: '';
+}
+
+.info-bubble::before {
+  top: -10px;
+}
+
+.info-bubble::after {
+  bottom: -10px;
+}
+
+.info-more {
+  display: block;
+  margin-top: 8px;
+  font-weight: 650;
+}
+
 /* --------------------------------------------------------- banner strips -- */
 
 /*
@@ -688,34 +764,6 @@ footer.site :focus-visible {
   background: var(--mint);
 }
 
-.future-note {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 40px;
-  margin-top: 72px;
-  padding: 24px 28px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  color: var(--future-fg);
-  flex-wrap: wrap;
-}
-
-.future-note strong {
-  color: var(--white);
-}
-.future-note p {
-  flex: 1 1 420px;
-  margin: 0;
-  font-size: 13px;
-}
-.future-note > span {
-  color: var(--lime);
-  font-size: 12px;
-  font-weight: 720;
-  white-space: nowrap;
-}
-
 /* ------------------------------------------------------- product surface -- */
 
 .product-view {
@@ -772,13 +820,17 @@ footer.site :focus-visible {
 
 .flow-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
 
+/* A flow is one column, so its page is as wide as the panel, not the site. */
+.workspace:has(> .flow-shell) {
+  width: min(820px, calc(100% - 48px));
+}
+
 .flow-main,
-.side-card,
 .single-card,
 .list-card {
   border: 1px solid var(--line-dark);
@@ -788,7 +840,6 @@ footer.site :focus-visible {
 }
 
 .flow-main {
-  min-height: 510px;
   overflow: hidden;
 }
 
@@ -835,9 +886,15 @@ footer.site :focus-visible {
   background: var(--green);
 }
 
+/*
+ * `backwards`, not `both`: a fill that outlives the animation leaves an
+ * identity transform on the panel, and any transform makes the panel the
+ * containing block for `position: fixed` — which put every info bubble inside
+ * a panel off by the panel's own offset.
+ */
 .flow-panel {
   padding: 42px;
-  animation: enter 0.18s ease both;
+  animation: enter 0.18s ease backwards;
 }
 
 @keyframes enter {
@@ -949,21 +1006,6 @@ footer.site :focus-visible {
   margin: 0 0 4px;
   color: var(--drop-fg);
   font-size: 12px;
-}
-
-.privacy {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: 17px;
-  color: var(--privacy-fg);
-  font-size: 12px;
-}
-
-.privacy::before {
-  content: '✓';
-  color: var(--privacy-mark);
-  font-weight: 850;
 }
 
 .verify-uploader {
@@ -1114,55 +1156,7 @@ footer.site :focus-visible {
   flex-wrap: wrap;
 }
 
-.keep-note {
-  margin-top: 15px;
-  color: var(--faint);
-  font-size: 11px;
-}
-
 /* ------------------------------------------------------------- side panel -- */
-
-.side-card {
-  padding: 24px;
-}
-
-.side-card h3 {
-  margin-bottom: 11px;
-  font-size: 14px;
-  letter-spacing: -0.015em;
-}
-
-.side-card p {
-  margin-bottom: 17px;
-  color: var(--ink-soft);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.side-card p:last-child {
-  margin-bottom: 0;
-}
-
-.side-list {
-  display: grid;
-  gap: 13px;
-  padding-top: 17px;
-  border-top: 1px solid var(--line-dark);
-}
-
-.side-list div {
-  display: flex;
-  align-items: start;
-  gap: 9px;
-  color: var(--side-fg);
-  font-size: 11px;
-}
-
-.side-list div::before {
-  content: '✓';
-  color: var(--side-mark);
-  font-weight: 900;
-}
 
 /* ------------------------------------------------------------------ pills -- */
 
@@ -1585,41 +1579,6 @@ footer.site :focus-visible {
   color: var(--warn-mark);
 }
 
-.vision-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 40px;
-  margin-top: 18px;
-  padding: 22px 24px;
-  border-radius: 12px;
-  color: var(--vision-fg);
-  background: var(--vision-bg);
-  flex-wrap: wrap;
-}
-
-.vision-strip > div {
-  flex: 1 1 420px;
-}
-
-.vision-strip strong {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 14px;
-}
-
-.vision-strip p {
-  margin: 0;
-  color: var(--vision-fg-soft);
-  font-size: 11px;
-}
-
-.vision-strip > span {
-  color: var(--vision-accent);
-  font-size: 12px;
-  font-weight: 750;
-}
-
 /* Reference links inside the paper surface. */
 .product-view a {
   color: var(--link);
@@ -1781,9 +1740,6 @@ footer.site a {
 /* ------------------------------------------------------------- responsive -- */
 
 @media (max-width: 980px) {
-  .flow-shell {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .service-grid,
   .how-grid {
     grid-template-columns: 1fr;
@@ -1878,4 +1834,12 @@ footer.site a {
   .spinner {
     animation-duration: 2s !important;
   }
+}
+
+/* Questions answered in a bubble, side by side under a drop zone. */
+.field-help.asks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin-top: 16px;
 }

@@ -10,6 +10,7 @@
    * it did not. It can say the file has not changed and the token is sound; it
    * cannot say the authority deserves to be believed, and it does not imply it.
    */
+  import Info from '../../../../app/src/site/Info.svelte';
   import { checkSignatures, type CheckedSignature } from '../lib/document/verify/verify';
   import {
     checkLinks,
@@ -128,22 +129,25 @@
     <div class="page-head">
       <div>
         <h1>Check a PDF</h1>
-        <p>
-          See whether a PDF carries a timestamp, and whether it still matches the document. The
-          file is read in this browser and never sent anywhere.
-        </p>
       </div>
-      <span class="secure-note">Processed in this browser</span>
+      <span class="secure-note"
+        >Processed in this browser<Info
+          >Nothing is uploaded and nothing is fetched — the whole check runs on this device, on the
+          file's own bytes.</Info
+        ></span
+      >
     </div>
 
     <div class="flow-shell">
       <div class="flow-main">
         <div class="flow-panel">
-          <h2 class="panel-title">Open a PDF</h2>
-          <p class="panel-copy">
-            Any PDF, not only one made here. Nothing is uploaded and nothing is fetched — the whole
-            check runs on this device, on the file's own bytes.
-          </p>
+          <h2 class="panel-title">
+            Open a PDF<Info
+              >Any PDF, not only one made here. Checked: that it still matches each timestamp and
+              signature byte for byte, that each token holds against its certificate, and whether
+              anything was appended afterwards.</Info
+            >
+          </h2>
 
           {#if fileName && !error}
             <div class="picked">
@@ -207,13 +211,10 @@
           <div class="flow-panel">
             <h2 class="panel-title">Nothing to check</h2>
             <p class="panel-copy">
-              This PDF carries no timestamp and no digital signature. That is not a fault — most
-              PDFs do not. It means there is nothing in the file that says when it existed, so
-              nothing here can be confirmed or contradicted.
-            </p>
-            <p class="panel-copy">
-              A picture of a signature on a page is not something that can be checked: it is ink on
-              a page like any other, and it leaves no trace of who put it there.
+              No timestamp and no digital signature — most PDFs have neither.<Info
+                >So nothing in the file says when it existed. A picture of a signature on a page
+                cannot be checked: it leaves no trace of who put it there.</Info
+              >
             </p>
           </div>
         {/if}
@@ -233,8 +234,7 @@
                     ? 'stamped'
                     : 'signed'}.
                 </strong>
-                The bytes here are the bytes it was taken over.
-              </div>
+</div>
             {:else if result.verdict === 'altered'}
               <div class="notice bad">
                 <strong>This document has been changed.</strong>
@@ -317,8 +317,7 @@
                       </span>
                     {/each}
                   </span>
-                  Each of those was checked against the next, which is arithmetic. Whether the
-                  authority at the top deserves to be believed is the judgement below.
+                  Each checked against the next — arithmetic only.
                 </div>
               {:else}
                 <!--
@@ -374,9 +373,8 @@
                 <div class="field">
                   <span class="field-label">Continue the chain yourself</span>
                   <p class="field-note">
-                    Fetch the certificate above and drop it in. It is read in this browser and
-                    checked against the signer's, offline, like everything else here — nothing is
-                    sent and nothing is written back to the document.
+                    Fetch the certificate above and drop it in. Checked offline; nothing is sent or
+                    written back.
                   </p>
                   <input
                     class="input"
@@ -421,7 +419,7 @@
               <div class="notice">
                 <strong>What the certificate says about itself.</strong>
                 {#if result.claims.qualified}
-                  It declares that it is a <em>qualified certificate</em> under eIDAS{result.claims
+                  It declares itself a <em>qualified certificate</em> under eIDAS{result.claims
                     .purpose === 'signature'
                     ? ', issued to a person for signing'
                     : result.claims.purpose === 'seal'
@@ -431,10 +429,9 @@
                     It also declares the private key is held on a qualified signature creation
                     device.
                   {:else}
-                    It does <strong>not</strong> declare the key is held on a qualified signature
-                    creation device, and a qualified electronic signature needs both. So this is
-                    an advanced signature made with a qualified certificate — a real standing, and
-                    not the same one.
+                    It does <strong>not</strong> declare the key is on a qualified signature
+                    creation device, so this is an advanced signature made with a qualified
+                    certificate — not a qualified electronic signature.
                   {/if}
                 {:else}
                   It makes no claim to being a qualified certificate under eIDAS.
@@ -447,17 +444,16 @@
                   It declares a transaction limit of {result.claims.limit.value.toLocaleString()}
                   {result.claims.limit.currency}.
                 {/if}
-                <br /><br />
-                The authority's own statements, read out of the certificate. Nothing here checks
-                they are true.
+                Nothing here checks these statements are true.
               </div>
 
               {#if result.claims.keyUsage.stated && !result.claims.keyUsage.digitalSignature && !result.claims.keyUsage.nonRepudiation}
                 <div class="notice warn">
                   <strong>This certificate was not issued for signing.</strong>
-                  Its key usage permits neither digital signature nor non-repudiation, so
-                  whatever it was for, it was not this. The signature above is still sound
-                  arithmetic; a reader that enforces key usage will reject it anyway.
+                  Readers that enforce key usage will reject it.<Info
+                    >Its key usage permits neither digital signature nor non-repudiation. The
+                    signature is still sound arithmetic.</Info
+                  >
                 </div>
               {/if}
             {/if}
@@ -469,15 +465,15 @@
               -->
               <div class="notice bad">
                 <strong>The timestamp inside this signature is not for this signature.</strong>
-                It is a real token from a real authority, but what it attests to is some other
-                signature. Treat the time above as meaning nothing here.
+                It attests to some other signature. Treat the time above as meaning nothing.
               </div>
             {:else if result.timestamp}
               <div class="notice ok">
                 <strong>The time on this signature is not the signer's own.</strong>
-                {result.timestamp.signedBy ?? 'An authority'} saw this signature and dated it, so
-                the time does not rest on the signer's computer. Whether that authority is worth
-                believing is, like the signer's identity, your PDF reader's call.
+                {result.timestamp.signedBy ?? 'An authority'} dated it.<Info
+                  >So the time does not rest on the signer's computer. Whether that authority is
+                  worth believing is, like the signer's identity, your PDF reader's call.</Info
+                >
               </div>
             {/if}
 
@@ -496,9 +492,10 @@
                       ? `, by ${next.signedBy}`
                       : ''}.
                   </strong>
-                  That is what a document signed by more than one party looks like: each
-                  signature covers everything before it, and the last one covers the whole file.
-                  Nothing here was changed behind anyone's back.
+                  Normal for a document signed by more than one party.<Info
+                    >Each signature covers everything before it, and the last one covers the whole
+                    file. Nothing was changed behind anyone's back.</Info
+                  >
                 </div>
               {:else}
                 <div class="notice warn">
@@ -506,10 +503,11 @@
                     Something was added after this was {result.isTimestamp ? 'stamped' : 'signed'},
                     and it is not another signature.
                   </strong>
-                  It does not reach the end of the file, so part of what you would see on opening
-                  it is not covered by anything above. That is how a document is made to show one
-                  thing while being signed as another, and it is worth finding out what the
-                  addition was.
+                  Part of what you see on opening it is covered by nothing above — find out what was
+                  added.<Info
+                    >That is how a document is made to show one thing while being signed as
+                    another.</Info
+                  >
                 </div>
               {/if}
             {/if}
@@ -519,10 +517,13 @@
               Saying "verified" without this would be the dishonest version.
             -->
             <div class="notice">
-              <strong>What this does not tell you.</strong>
-              Whether <em>{result.signedBy ?? 'that signer'}</em> is who they say they are. That
-              takes two things this app does not have: a list of trusted authorities, which it
-              chooses not to ship, and a revocation check, which needs a network it does not use.
+              <strong>Not checked:</strong> whether <em>{result.signedBy ?? 'that signer'}</em> is who
+              they say they are — open the file in a PDF reader for that.<Info
+                >That takes a list of trusted authorities, which this app chooses not to ship, and a
+                revocation check, which needs a network it does not use. The name above is read out
+                of the token, not vouched for.{#if !result.isTimestamp}
+                  Reason and Location were typed by whoever signed; nothing makes them true.{/if}</Info
+              >
               {#if result.claims?.ocspUrl || result.claims?.crlUrls.length}
                 <!--
                   Named, not called. The same fact the signing screen states
@@ -530,7 +531,7 @@
                   a refusal is easier to weigh against the addresses it applies
                   to than in the abstract.
                 -->
-                The certificate says where that check would go, and this app calls none of them:
+                Where that check would go, uncalled:
                 <span class="outgoing-list">
                   {#if result.claims.ocspUrl}
                     <span><strong>Asked at:</strong> <code>{result.claims.ocspUrl}</code></span>
@@ -540,30 +541,11 @@
                   {/each}
                 </span>
               {/if}
-              Open the file in a PDF reader for that judgement. The name above is read out of the
-              token, not vouched for.
-              {#if !result.isTimestamp}
-                Reason and Location were typed by whoever signed — the signature stops anyone else
-                altering them; nothing makes them true.
-              {/if}
+
             </div>
           </div>
         {/each}
       </div>
-
-      <aside class="side-card">
-        <h3>What is checked</h3>
-        <p>Two things, both on this device.</p>
-        <div class="side-list">
-          <div>That the document still matches the timestamp, byte for byte</div>
-          <div>That the token's own signature holds against the certificate in it</div>
-          <div>Whether anything was appended after the stamp was made</div>
-        </div>
-        <p class="side-foot">
-          Not checked: whether the authority is trustworthy. That needs a trust store and a
-          network, and belongs in a PDF reader.
-        </p>
-      </aside>
     </div>
   </div>
 </section>

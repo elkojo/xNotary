@@ -1,0 +1,22 @@
+[package]
+name = "xconvert-typst-pdf"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Typst source + images + fonts in, PDF/A-2b out — for xConvert, in the browser."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+typst = "0.15"
+typst-pdf = "0.15"
+typst-layout = "0.15"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

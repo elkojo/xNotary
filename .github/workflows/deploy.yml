@@ -80,6 +80,7 @@ jobs:
           cache-dependency-path: |
             app/package-lock.json
             xsignature/app/package-lock.json
+            xconvert/app/package-lock.json
 
       - run: npm ci
 
@@ -97,6 +98,28 @@ jobs:
 
       - name: Test xSignature
         run: npm test --prefix ../xsignature/app
+      - name: Install xConvert
+        run: npm ci --prefix ../xconvert/app
+      - name: Type-check xConvert
+        run: npm run typecheck --prefix ../xconvert/app
+      # xConvert's Typst wrapper is Rust, built here from source. rustup ships on the runner.
+      - name: Add the WebAssembly target for xConvert's Typst wrapper
+        run: rustup target add wasm32-unknown-unknown
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            xconvert/typst-pdf/target
+          key: typst-pdf-${{ runner.os }}-${{ hashFiles('xconvert/typst-pdf/Cargo.lock') }}
+      - uses: actions/cache@v4
+        with:
+          path: xconvert/app/.vendor-cache
+          key: xconvert-vendor-${{ hashFiles('xconvert/app/scripts/vendor.sh', 'xconvert/app/scripts/install-verapdf.sh') }}
+      - name: Fetch xConvert's converters (checksum-pinned) and build its Typst wrapper
+        run: npm run vendor --prefix ../xconvert/app
+      - name: Test xConvert
+        # After the vendor step: the Typst tests run the real wrapper.
+        run: npm test --prefix ../xconvert/app
 
       - name: Build
         # The whole site: the front page into dist/, xNotary into dist/xnotary/,
@@ -105,23 +128,47 @@ jobs:
         # else would move xNotary out from under its front page and its CSP rule.
         run: npm run build:only
 
-      - name: Check every host xSignature's build mentions is accounted for
+      - name: Check every host each service's build mentions is accounted for
         # xSignature is allowed one network request — the opt-in timestamp — and
-        # a blocklist of known CDNs would only catch the hosts somebody thought
-        # to list. So every host its build mentions is compared against
-        # xsignature/app/hosts-in-build.txt, and anything not written down
+        # xConvert none. A blocklist of known CDNs would only catch the hosts
+        # somebody thought to list, so every host each build mentions is compared
+        # against that service's hosts-in-build.txt, and anything not written down
         # there fails here.
         run: |
-          grep -ohE 'https?://[a-zA-Z0-9._-]+' \
-            dist/xsignature/assets/*.js dist/xsignature/assets/*.css dist/xsignature/*.html 2>/dev/null \
-            | sed -E 's|https?://||' | sort -u > /tmp/found-hosts.txt
-          grep -vE '^\s*(#|$)' ../xsignature/app/hosts-in-build.txt | awk '{print $1}' | sort -u > /tmp/allowed-hosts.txt
-          if comm -23 /tmp/found-hosts.txt /tmp/allowed-hosts.txt | grep -q .; then
-            echo "::error::xSignature's build mentions a host that is not in hosts-in-build.txt:"
-            comm -23 /tmp/found-hosts.txt /tmp/allowed-hosts.txt
-            exit 1
-          fi
-          echo "every host in xSignature's build is accounted for"
+          for service in xsignature xconvert; do
+            grep -ohE 'https?://[a-zA-Z0-9._-]+' \
+              dist/$service/assets/*.js dist/$service/assets/*.css dist/$service/*.html 2>/dev/null \
+              | sed -E 's|https?://||' | sort -u > /tmp/found-hosts.txt
+            grep -vE '^\s*(#|$)' ../$service/app/hosts-in-build.txt | awk '{print $1}' | sort -u > /tmp/allowed-hosts.txt
+            if comm -23 /tmp/found-hosts.txt /tmp/allowed-hosts.txt | grep -q .; then
+              echo "::error::$service's build mentions a host that is not in its hosts-in-build.txt:"
+              comm -23 /tmp/found-hosts.txt /tmp/allowed-hosts.txt
+              exit 1
+            fi
+            echo "every host in $service's build is accounted for"
+          done
+      # pandoc needs WebAssembly exception handling, which Node 18 lacks, so the real
+      # conversions are tested in Chrome, against the built site and its real CSP. Every PDF
+      # must pass veraPDF as PDF/A-2b: xConvert calls them archival only because they do.
+      - name: Install veraPDF (pinned)
+        run: npm run verapdf:install --prefix ../xconvert/app
+      - name: xConvert end-to-end in Chrome
+        run: REQUIRE_VERAPDF=1 npm run e2e --prefix ../xconvert/app
+      - name: Check every service's notices are where the front page's index says
+        # /THIRD-PARTY.txt is generated from the service registry; each service must
+        # actually ship the file it is listed with.
+        run: |
+          paths=$(grep -oE '^  [A-Za-z]+ +(/[^ ]+)$' dist/THIRD-PARTY.txt | awk '{print $2}')
+          test -n "$paths" || { echo '::error::dist/THIRD-PARTY.txt lists no services'; exit 1; }
+          for path in $paths; do
+            test -s "dist$path" || { echo "::error::the notices index names $path, which is not in the build"; exit 1; }
+          done
+          echo "every service's notices are in the build: $(echo $paths)"
+      - name: Check no file is over Cloudflare Pages' 25 MiB limit
+        run: |
+          big=$(find dist -type f -size +25M)
+          if [ -n "$big" ]; then echo "::error::over 25 MiB, Cloudflare Pages would refuse the deploy:"; echo "$big"; exit 1; fi
+          echo "every file in dist is under 25 MiB"
 
       - name: Check every bundled font ships its licence
         # The OFL requires the licence to travel with the font.
@@ -150,6 +197,14 @@ jobs:
           if grep -q '/xNotary/' dist/xnotary/index.html; then echo '::error::xNotary still carries the GitHub Pages base path'; exit 1; fi
           grep -q 'src="/xsignature/assets/' dist/xsignature/index.html || { echo '::error::dist/xsignature/index.html does not reference /xsignature/assets/'; exit 1; }
           grep -A1 '^/xsignature/\*' dist/_headers | grep -q '! Content-Security-Policy' || { echo '::error::the /xsignature/* rule does not detach the general CSP'; exit 1; }
+          grep -q 'src="/xconvert/assets/' dist/xconvert/index.html || { echo '::error::dist/xconvert/index.html does not reference /xconvert/assets/'; exit 1; }
+          grep -A1 '^/xconvert/\*' dist/_headers | grep -q '! Content-Security-Policy' || { echo '::error::the /xconvert/* rule does not detach the general CSP'; exit 1; }
+          grep -A2 '^/xconvert/\*' dist/_headers | grep -q "connect-src 'self';" || { echo '::error::the /xconvert/* rule lets xConvert connect beyond this origin'; exit 1; }
+          for f in pandoc.wasm.gz typst-pdf.wasm.gz licences/pandoc-COPYING.md licences/pandoc-COPYRIGHT.txt licences/fonts-NOTICE.txt licences/typst-pdf-THIRD-PARTY.txt; do
+            test -s "dist/xconvert/vendor/$f" || { echo "::error::dist/xconvert/vendor/$f is missing"; exit 1; }
+          done
+          test -s dist/xconvert/THIRD-PARTY.txt || { echo '::error::dist/xconvert/THIRD-PARTY.txt is missing'; exit 1; }
+          test -s dist/xconvert/licences/pandoc-wasm-loader-MIT.txt || { echo "::error::the pandoc loader's MIT notice is missing"; exit 1; }
           grep -q 'registration.unregister' dist/sw.js || { echo '::error::dist/sw.js, which retires the pre-0.5.0 worker, is missing'; exit 1; }
 
       - uses: actions/upload-artifact@v4

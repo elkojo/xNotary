@@ -326,7 +326,10 @@ a.product-card:hover {
   font-size: 12px;
   font-weight: 620;
 }
+/* What comes next: a slim strip under the services, not a card of its own. */
 .product-card.soon {
+  grid-column: 1 / -1;
+  min-height: 0;
   border-style: dashed;
   background: none;
 }

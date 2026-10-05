@@ -1,0 +1,48 @@
+/*
+ * Styling that belongs to xConvert's shell rather than to the family. The family's
+ * stylesheet is xNotary's app/src/app.css, imported as it is.
+ */
+:root {
+  --site-version: #a8a08a;
+}
+
+/* As on xSignature: a fact for whoever checks which build is live, so quieter than prose. */
+.site-version {
+  margin-top: 14px;
+  color: var(--site-version);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Option buttons, as xSignature draws them: a selected one looks like a dark button. */
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice {
+  padding: 9px 16px;
+  border: 1px solid var(--line-dark);
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 650;
+  background: var(--card);
+  cursor: pointer;
+}
+
+.choice:hover {
+  border-color: var(--ink-soft);
+}
+
+.choice.selected {
+  border-color: var(--dark-btn-line);
+  color: var(--dark-btn-fg);
+  background: var(--dark-btn-bg);
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}

@@ -18,6 +18,7 @@
   import { groupHex, toHex } from '../lib/hash';
   import { checkStatus, parseOts, type OtsStatus } from '../lib/ots';
   import { utcStamp } from '../lib/time';
+  import Info from '../site/Info.svelte';
   import {
     AgreementError,
     DSS_SOURCE_URL,
@@ -26,12 +27,6 @@
     claimsLine,
     type Certificate2Draft,
   } from '../lib/certificate2';
-  import type { View } from '../nav';
-
-  interface Props {
-    go: (view: View) => void;
-  }
-  let { go }: Props = $props();
 
   let files = $state<File[]>([]);
   /** The Certificate 1 or bare .ots for the document that was signed. */
@@ -169,12 +164,12 @@
     <div class="page-head">
       <div>
         <h1>Attest signatures</h1>
-        <p>
-          Certificate 1 shows a document existed. Certificate 2 shows who put their name to it —
-          read from files that were signed elsewhere, with each signer's consent.
-        </p>
       </div>
-      <span class="secure-note">Read in this browser</span>
+      <span class="secure-note"
+        >Read in this browser<Info more="#/help/keeps"
+          >The signed files are read on this device. Nothing is uploaded.</Info
+        ></span
+      >
     </div>
 
     <div class="flow-shell">
@@ -191,11 +186,12 @@
 
         {#if step === 1}
           <div class="flow-panel">
-            <h2 class="panel-title">Bring the signed files</h2>
-            <p class="panel-copy">
-              xNotary does not send signing invitations and never holds a signing key. Everyone
-              signs in their own tool, with a provider they already trust; you drop the result here.
-            </p>
+            <h2 class="panel-title">
+              Add the signed files<Info more="#/help/signing"
+                >Everyone signs in their own tool, with a provider they already trust. xNotary sends
+                no invitations and never holds a signing key.</Info
+              >
+            </h2>
 
             <FileDrop
               label="Signed PDFs"
@@ -218,14 +214,14 @@
                 compact
                 icon="◇"
                 label="Timestamp proof (optional)"
-                hint="The Certificate 1 for the signed document, or its proof.ots"
+hint="Its Certificate 1 or proof.ots"
                 accept=".pdf,.ots"
                 file={proofFile}
                 onselect={(f) => inspect(files, f)}
               />
             </div>
 
-            <div class="privacy">Everything is read on this device; nothing is uploaded.</div>
+
 
             {#if busy}
               <div class="notice"><span class="spinner"></span> Reading signatures…</div>
@@ -235,37 +231,32 @@
               <div class="notice bad">{error}</div>
             {/if}
 
-            <details class="explain">
-              <summary>Sign the document itself, or its Certificate 1?</summary>
-              <div>
-                Have everyone sign the contract rather than the Certificate 1, then drop the signed
-                contract here together with its Certificate 1 (or the
-                <span class="mono">proof.ots</span>). xNotary checks that the timestamped bytes
-                really are a revision of the file they signed, and Certificate 2 then says the
-                signatures are over the document — carrying the proof along inside it. Signing the
-                Certificate 1 still works; it just attests to the certificate rather than to the
-                contract.
-              </div>
-            </details>
-
-            <details class="explain">
-              <summary>Signing in parallel or in sequence</summary>
-              <div>
-                In parallel, each signer gets their own copy to sign; drop all of them together and
-                their signatures are pooled onto one certificate. In sequence, one file ends up
-                carrying every signature — drop just that. Either way, xNotary first checks the
-                files really are signatures over the same document, and refuses to combine them if
-                they are not.
-              </div>
-            </details>
+            <p class="field-help asks">
+              <span
+                >Sign the document or its Certificate 1?<Info more="#/help/what-to-sign"
+                  >Prefer the document itself, then add its Certificate 1 or
+                  <span class="mono">proof.ots</span> here: Certificate 2 then says the signatures are
+                  over the document. Signing the Certificate 1 works too, but attests to the
+                  certificate rather than the document.</Info
+                ></span
+              >
+              <span
+                >Parallel or in sequence?<Info more="#/help/parallel"
+                  >In parallel, drop every signer's copy together; in sequence, drop the one file
+                  that carries every signature. Copies that are not signatures over the same
+                  document are never combined.</Info
+                ></span
+              >
+            </p>
           </div>
         {:else if step === 2 && draft}
           <div class="flow-panel">
-            <h2 class="panel-title">Who may be named?</h2>
-            <p class="panel-copy">
-              Each signature stays off the certificate until you tick it. Only the name, the issuing
-              authority and the signing time are ever printed — nothing else from the certificate.
-            </p>
+            <h2 class="panel-title">
+              Who may be named?<Info
+                >Nobody is named until you tick them. Only the name, the issuing authority and the
+                signing time are printed.</Info
+              >
+            </h2>
 
             <div class="review-box">
               {#each draft.sources as s}
@@ -288,22 +279,23 @@
             {#if draft.agreement.kind === 'differs'}
               <div class="notice bad">
                 <strong>These are not signatures over the same document.</strong>
-                {draft.agreement.detail} Listing them together would say they signed the same thing,
-                so no certificate can be created from this set.
+                {draft.agreement.detail} They cannot share a certificate.
               </div>
             {:else if draft.agreement.kind === 'agree'}
               <div class="notice ok">
-                All {draft.sources.length} files are signatures over the same document, established from
-                {draft.agreement.evidence === 'notarized-digest'
-                  ? 'the OpenTimestamps proof each one carries'
-                  : 'the bytes preceding the first signature, which are identical'}.
+                All {draft.sources.length} files are signatures over the same document.<Info
+                  >Established from {draft.agreement.evidence === 'notarized-digest'
+                    ? 'the OpenTimestamps proof each one carries'
+                    : 'the bytes preceding the first signature, which are identical'}.</Info
+                >
               </div>
             {/if}
 
             {#if draft.underlying}
               <div class="notice ok">
-                This is an xNotary Certificate 1. The digest above is the document it was issued
-                for, read from the OpenTimestamps proof still embedded inside it.
+                An xNotary Certificate 1: the digest above is the document it was issued for.<Info
+                  >Read from the OpenTimestamps proof still embedded inside it.</Info
+                >
               </div>
             {/if}
 
@@ -312,19 +304,22 @@
               {#if linked > 0}
                 <div class="notice ok">
                   <strong>The signatures are over the document itself.</strong>
-                  {linked === draft.timestamp.links.length
-                    ? 'The proof you supplied timestamps'
-                    : `The proof you supplied timestamps ${linked} of ${draft.timestamp.links.length} of these files at`}
-                  the bytes signed here, so the document existed in this exact form before anyone
-                  signed it. {statusText(proofStatus)} The proof is attached to Certificate 2.
+                  {#if linked < draft.timestamp.links.length}
+                    The proof fits {linked} of {draft.timestamp.links.length} files.
+                  {/if}
+                  {statusText(proofStatus)}<Info
+                    >The proof timestamps the bytes signed here, so the document existed in this
+                    exact form before anyone signed it. It is attached to Certificate 2.</Info
+                  >
                 </div>
               {:else}
                 <div class="notice warn">
-                  <strong>That proof does not fit these files.</strong> It commits to
-                  <span class="mono">{groupHex(toHex(draft.timestamp.digest))}</span>, which is not
-                  any revision of what was signed — so it is a timestamp of some other document, or
-                  the signing tool rewrote the file rather than appending to it. Certificate 2 will
-                  not claim a link it could not establish.
+                  <strong>That proof does not fit these files</strong>, so Certificate 2 will not link
+                  them.<Info
+                    >It commits to <span class="mono">{groupHex(toHex(draft.timestamp.digest))}</span>,
+                    which is no revision of what was signed: it timestamps another document, or the
+                    signing tool rewrote the file instead of appending to it.</Info
+                  >
                 </div>
               {/if}
             {/if}
@@ -345,11 +340,12 @@
               on screen before it, not conditionally after it.
             -->
             <div class="notice" style="margin-top:18px">
-              <strong>Leaving someone off is not anonymization.</strong>
-              The certificate embeds the signed file in full, and their name is inside it — that is
-              where xNotary read it from. Anyone opening the attachment can see it, and it cannot be
-              removed without breaking the signature. Unticking keeps a name off the overview page;
-              it does not take it out of the evidence.
+              <strong>Leaving someone off is not anonymization.</strong> Their name stays inside the
+              signed file the certificate attaches.<Info more="#/help/naming"
+                >Unticking keeps a name off the overview page, which only says how many others
+                signed. Anyone opening the attachment can read the name, and removing it would break
+                the signature.</Info
+              >
             </div>
 
             <div class="signers" style="margin-top:14px">
@@ -392,26 +388,15 @@
               the framework's rather than as eIDAS's.
             -->
             <div class="notice warn">
-              xNotary only reports what these certificates claim; it checks them against no trust
-              list, so it cannot tell you a signature is a QES — or whatever your jurisdiction calls
-              its highest tier. For that, validate the signed document against the trust list it was
-              issued under: run
-              <a href={DSS_SOURCE_URL} target="_blank" rel="noopener noreferrer">DSS</a> on your own
-              machine, so the document never leaves it, or ask a trust provider. In the EU, only a
-              qualified provider's validation carries the presumption eIDAS attaches.
+              <strong>Claims, not verdicts.</strong> Nothing here is checked against a trust list.<Info
+                more="#/help/validation"
+                >So xNotary cannot tell you a signature meets its framework's highest tier — a QES, in
+                the EU. Validate the signed document against the trust list it was issued under: run
+                <a href={DSS_SOURCE_URL} target="_blank" rel="noopener noreferrer">DSS</a> on your own
+                machine, or ask a trust provider.</Info
+              >
             </div>
 
-            {#if withheld > 0}
-              <div class="notice warn">
-                <strong
-                  >{withheld} signature{withheld === 1 ? '' : 's'} will not be named on the overview —
-                  but {withheld === 1 ? 'that name stays' : 'those names stay'} in the file.</strong
-                >
-                The certificate will say {withheld === 1 ? 'one exists' : `${withheld} exist`} without
-                identifying {withheld === 1 ? 'them' : 'any of them'}, and states on its own face that
-                this is not anonymization.
-              </div>
-            {/if}
 
             {#if error}
               <div class="notice bad">{error}</div>
@@ -430,11 +415,7 @@
                 Create Certificate 2
               </button>
             </div>
-            <p class="field-help">
-              You can create this at any time, with whichever signatures exist so far. There is no
-              “complete” state and nothing expires — collect another signature later and issue a new
-              one.
-            </p>
+            <p class="field-help">More signatures later? Issue a new certificate any time.</p>
           </div>
         {:else if step === 3 && built && draft}
           <div class="flow-panel">
@@ -442,9 +423,8 @@
               <div class="success-mark" aria-hidden="true">✓</div>
               <h2>Certificate 2 created</h2>
               <p>
-                One A4 page naming {chosen} signator{chosen === 1 ? 'y' : 'ies'}, with the signed
-                document{draft.sources.length > 1 ? 's' : ''} attached inside it, byte for byte. The
-                attachment is what a validator needs — this certificate never altered it.
+                Names {chosen} signator{chosen === 1 ? 'y' : 'ies'}; the signed
+                document{draft.sources.length > 1 ? 's are' : ' is'} attached unchanged.
               </p>
 
               <div class="success-actions">
@@ -459,14 +439,13 @@
             </div>
 
             <div class="notice warn">
-              <strong>Save it now — xNotary is not keeping a copy.</strong>
-              This certificate exists only in this browser tab: no xNotary backend, and nothing
-              written to this device. Close the tab and it is gone.
               {#if saved}
-                Saved — keep it somewhere you back up, it is the only copy.
+                <strong>Saved.</strong> Keep it somewhere you back up — it is the only copy.
               {:else}
-                Nothing is lost if you do: it rebuilds identically from the same signed
-                {draft.sources.length > 1 ? 'files' : 'file'} at any time.
+                <strong>Save it now</strong> — it exists only in this tab.<Info
+                  >Nothing is stored, here or anywhere. If it is lost, it rebuilds identically from
+                  the same signed {draft.sources.length > 1 ? 'files' : 'file'}.</Info
+                >
               {/if}
             </div>
 
@@ -479,26 +458,6 @@
           </div>
         {/if}
       </div>
-
-      <aside class="side-card">
-        <h3>Before you name anyone</h3>
-        <p>
-          A signature in a document is not consent to be listed in a new one — nobody appears until
-          you say so. Leaving someone off keeps them off the overview page; it does not remove them
-          from the signed file the certificate attaches.
-        </p>
-        <div class="side-list">
-          <div>Signatures are read, never collected</div>
-          <div>Your signing key never touches xNotary</div>
-          <div>The signed file is attached, not modified — names included</div>
-          <div>Claims are reported; no legal verdict is given</div>
-        </div>
-        <p style="margin-top:17px">
-          Not sure where a signature comes from?
-          <button class="link-button" onclick={() => go('help')}>How it works</button> lists what counts
-          in the EU, and what does not.
-        </p>
-      </aside>
     </div>
   </div>
 </section>

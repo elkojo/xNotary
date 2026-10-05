@@ -22,6 +22,16 @@
  * the relay, not to the authority whose name is on the token. What the relay
  * can see is a 32-byte digest, the time, and the address it came from. It
  * cannot see the document, and the digest cannot be turned back into one.
+ *
+ * "Qualified" in a note is a fact checked, not a name read. On 2026-10-05 a
+ * token from each of the last three entries was matched, by key, against a
+ * granted TSA/QTST service on its country's EU trust list. The first four
+ * failed the same check: the relay reaches Sectigo's public UK signer, not its
+ * qualified Spanish one, and GlobalSign's AATL signer, not its qualified one.
+ * Sectigo's qualified service, and every other qualified authority tried
+ * (Docusign France, Evrotrust, ACCV, Ministero della Difesa, SK ID Solutions
+ * for RIA), answers no preflight and is absent from the relay. Re-check
+ * before adding to this list: a relay path can change without notice.
  */
 
 export interface Authority {
@@ -31,7 +41,11 @@ export interface Authority {
   readonly signedBy: string;
   readonly url: string;
   /**
-   * Whether the signing certificate chains to a root Adobe Acrobat trusts.
+   * Whether the signing certificate chains to a root Adobe Acrobat trusts by
+   * default: one on the Adobe Approved Trust List, or a qualified service on
+   * the EU trust lists, which Acrobat also loads unless told not to. Checked
+   * against the lists themselves, not against what a relay says about them —
+   * the ai.moda relay marks Izenpe as on the AATL, and it is not.
    *
    * It decides what the reader is told to expect when they open the result: a
    * timestamp Acrobat validates, or one it reports as being of unknown origin
@@ -42,6 +56,30 @@ export interface Authority {
 }
 
 export const AUTHORITIES: readonly Authority[] = [
+  {
+    id: 'izenpe',
+    name: 'Izenpe (Spain)',
+    signedBy: 'Izenpe',
+    url: 'https://rfc3161.ai.moda/izenpe',
+    adobeTrusted: true,
+    note: 'A qualified electronic timestamp under eIDAS, issued by Izenpe, the Basque Government’s certification authority. Reached through the ai.moda relay. Acrobat recognises the signer through the EU trust list.',
+  },
+  {
+    id: 'cartao-de-cidadao',
+    name: 'Cartão de Cidadão (Portugal)',
+    signedBy: 'Cartão de Cidadão',
+    url: 'https://rfc3161.ai.moda/instituto-dos-registos-e-do-notariado-i.p.',
+    adobeTrusted: true,
+    note: 'A qualified electronic timestamp under eIDAS, issued by the Instituto dos Registos e do Notariado. Fair use: at most 20 requests in 20 minutes. Reached through the ai.moda relay. Acrobat recognises the signer through the EU trust list.',
+  },
+  {
+    id: 'aped',
+    name: 'APED (Greece)',
+    signedBy: 'APED',
+    url: 'https://rfc3161.ai.moda/aped',
+    adobeTrusted: true,
+    note: 'A qualified electronic timestamp under eIDAS, issued by the Hellenic Public Administration Certification Authority. Reached through the ai.moda relay. Acrobat recognises the signer through the EU trust list.',
+  },
   {
     id: 'digicert',
     name: 'DigiCert',
@@ -76,7 +114,7 @@ export const AUTHORITIES: readonly Authority[] = [
   },
 ];
 
-export const DEFAULT_AUTHORITY_ID = 'digicert';
+export const DEFAULT_AUTHORITY_ID = 'izenpe';
 
 export function authorityById(id: string): Authority | undefined {
   return AUTHORITIES.find((authority) => authority.id === id);

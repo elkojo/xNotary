@@ -33,6 +33,13 @@
 # xsignature/app/hosts-in-build.txt. PDF.js runs in a worker loaded from this
 # origin, and previews and downloads are blob: URLs.
 #
+# For /xconvert/*, connect-src is 'self' alone: xConvert converts on the device and
+# talks to nobody. It fetches its own converters (pandoc.wasm, our Typst wrapper,
+# fonts) from this origin and nothing else. It is the only path that adds
+# 'wasm-unsafe-eval' to script-src, which lets the page compile WebAssembly and
+# nothing more — JavaScript eval stays forbidden. The wasm-bindgen glue that would
+# have needed 'unsafe-eval' was designed out (docs/xconvert-spike.md).
+#
 # 'unsafe-inline' in style-src is load-bearing: Svelte emits style attributes
 # (`style="margin:16px 0 0"`), and CSP counts those as inline styles. There is
 # no matching allowance for script-src and there must not be.
@@ -51,3 +58,7 @@
 /xsignature/*
   ! Content-Security-Policy
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https:; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'
+
+/xconvert/*
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'

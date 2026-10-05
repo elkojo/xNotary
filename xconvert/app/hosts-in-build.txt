@@ -1,0 +1,17 @@
+# Every host that may appear in xConvert's build, and why.
+#
+# xConvert makes no network request at all: it converts on the device, and fetches
+# its converters from its own origin. The build is scanned for every host it
+# mentions and anything not written down here fails CI — so a dependency that
+# starts phoning home, or a CDN URL someone pastes in, is noticed. None of the
+# hosts below is ever contacted by the app.
+
+# --- Links the reader may follow (footer) -----------------------------------
+pandoc.org          # the converter it is built on
+typst.app           # the typesetter it is built on
+www.gnu.org         # the AGPL-3.0 text
+github.com          # #/licences: the source of this build, and pandoc 3.12's
+
+# --- Never fetched: namespaces and library strings --------------------------
+www.w3.org          # SVG and XML namespaces in Svelte's runtime
+svelte.dev          # Svelte's error messages link to its docs

@@ -312,13 +312,6 @@
   overflow-wrap: anywhere;
 }
 
-.side-foot {
-  margin: 14px 0 0;
-  color: var(--ink-soft);
-  font-size: 12.5px;
-  line-height: 1.55;
-}
-
 /* The signature brought in from the other screen, shown as it will be placed. */
 .signature-preview {
   display: grid;

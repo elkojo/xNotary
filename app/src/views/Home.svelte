@@ -12,10 +12,7 @@
     <div class="hero">
       <div class="eyebrow">Independent document evidence</div>
       <h1>Make any document provable.</h1>
-      <p>
-        Create a portable record of what existed, when, and who signed it. Your document stays with
-        you, it is read in this browser and never sent anywhere.
-      </p>
+      <p>Prove what existed, when, and who signed it. Your document never leaves this browser.</p>
       <div class="hero-actions">
         <button class="button primary" onclick={() => go('notarize')}>
           Timestamp a document →
@@ -31,28 +28,19 @@
         <span class="service-number">01</span>
         <span class="service-arrow" aria-hidden="true">↗</span>
         <h2>Timestamp</h2>
-        <p>
-          Prove that an exact file existed no later than a particular Bitcoin block. Only its
-          32-byte fingerprint is ever sent.
-        </p>
+        <p>Prove an exact file existed by a given Bitcoin block.</p>
       </button>
       <button class="service-card" onclick={() => go('attest')}>
         <span class="service-number">02</span>
         <span class="service-arrow" aria-hidden="true">↗</span>
         <h2>Certify signers</h2>
-        <p>
-          Sign in your own tool, with a provider you already trust, then bring the signed file back
-          here to record who signed the exact document.
-        </p>
+        <p>Record who signed, from files signed in your own tool.</p>
       </button>
       <button class="service-card" onclick={() => go('verify')}>
         <span class="service-number">03</span>
         <span class="service-arrow" aria-hidden="true">↗</span>
         <h2>Verify proof</h2>
-        <p>
-          Check a document against its certificate and its Bitcoin anchor — here, or with the
-          reference client and no xNotary at all.
-        </p>
+        <p>Check a document against its certificate — here or without xNotary.</p>
       </button>
     </div>
 
@@ -61,20 +49,6 @@
       <span>No account</span>
       <span>No xNotary backend</span>
       <span>Open verification</span>
-    </div>
-
-    <!--
-      Direction, not capability. The wording has to survive a reader who arrives
-      at it cold: nothing on this strip describes something the app does today,
-      and it says so rather than relying on the tense to carry it.
-    -->
-    <div class="future-note">
-      <p>
-        <strong>Proof for people today. Verifiable authority for software tomorrow.</strong><br />
-        The same evidence layer could carry remote multiparty agreements, and contracts between
-        authorised software agents.
-      </p>
-      <span>Our direction</span>
     </div>
   </div>
 </section>
