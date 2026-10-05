@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Stepper from '../site/Stepper.svelte';
   /**
    * "Timestamp" — Certificate 1, in three steps: choose the file, look at what
    * is about to be published, create the proof.
@@ -152,15 +153,7 @@
 
     <div class="flow-shell">
       <div class="flow-main">
-        <div class="stepper">
-          <button class="step" class:active={step === 1} class:done={step > 1} disabled>
-            1 Choose file
-          </button>
-          <button class="step" class:active={step === 2} class:done={step > 2} disabled>
-            2 Review
-          </button>
-          <button class="step" class:active={step === 3} disabled>3 Certificate</button>
-        </div>
+        <Stepper steps={['Choose file', 'Review', 'Certificate']} current={step} />
 
         {#if step === 1}
           <div class="flow-panel">
@@ -173,12 +166,12 @@
             />
 
             {#if phase === 'hashing'}
-              <div class="progress"><div style="width:{hashProgress * 100}%"></div></div>
-              <p class="field-help">Hashing… {Math.round(hashProgress * 100)}%</p>
+              <div class="progress"><div style="transform:scaleX({hashProgress})"></div></div>
+              <p class="field-help" role="status">Hashing… {Math.round(hashProgress * 100)}%</p>
             {/if}
 
             {#if error}
-              <div class="notice bad"><strong>Could not read that file.</strong> {error}</div>
+              <div class="notice bad" role="alert"><strong>Could not read that file.</strong> {error}</div>
             {/if}
           </div>
         {:else if step === 2}
@@ -225,10 +218,13 @@
                     ? 'Building certificate…'
                     : 'Create Certificate 1'}
               </button>
+              <span class="visually-hidden" role="status"
+                >{phase === 'stamping' ? 'Submitting to calendars…' : phase === 'building' ? 'Building certificate…' : ''}</span
+              >
             </div>
 
             {#if error}
-              <div class="notice bad">
+              <div class="notice bad" role="alert">
                 <strong>Could not create the certificate.</strong>
                 {error}
               </div>

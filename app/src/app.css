@@ -866,7 +866,9 @@ footer.site :focus-visible {
 .stepper {
   display: flex;
   gap: 0;
+  margin: 0;
   padding: 0 30px;
+  list-style: none;
   border-bottom: 1px solid var(--line-dark);
 }
 
@@ -877,6 +879,7 @@ footer.site :focus-visible {
   border: 0;
   color: var(--step-fg);
   background: transparent;
+  padding-right: 12px;
   text-align: left;
   font-size: 11px;
   font-weight: 730;
@@ -884,9 +887,6 @@ footer.site :focus-visible {
   text-transform: uppercase;
 }
 
-.step:disabled {
-  cursor: default;
-}
 .step.active {
   color: var(--ink);
 }
@@ -902,6 +902,22 @@ footer.site :focus-visible {
   height: 2px;
   content: '';
   background: var(--green);
+}
+
+/* A panel heading takes focus when its step opens (Stepper.svelte); it is not a
+   control, so it needs no ring. */
+.flow-panel h2[tabindex='-1']:focus {
+  outline: none;
+}
+
+/* Read aloud, not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /*
@@ -1660,6 +1676,11 @@ details.explain > div {
   line-height: 1.6;
 }
 
+/* Help answers run the width of the page; a line that long is hard to follow. */
+details.explain > div > * {
+  max-width: 72ch;
+}
+
 /* A list of foldable examples: these summaries are headings, not asides. */
 .case-list {
   display: grid;
@@ -1722,7 +1743,8 @@ details.raw pre {
 .progress > div {
   height: 100%;
   background: var(--green);
-  transition: width 0.15s linear;
+  transform-origin: left;
+  transition: transform 0.15s linear;
 }
 
 .spinner {
