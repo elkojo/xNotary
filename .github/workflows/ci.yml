@@ -127,6 +127,12 @@ jobs:
           done < <(find ../xsignature/app/src -name '*.ttf')
           test "$found" -gt 0 || { echo '::error::no bundled fonts found — has the layout moved?'; exit 1; }
           echo "$found bundled fonts, each with its licence"
+          # The site's own text face, shared by every service.
+          test -f src/site/fonts/InterVariable.woff2 && test -f src/site/fonts/OFL.txt \
+            || { echo '::error::src/site/fonts/ lost InterVariable.woff2 or its OFL.txt'; exit 1; }
+          for service in . xnotary xsignature xconvert; do
+            grep -q 'Inter' dist/$service/THIRD-PARTY.* || { echo "::error::dist/$service's notices do not name Inter"; exit 1; }
+          done
 
       - name: Check the certificate proof stayed self-contained
         # Cheap guard on principle 3: a Certificate 1 must carry its own proof.

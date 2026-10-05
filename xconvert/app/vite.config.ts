@@ -1,3 +1,4 @@
+import { fontNoticeText } from '../../app/src/site/fonts/notice';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -81,7 +82,7 @@ New Computer Modern Math (GUST Font License), from typst-assets v0.15.0
 vendor/fonts/; their licences: vendor/licences/fonts-NOTICE.txt
 They are embedded, subset, in the PDFs xConvert writes.
 
-${js.join('\n\n')}
+${[fontNoticeText(rule), ...js].join('\n\n')}
 `,
       });
     },
@@ -113,7 +114,7 @@ function serviceWorker(): Plugin {
       for (const file of walk(vendorDir).sort()) digest.update(file.slice(vendorDir.length)).update(readFileSync(file));
       const shell = [
         base,
-        ...Object.keys(bundle).filter((f) => /\.(js|css|html|svg|txt)$/.test(f) && f !== 'sw.js').map((f) => base + f),
+        ...Object.keys(bundle).filter((f) => /\.(js|css|html|svg|txt|woff2)$/.test(f) && f !== 'sw.js').map((f) => base + f),
         `${base}licences/pandoc-wasm-loader-MIT.txt`,
       ];
       this.emitFile({
