@@ -109,6 +109,7 @@ try {
   const pending = new Map();
   const problems = [];
   let workers = 0;
+  let fileChoosers = 0;
   ws.on('message', (raw) => {
     const m = JSON.parse(raw);
     if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
@@ -119,6 +120,7 @@ try {
       }
       workers += 1;
     }
+    if (m.method === 'Page.fileChooserOpened') fileChoosers += 1;
     if (m.method === 'Runtime.exceptionThrown') problems.push(`exception: ${m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text}`);
     if (m.method === 'Log.entryAdded' && /Content Security Policy|Refused to/i.test(m.params.entry.text)) problems.push(`csp: ${m.params.entry.text}`);
     if (m.method === 'Network.requestWillBeSent') {
@@ -164,6 +166,23 @@ try {
   await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
   await send('Page.navigate', { url: BASE });
   check('the page loads', await waitFor(`document.body.innerText.includes('Drop a document here')`, 15000));
+
+  // 0. A real click on the drop zone opens the file chooser. It once opened an ⓘ bubble instead:
+  //    a click on a <label> goes to its first control, and the ⓘ button came before the input.
+  await send('Page.setInterceptFileChooserDialog', { enabled: true });
+  // Up to three real clicks: a slow runner may still be settling the page after load.
+  let hit = '';
+  for (let attempt = 0; attempt < 3 && !fileChoosers; attempt++) {
+    const zone = await ev(`(() => { const z = document.querySelector('.dropzone'); z.scrollIntoView({ block: 'center' });
+      const r = z.getBoundingClientRect(); const x = r.x + r.width / 2, y = r.y + r.height / 2;
+      const e = document.elementFromPoint(x, y); return { x, y, hit: e ? e.tagName + '.' + [...e.classList].join('.') : 'nothing' }; })()`);
+    hit = zone.hit;
+    for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: zone.x, y: zone.y, button: 'left', clickCount: 1 });
+    for (let i = 0; i < 20 && !fileChoosers; i++) await sleep(100);
+  }
+  check('clicking the drop zone opens the file chooser', fileChoosers > 0, fileChoosers ? '' : `under the pointer: ${hit}`);
+  check('…and pins no ⓘ bubble', !(await ev(`!!document.querySelector('.info-mark[aria-expanded=true]')`)));
+  await send('Page.setInterceptFileChooserDialog', { enabled: false });
 
   // 1. DOCX → PDF/A
   await pick('smlouva.docx');

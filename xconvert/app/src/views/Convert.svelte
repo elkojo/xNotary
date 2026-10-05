@@ -138,7 +138,13 @@
           </div>
         {:else if step === 1}
           <div class="flow-panel">
-            <h2 class="panel-title">Choose a document</h2>
+            <!-- The ⓘ sits in the title, not in the drop zone: a click on a <label> goes to its
+                 first control, and a button inside it would take the click from the file input. -->
+            <h2 class="panel-title">
+              Choose a document<Info
+                >Images a Markdown or HTML file refers to can be dropped with it, in one go.</Info
+              >
+            </h2>
 
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <label
@@ -156,14 +162,9 @@
               }}
             >
               <div>
-                <span class="file-icon" aria-hidden="true">⇄</span>
+                <div class="file-icon" aria-hidden="true">DOC</div>
                 <strong>Drop a document here</strong>
-                <p>
-                  {readable}<Info
-                    >Images a Markdown or HTML file refers to can be dropped with it, in one go.</Info
-                  >
-                </p>
-                <span class="button dark small">Choose a file</span>
+                <div class="drop-hint">or click to choose one — {readable}</div>
               </div>
               <input type="file" multiple onchange={(event) => take(event.currentTarget.files)} />
             </label>
