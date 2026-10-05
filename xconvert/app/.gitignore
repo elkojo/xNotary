@@ -1,0 +1,5 @@
+node_modules/
+dist/
+# Fetched and built by scripts/vendor.sh: far too large for git, and pinned there by checksum.
+public/vendor/
+.vendor-cache/

@@ -1,0 +1,14 @@
+/*
+ * Styling that belongs to xConvert's shell rather than to the family. The family's
+ * stylesheet is xNotary's app/src/app.css, imported as it is.
+ */
+:root {
+  --site-version: #a8a08a;
+}
+
+/* As on xSignature: a fact for whoever checks which build is live, so quieter than prose. */
+.site-version {
+  margin-top: 14px;
+  color: var(--site-version);
+  font-variant-numeric: tabular-nums;
+}

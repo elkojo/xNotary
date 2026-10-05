@@ -1,5 +1,6 @@
 import { NAV } from '../nav';
 import { NAV as XSIGNATURE_NAV } from '../../../xsignature/app/src/nav';
+import { NAV as XCONVERT_NAV } from '../../../xconvert/app/src/nav';
 
 /**
  * The xNotary.digital family, as the shared bar, the task menu and the front
@@ -11,7 +12,7 @@ import { NAV as XSIGNATURE_NAV } from '../../../xsignature/app/src/nav';
  * than pretending to be part of the site. Each service's tabs are its own
  * routing table, imported, so a renamed screen cannot leave a stale label here.
  */
-export type ServiceId = 'xnotary' | 'xsignature';
+export type ServiceId = 'xnotary' | 'xsignature' | 'xconvert';
 
 export interface Service {
   readonly id: ServiceId;
@@ -50,6 +51,19 @@ export const SERVICES: readonly Service[] = [
       'electronic signature with a qualified timestamp.',
     tabs: XSIGNATURE_NAV,
   },
+  {
+    id: 'xconvert',
+    name: 'xConvert',
+    mark: 'xC',
+    href: '/xconvert/',
+    external: false,
+    home: 'convert',
+    tagline: 'Convert a document to PDF/A, DOCX, ODT and more.',
+    description:
+      'Convert a document between DOCX, ODT, HTML, Markdown and more — or to an archival PDF/A, ' +
+      'ready to sign or timestamp.',
+    tabs: XCONVERT_NAV,
+  },
 ];
 
 /** What people come to do, each pointing at the screen that does it. */
@@ -59,8 +73,9 @@ export const TASKS: ReadonlyArray<{
   readonly title: string;
   readonly description: string;
 }> = [
+  { service: 'xconvert', page: 'convert', title: 'Convert a document', description: 'To an archival PDF/A, DOCX, ODT and more.' },
   { service: 'xnotary', page: 'notarize', title: 'Prove a file existed', description: 'A Bitcoin-anchored timestamp of the exact file.' },
-  { service: 'xsignature', page: 'document', title: 'Sign a PDF',description: 'Place your signature, sign with your certificate and a qualified timestamp.' },
+  { service: 'xsignature', page: 'document', title: 'Sign a PDF', description: 'Place your signature, sign with your certificate and a qualified timestamp.' },
   { service: 'xnotary', page: 'attest', title: 'Record who signed', description: 'Certify the signers of a file that was signed elsewhere.' },
   { service: 'xsignature', page: 'signature', title: 'Make a signature image', description: 'Type or draw it; export PNG or SVG.' },
   { service: 'xnotary', page: 'verify', title: 'Verify an xNotary proof', description: 'Match a document to its xNotary certificate.' },
