@@ -123,7 +123,7 @@ describe('convert', () => {
       const typst = fakeTypst({ ok: true, pdf });
       const result = await convert(request({ to: 'pdf', paper: 'letter' }), pandoc, typst.typst);
 
-      expect(calls[0].options).toMatchObject({ to: 'typst', standalone: true, 'extract-media': 'media', variables: { papersize: 'letter' } });
+      expect(calls[0].options).toMatchObject({ to: 'typst', standalone: true, 'extract-media': 'media', variables: { papersize: 'us-letter' } });
       // Images Typst cannot draw are replaced by a note before they can stop the PDF.
       expect(calls[0].options.filters).toEqual(['xconvert-undrawable.lua']);
       expect(new TextDecoder().decode(calls[0].files['xconvert-undrawable.lua'])).toContain('function Image');

@@ -96,6 +96,9 @@ export function defaultPaper(locale: string): Paper {
     : 'a4';
 }
 
+/** Typst's own names for the sizes: it knows Letter only as `us-letter`, and rejects `letter`. */
+const TYPST_PAPER: Record<Paper, string> = { a4: 'a4', letter: 'us-letter' };
+
 const DEFAULTS_FILE = 'xconvert-defaults.yaml';
 const UNDRAWABLE_FILE = 'xconvert-undrawable.lua';
 const OUTPUT_FILE = 'output';
@@ -127,7 +130,7 @@ export async function convert(
       'metadata-files': [DEFAULTS_FILE],
       standalone: toPdf || STANDALONE.has(writer),
       // For PDF: images Typst cannot draw become a visible note (undrawable.lua).
-      ...(toPdf ? { 'extract-media': 'media', variables: { papersize: request.paper }, filters: [UNDRAWABLE_FILE] } : {}),
+      ...(toPdf ? { 'extract-media': 'media', variables: { papersize: TYPST_PAPER[request.paper] }, filters: [UNDRAWABLE_FILE] } : {}),
     },
     files,
   );

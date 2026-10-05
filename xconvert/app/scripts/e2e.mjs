@@ -173,6 +173,9 @@ try {
   check('"Show all formats" lists pandoc’s own', await waitFor(`(document.querySelector('.all-formats')?.options.length ?? 0) > 40`, 60000),
     `${await ev(`document.querySelector('.all-formats')?.options.length ?? 0`)} formats`);
   await ev(`(() => { const s = document.querySelector('.all-formats'); s.value = 'pdf'; s.dispatchEvent(new Event('change')); })()`);
+  // Both paper sizes are chosen explicitly: the default follows the locale, which differs
+  // between this machine and a CI runner, and Letter once failed only on the runner.
+  check('the paper size can be chosen', await click('A4'));
   await click('Convert to PDF/A');
   check('DOCX converts to PDF', await waitFor(`document.body.innerText.includes('Converted')`, 90000), (await text()).match(/Details[\s\S]{0,300}/)?.[0] ?? '');
   let before = readdirSync(downloads);
@@ -183,6 +186,7 @@ try {
     const pdf = readFileSync(file).toString('latin1');
     check('it is a PDF declaring PDF/A-2b', pdf.startsWith('%PDF-') && pdf.includes('<pdfaid:part>2</pdfaid:part>') && pdf.includes('<pdfaid:conformance>B</pdfaid:conformance>'));
     if (hasPdftotext) {
+      check('it is A4', /Page size:\s+595\.\d+ x 841\.\d+/.test(execFileSync('pdfinfo', [file]).toString()));
       check('the Czech text survives', execFileSync('pdftotext', [file, '-']).toString().includes('Řehořem Čížkem'));
     } else {
       console.log('SKIP  text extraction — pdftotext (poppler-utils) is not installed');
@@ -234,6 +238,7 @@ try {
   await waitFor(`document.body.innerText.includes('Convert to')`, 5000);
   // The screen keeps the last format chosen (Word, above); choose PDF/A again.
   await ev(`[...document.querySelectorAll('.choice')].find((b) => b.textContent.includes('PDF/A')).click()`);
+  await click('Letter');
   await click('Convert to PDF/A');
   check('a document with a WMF drawing still converts to PDF', await waitFor(`document.body.innerText.includes('Converted')`, 60000),
     await ev(`(document.querySelector('details.raw pre')?.textContent ?? document.querySelector('.flow-panel')?.innerText ?? '').slice(0, 600)`));
@@ -244,6 +249,7 @@ try {
   file = await nextDownload(before);
   if (file && hasPdftotext) {
     const words = execFileSync('pdftotext', [file, '-']).toString();
+    check('it is Letter', /Page size:\s+612 x 792/.test(execFileSync('pdfinfo', [file]).toString()));
     check('the PDF says where the image was, and keeps the PNG', words.includes('[Image not shown: WMF') && words.includes('Za obrázkem'));
   }
   if (file && verapdf) {
