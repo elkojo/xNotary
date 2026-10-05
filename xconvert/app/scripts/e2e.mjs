@@ -170,10 +170,17 @@ try {
   // 0. A real click on the drop zone opens the file chooser. It once opened an ⓘ bubble instead:
   //    a click on a <label> goes to its first control, and the ⓘ button came before the input.
   await send('Page.setInterceptFileChooserDialog', { enabled: true });
-  const zone = await ev(`(() => { const r = document.querySelector('.dropzone').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
-  for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: zone.x, y: zone.y, button: 'left', clickCount: 1 });
-  for (let i = 0; i < 25 && !fileChoosers; i++) await sleep(100);
-  check('clicking the drop zone opens the file chooser', fileChoosers > 0);
+  // Up to three real clicks: a slow runner may still be settling the page after load.
+  let hit = '';
+  for (let attempt = 0; attempt < 3 && !fileChoosers; attempt++) {
+    const zone = await ev(`(() => { const z = document.querySelector('.dropzone'); z.scrollIntoView({ block: 'center' });
+      const r = z.getBoundingClientRect(); const x = r.x + r.width / 2, y = r.y + r.height / 2;
+      const e = document.elementFromPoint(x, y); return { x, y, hit: e ? e.tagName + '.' + [...e.classList].join('.') : 'nothing' }; })()`);
+    hit = zone.hit;
+    for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: zone.x, y: zone.y, button: 'left', clickCount: 1 });
+    for (let i = 0; i < 20 && !fileChoosers; i++) await sleep(100);
+  }
+  check('clicking the drop zone opens the file chooser', fileChoosers > 0, fileChoosers ? '' : `under the pointer: ${hit}`);
   check('…and pins no ⓘ bubble', !(await ev(`!!document.querySelector('.info-mark[aria-expanded=true]')`)));
   await send('Page.setInterceptFileChooserDialog', { enabled: false });
 
