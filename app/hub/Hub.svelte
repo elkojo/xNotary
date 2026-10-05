@@ -80,6 +80,6 @@
     >{#if revisionUrl}, built from
       <a href={revisionUrl} target="_blank" rel="noopener noreferrer"
         ><span class="mono">{revision}</span></a
-    >{/if}. <a href="/xnotary/THIRD-PARTY.txt">Third-party code</a>. Not legal advice.
+    >{/if}.<a href="/THIRD-PARTY.txt">Third-party code</a>. Not legal advice.
   </div>
 </footer>

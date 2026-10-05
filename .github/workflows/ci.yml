@@ -101,6 +101,16 @@ jobs:
         run: npm run verapdf:install --prefix ../xconvert/app
       - name: xConvert end-to-end in Chrome
         run: REQUIRE_VERAPDF=1 npm run e2e --prefix ../xconvert/app
+      - name: Check every service's notices are where the front page's index says
+        # /THIRD-PARTY.txt is generated from the service registry; each service must
+        # actually ship the file it is listed with.
+        run: |
+          paths=$(grep -oE '^  [A-Za-z]+ +(/[^ ]+)$' dist/THIRD-PARTY.txt | awk '{print $2}')
+          test -n "$paths" || { echo '::error::dist/THIRD-PARTY.txt lists no services'; exit 1; }
+          for path in $paths; do
+            test -s "dist$path" || { echo "::error::the notices index names $path, which is not in the build"; exit 1; }
+          done
+          echo "every service's notices are in the build: $(echo $paths)"
       - name: Check no file is over Cloudflare Pages' 25 MiB limit
         run: |
           big=$(find dist -type f -size +25M)

@@ -24,6 +24,8 @@ export interface Service {
   readonly tagline: string;
   readonly description: string;
   readonly tabs: ReadonlyArray<{ readonly id: string; readonly label: string }>;
+  /** Its third-party notices, relative to `href`. The front page's index lists them all. */
+  readonly notices: string;
 }
 
 export const SERVICES: readonly Service[] = [
@@ -37,6 +39,7 @@ export const SERVICES: readonly Service[] = [
     tagline: 'Timestamp a document in Bitcoin and certify who signed it.',
     description: 'Prove an exact file existed by a given Bitcoin block, and record who signed it.',
     tabs: NAV,
+    notices: 'THIRD-PARTY.txt',
   },
   {
     id: 'xsignature',
@@ -50,6 +53,7 @@ export const SERVICES: readonly Service[] = [
       'Make a signature, put it on a PDF. Sign with your own certificate to produce an advanced ' +
       'electronic signature with a qualified timestamp.',
     tabs: XSIGNATURE_NAV,
+    notices: 'THIRD-PARTY.md',
   },
   {
     id: 'xconvert',
@@ -63,6 +67,7 @@ export const SERVICES: readonly Service[] = [
       'Convert a document between DOCX, ODT, HTML, Markdown and more — or to an archival PDF/A, ' +
       'ready to sign or timestamp.',
     tabs: XCONVERT_NAV,
+    notices: 'THIRD-PARTY.txt',
   },
 ];
 
