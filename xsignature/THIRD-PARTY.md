@@ -113,6 +113,16 @@ that nothing enumerating the signature faces can reach them. Each is a separate
 asset fetched only when a document actually needs it: a memo with nothing
 emphasised never downloads the italic.
 
+### The pages' own text face
+
+The site's pages are set in **Inter 4.1** (Copyright 2016 The Inter Project Authors, OFL-1.1),
+served from this site as one variable WOFF2. It is shared by every service on xNotary.digital
+and lives in the main app, with its licence beside it, at
+`app/src/site/fonts/InterVariable.woff2` and `OFL.txt` in the repository. It is a subset
+(Latin through Extended-B plus punctuation and symbols, optical size pinned to text) and
+declares no Reserved Font Name, so the same reasoning as above applies. It is a different file
+from the static Inter subsets above, which are embedded in signed PDFs.
+
 A font whose licence has not been read is never added: `npm run fonts:vendor`
 refuses to bundle a file whose
 accompanying licence is not the OFL, which is what caught these packages

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Stepper from '../site/Stepper.svelte';
   /**
    * "Signatures" — Certificate 2, in three steps: bring the signed files,
    * choose who may be named, issue the certificate.
@@ -163,7 +164,7 @@
   <div class="workspace">
     <div class="page-head">
       <div>
-        <h1>Attest signatures</h1>
+        <h1>Certify signers</h1>
       </div>
       <span class="secure-note"
         >Read in this browser<Info more="#/help/keeps"
@@ -174,15 +175,7 @@
 
     <div class="flow-shell">
       <div class="flow-main">
-        <div class="stepper">
-          <button class="step" class:active={step === 1} class:done={step > 1} disabled>
-            1 Signed files
-          </button>
-          <button class="step" class:active={step === 2} class:done={step > 2} disabled>
-            2 Who may be named
-          </button>
-          <button class="step" class:active={step === 3} disabled>3 Certificate</button>
-        </div>
+        <Stepper steps={['Signed files', 'Who may be named', 'Certificate']} current={step} />
 
         {#if step === 1}
           <div class="flow-panel">
@@ -224,11 +217,11 @@ hint="Its Certificate 1 or proof.ots"
 
 
             {#if busy}
-              <div class="notice"><span class="spinner"></span> Reading signatures…</div>
+              <div class="notice" role="status"><span class="spinner"></span> Reading signatures…</div>
             {/if}
 
             {#if error}
-              <div class="notice bad">{error}</div>
+              <div class="notice bad" role="alert">{error}</div>
             {/if}
 
             <p class="field-help asks">
@@ -277,7 +270,7 @@ hint="Its Certificate 1 or proof.ots"
             </div>
 
             {#if draft.agreement.kind === 'differs'}
-              <div class="notice bad">
+              <div class="notice bad" role="alert">
                 <strong>These are not signatures over the same document.</strong>
                 {draft.agreement.detail} They cannot share a certificate.
               </div>
@@ -325,7 +318,7 @@ hint="Its Certificate 1 or proof.ots"
             {/if}
 
             {#if draft.errors.length > 0}
-              <div class="notice bad">
+              <div class="notice bad" role="alert">
                 {draft.errors.length} signature{draft.errors.length === 1 ? '' : 's'} could not be read
                 and cannot appear on the certificate:
                 <ul>
@@ -399,7 +392,7 @@ hint="Its Certificate 1 or proof.ots"
 
 
             {#if error}
-              <div class="notice bad">{error}</div>
+              <div class="notice bad" role="alert">{error}</div>
             {/if}
 
             <div class="flow-actions">

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Stepper from '../site/Stepper.svelte';
   /**
    * "Timestamp" — Certificate 1, in three steps: choose the file, look at what
    * is about to be published, create the proof.
@@ -140,7 +141,7 @@
   <div class="workspace">
     <div class="page-head">
       <div>
-        <h1>Timestamp a document</h1>
+        <h1>Timestamp a document on Bitcoin</h1>
       </div>
       <span class="secure-note"
         >Processed in this browser<Info more="#/help/keeps"
@@ -152,15 +153,7 @@
 
     <div class="flow-shell">
       <div class="flow-main">
-        <div class="stepper">
-          <button class="step" class:active={step === 1} class:done={step > 1} disabled>
-            1 Choose file
-          </button>
-          <button class="step" class:active={step === 2} class:done={step > 2} disabled>
-            2 Review
-          </button>
-          <button class="step" class:active={step === 3} disabled>3 Certificate</button>
-        </div>
+        <Stepper steps={['Choose file', 'Review', 'Certificate']} current={step} />
 
         {#if step === 1}
           <div class="flow-panel">
@@ -173,12 +166,12 @@
             />
 
             {#if phase === 'hashing'}
-              <div class="progress"><div style="width:{hashProgress * 100}%"></div></div>
-              <p class="field-help">Hashing… {Math.round(hashProgress * 100)}%</p>
+              <div class="progress"><div style="transform:scaleX({hashProgress})"></div></div>
+              <p class="field-help" role="status">Hashing… {Math.round(hashProgress * 100)}%</p>
             {/if}
 
             {#if error}
-              <div class="notice bad"><strong>Could not read that file.</strong> {error}</div>
+              <div class="notice bad" role="alert"><strong>Could not read that file.</strong> {error}</div>
             {/if}
           </div>
         {:else if step === 2}
@@ -225,10 +218,13 @@
                     ? 'Building certificate…'
                     : 'Create Certificate 1'}
               </button>
+              <span class="visually-hidden" role="status"
+                >{phase === 'stamping' ? 'Submitting to calendars…' : phase === 'building' ? 'Building certificate…' : ''}</span
+              >
             </div>
 
             {#if error}
-              <div class="notice bad">
+              <div class="notice bad" role="alert">
                 <strong>Could not create the certificate.</strong>
                 {error}
               </div>
@@ -237,8 +233,14 @@
         {:else if result}
           <div class="flow-panel">
             <div class="success">
-              <div class="success-mark" aria-hidden="true">✓</div>
-              <h2>Certificate 1 created</h2>
+              {#if result.status.kind === 'pending'}
+                <!-- No ✓ while pending: it read as finished, and people sent it on. -->
+                <div class="success-mark pending" aria-hidden="true"></div>
+                <h2>Certificate 1 created — waiting for Bitcoin</h2>
+              {:else}
+                <div class="success-mark" aria-hidden="true">✓</div>
+                <h2>Certificate 1 created</h2>
+              {/if}
               {#if result.status.kind === 'confirmed'}
                 <p>
                   Existed no later than <strong>{utcStamp(result.status.blockTime)}</strong>.
@@ -274,6 +276,18 @@
                 {/if}
               </div>
 
+              {#if result.status.kind === 'pending'}
+                <div class="notice warn">
+                  <strong>Not in a Bitcoin block yet.</strong> In a few hours, press <em>Upgrade</em> in
+                  <button class="link-button" onclick={() => go('library')}>My certificates</button
+                  >, in this browser, where it is kept. Save both files now either way.<Info
+                    more="#/help/pending"
+                    >The upgraded certificate states the block's own time and verifies with no
+                    calendar involved.</Info
+                  >
+                </div>
+              {/if}
+
               <div class="success-actions">
                 <button
                   class="button dark"
@@ -296,16 +310,6 @@
               </div>
             </div>
 
-            {#if result.status.kind === 'pending'}
-              <div class="notice warn">
-                <strong>Not in a Bitcoin block yet.</strong> In a few hours, press <em>Upgrade</em> in
-                <button class="link-button" onclick={() => go('library')}>My certificates</button
-                >.<Info more="#/help/pending"
-                  >The upgraded certificate states the block's own time and verifies with no
-                  calendar involved.</Info
-                >
-              </div>
-            {/if}
 
             {#if calendarWarnings.length}
               <div class="notice">

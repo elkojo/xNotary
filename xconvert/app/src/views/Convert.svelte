@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Stepper from '../../../../app/src/site/Stepper.svelte';
   import Info from '../../../../app/src/site/Info.svelte';
   import { defaultPaper, type ConvertResult, type Paper } from '../lib/convert';
   import { ConverterError, convertDocument, formats, preload } from '../lib/converter';
@@ -120,15 +121,11 @@
 
     <div class="flow-shell">
       <div class="flow-main">
-        <div class="stepper">
-          <button class="step" class:active={step === 1} class:done={step > 1} disabled>1 Choose</button>
-          <button class="step" class:active={step === 2} class:done={step > 2} disabled>2 Convert to</button>
-          <button class="step" class:active={step === 3} disabled>3 Save</button>
-        </div>
+        <Stepper steps={['Choose', 'Convert to', 'Save']} current={step} />
 
         {#if !supported}
           <div class="flow-panel">
-            <div class="notice bad">
+            <div class="notice bad" role="alert">
               <strong>This browser cannot run the converter.</strong> Update it, or use a current
               Chrome, Edge, Firefox or Safari (18.4 or later).<Info
                 >pandoc needs WebAssembly exception handling, in every major browser since 2025.
@@ -170,7 +167,7 @@
             </label>
 
             {#if main && !from}
-              <div class="notice bad">
+              <div class="notice bad" role="alert">
                 <strong>{main.name} is not a format xConvert recognises.</strong>
                 {#if main.name.toLowerCase().endsWith('.txt')}Rename it to .md if it is Markdown.<Info
                     >pandoc reads no plain-text format, and reading text as Markdown would turn its
@@ -256,7 +253,7 @@
             {/if}
 
             {#if failure}
-              <div class="notice bad">
+              <div class="notice bad" role="alert">
                 <strong>{failure.message}</strong>
                 <details class="raw"><summary>Details</summary><pre>{failure.detail}</pre></details>
               </div>
@@ -268,6 +265,7 @@
                 {#if busy}<span class="spinner"></span>{/if}
                 {busy ? 'Converting…' : `Convert to ${labelFor(to)}`}
               </button>
+              <span class="visually-hidden" role="status">{busy ? 'Converting…' : ''}</span>
             </div>
           </div>
         {:else if step === 3 && result}

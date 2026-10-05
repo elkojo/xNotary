@@ -1,6 +1,6 @@
 {
   "name": "xnotary",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
@@ -21,7 +21,8 @@
     "spike:cors": "node scripts/cdp-probe.mjs http://localhost:5173/src/spikes/cors-probe.html",
     "e2e": "node scripts/e2e-flow-a.mjs",
     "fixtures:pades": "bash scripts/make-pades-fixture.sh && node scripts/make-pades-fixtures.mjs",
-    "fonts:subset": "node scripts/make-font-subsets.mjs"
+    "fonts:subset": "node scripts/make-font-subsets.mjs",
+    "fonts:inter": "node scripts/make-inter-subset.mjs"
   },
   "dependencies": {
     "@noble/hashes": "^1.5.0",

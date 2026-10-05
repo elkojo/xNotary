@@ -359,17 +359,20 @@ footer.site .family-links a {
   .brand.small .brand-text {
     display: none;
   }
-  /* The tabs take their own scrollable row; the first row keeps
-     brand · switcher · task entry. */
+  /* The tabs take their own row under brand · switcher · task entry, and wrap
+     rather than scroll: a scroller hid "My certificates" and "Help" off the
+     edge with nothing to say they were there. */
   .main-nav {
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    gap: 4px;
   }
   .main-nav:empty {
     display: none;
   }
   .main-nav .nav-link {
     flex: 0 0 auto;
+    height: 34px;
+    padding: 0 12px;
     white-space: nowrap;
   }
   .menu {

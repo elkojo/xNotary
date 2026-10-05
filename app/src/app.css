@@ -214,6 +214,16 @@
   box-sizing: border-box;
 }
 
+/* Inter, subset and served from this site (src/site/fonts/README.md). `swap`: text shows at
+   once in the fallback and changes face when this arrives, rather than staying blank. */
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./site/fonts/InterVariable.woff2') format('woff2');
+}
+
 body {
   margin: 0;
   color: var(--white);
@@ -445,6 +455,7 @@ footer.site :focus-visible {
 }
 
 .info-mark {
+  position: relative;
   display: inline-grid;
   width: 16px;
   height: 16px;
@@ -457,6 +468,13 @@ footer.site :focus-visible {
   cursor: help;
   font: italic 700 10px/1 Georgia, 'Times New Roman', serif;
   opacity: 0.75;
+}
+
+/* The mark stays 16px; the target is 24px, so a thumb can hit it (WCAG 2.5.8). */
+.info-mark::after {
+  position: absolute;
+  inset: -5px;
+  content: '';
 }
 
 .info-mark:hover,
@@ -661,7 +679,7 @@ footer.site :focus-visible {
   font-size: clamp(38px, 7vw, 68px);
   font-weight: 500;
   line-height: 1.02;
-  letter-spacing: -0.052em;
+  letter-spacing: -0.04em;
 }
 
 .hero > p {
@@ -848,7 +866,9 @@ footer.site :focus-visible {
 .stepper {
   display: flex;
   gap: 0;
+  margin: 0;
   padding: 0 30px;
+  list-style: none;
   border-bottom: 1px solid var(--line-dark);
 }
 
@@ -859,6 +879,7 @@ footer.site :focus-visible {
   border: 0;
   color: var(--step-fg);
   background: transparent;
+  padding-right: 12px;
   text-align: left;
   font-size: 11px;
   font-weight: 730;
@@ -866,9 +887,6 @@ footer.site :focus-visible {
   text-transform: uppercase;
 }
 
-.step:disabled {
-  cursor: default;
-}
 .step.active {
   color: var(--ink);
 }
@@ -884,6 +902,22 @@ footer.site :focus-visible {
   height: 2px;
   content: '';
   background: var(--green);
+}
+
+/* A panel heading takes focus when its step opens (Stepper.svelte); it is not a
+   control, so it needs no ring. */
+.flow-panel h2[tabindex='-1']:focus {
+  outline: none;
+}
+
+/* Read aloud, not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /*
@@ -1131,6 +1165,16 @@ footer.site :focus-visible {
   box-shadow: 0 0 0 10px var(--success-halo);
 }
 
+.success .notice {
+  text-align: left;
+}
+
+.success-mark.pending {
+  border: 3px solid var(--ink);
+  background: transparent;
+  box-shadow: 0 0 0 10px var(--well);
+}
+
 .success h2 {
   margin-bottom: 8px;
   font-size: clamp(22px, 3.5vw, 27px);
@@ -1173,7 +1217,7 @@ footer.site :focus-visible {
   align-items: center;
   padding: 5px 9px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 780;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1412,7 +1456,7 @@ footer.site :focus-visible {
   padding: 12px 22px;
   color: var(--table-head-fg);
   background: var(--table-head-bg);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 780;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1433,7 +1477,7 @@ footer.site :focus-visible {
 .doc-hash {
   color: var(--hash-fg);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: 11px;
   overflow-wrap: anywhere;
 }
 
@@ -1642,6 +1686,11 @@ details.explain > div {
   line-height: 1.6;
 }
 
+/* Help answers run the width of the page; a line that long is hard to follow. */
+details.explain > div > * {
+  max-width: 72ch;
+}
+
 /* A list of foldable examples: these summaries are headings, not asides. */
 .case-list {
   display: grid;
@@ -1704,7 +1753,8 @@ details.raw pre {
 .progress > div {
   height: 100%;
   background: var(--green);
-  transition: width 0.15s linear;
+  transform-origin: left;
+  transition: transform 0.15s linear;
 }
 
 .spinner {
@@ -1803,7 +1853,7 @@ footer.site a {
     padding: 0 16px;
   }
   .step {
-    font-size: 10px;
+    font-size: 11px;
   }
   .nav {
     gap: 12px;

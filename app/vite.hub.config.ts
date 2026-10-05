@@ -1,3 +1,4 @@
+import { fontNoticeText } from './src/site/fonts/notice';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
@@ -54,7 +55,7 @@ function noticesIndex(): Plugin {
           `Every service on this site is free software under the AGPL-3.0-or-later. Each lists\n` +
           `the third-party code it ships, with the licences, in its own file:\n\n` +
           SERVICES.map((s) => `  ${s.name.padEnd(width)}  ${s.href}${s.notices}`).join('\n') +
-          `\n\nThe front page itself ships the following.\n\n${own.join('\n\n')}\n`,
+          `\n\nThe front page itself ships the following.\n\n${[...own, fontNoticeText(rule)].join('\n\n')}\n`,
       });
     },
   };

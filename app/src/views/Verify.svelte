@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Stepper from '../site/Stepper.svelte';
   /**
    * "Verify" — the screen a signer uses after receiving a document and a
    * Certificate 1 out of band. It answers two separate questions:
@@ -97,7 +98,7 @@
   <div class="workspace">
     <div class="page-head">
       <div>
-        <h1>Verify a document</h1>
+        <h1>Verify a proof</h1>
       </div>
       <span class="secure-note"
         >Checked in this browser<Info more="#/help/verified"
@@ -109,12 +110,7 @@
 
     <div class="flow-shell">
       <div class="flow-main">
-        <div class="stepper">
-          <button class="step" class:active={step === 1} class:done={step > 1} disabled>
-            1 Add files
-          </button>
-          <button class="step" class:active={step === 2} disabled>2 Result</button>
-        </div>
+        <Stepper steps={['Add files', 'Result']} current={step} />
 
         {#if step === 1}
           <div class="flow-panel">
@@ -146,7 +142,7 @@ hint="The PDF is enough"
             </div>
 
             {#if error}
-              <div class="notice bad">{error}</div>
+              <div class="notice bad" role="alert">{error}</div>
             {/if}
 
             <div class="flow-actions end">
@@ -158,6 +154,7 @@ hint="The PDF is enough"
                 {#if checking}<span class="spinner"></span>{/if}
                 {checking ? 'Checking…' : 'Verify'}
               </button>
+              <span class="visually-hidden" role="status">{checking ? 'Checking…' : ''}</span>
             </div>
           </div>
         {:else if outcome}

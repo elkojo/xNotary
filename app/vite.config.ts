@@ -1,3 +1,4 @@
+import { fontNotice } from './src/site/fonts/notice';
 import { build as esbuildBundle } from 'esbuild';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -192,6 +193,8 @@ function thirdPartyNotices(): Plugin {
           note: 'Subset and embedded in the certificate PDFs this app generates.',
         });
       }
+
+      notices.push(fontNotice());
 
       const rule = '-'.repeat(78);
       const body = notices

@@ -187,6 +187,11 @@ try {
   // 1. DOCX → PDF/A
   await pick('smlouva.docx');
   check('the document is recognised as Word', await waitFor(`document.body.innerText.includes('Word (DOCX)')`, 5000));
+  // The step change is announced: focus moves to the new step's heading, and the
+  // stepper says which step is current (it once was three disabled buttons).
+  check('focus moves to the new step’s heading', await waitFor(`document.activeElement?.matches('.flow-panel h2') ?? false`, 3000),
+    await ev(`document.activeElement?.tagName ?? 'none'`));
+  check('the stepper marks step 2 as current', await ev(`document.querySelector('.stepper [aria-current=step]')?.textContent.trim().startsWith('2') ?? false`));
   check('PDF/A is the default output', await ev(`!!document.querySelector('.choice.selected') && document.querySelector('.choice.selected').textContent.includes('PDF/A')`));
   await click('Show all formats');
   check('"Show all formats" lists pandoc’s own', await waitFor(`(document.querySelector('.all-formats')?.options.length ?? 0) > 40`, 60000),
