@@ -102,8 +102,6 @@ jobs:
         run: npm ci --prefix ../xconvert/app
       - name: Type-check xConvert
         run: npm run typecheck --prefix ../xconvert/app
-      - name: Test xConvert
-        run: npm test --prefix ../xconvert/app
       # xConvert's Typst wrapper is Rust, built here from source. rustup ships on the runner.
       - name: Add the WebAssembly target for xConvert's Typst wrapper
         run: rustup target add wasm32-unknown-unknown
@@ -113,8 +111,15 @@ jobs:
             ~/.cargo/registry
             xconvert/typst-pdf/target
           key: typst-pdf-${{ runner.os }}-${{ hashFiles('xconvert/typst-pdf/Cargo.lock') }}
+      - uses: actions/cache@v4
+        with:
+          path: xconvert/app/.vendor-cache
+          key: xconvert-vendor-${{ hashFiles('xconvert/app/scripts/vendor.sh', 'xconvert/app/scripts/install-verapdf.sh') }}
       - name: Fetch xConvert's converters (checksum-pinned) and build its Typst wrapper
         run: npm run vendor --prefix ../xconvert/app
+      - name: Test xConvert
+        # After the vendor step: the Typst tests run the real wrapper.
+        run: npm test --prefix ../xconvert/app
 
       - name: Build
         # The whole site: the front page into dist/, xNotary into dist/xnotary/,
@@ -142,6 +147,13 @@ jobs:
             fi
             echo "every host in $service's build is accounted for"
           done
+      # pandoc needs WebAssembly exception handling, which Node 18 lacks, so the real
+      # conversions are tested in Chrome, against the built site and its real CSP. Every PDF
+      # must pass veraPDF as PDF/A-2b: xConvert calls them archival only because they do.
+      - name: Install veraPDF (pinned)
+        run: npm run verapdf:install --prefix ../xconvert/app
+      - name: xConvert end-to-end in Chrome
+        run: REQUIRE_VERAPDF=1 npm run e2e --prefix ../xconvert/app
       - name: Check no file is over Cloudflare Pages' 25 MiB limit
         run: |
           big=$(find dist -type f -size +25M)

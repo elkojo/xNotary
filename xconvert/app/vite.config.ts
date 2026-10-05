@@ -19,6 +19,8 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(version),
   },
   plugins: [svelte()],
+  // The converter runs as a module worker (src/worker.ts).
+  worker: { format: 'es' },
   build: {
     target: 'es2022',
     sourcemap: true,
