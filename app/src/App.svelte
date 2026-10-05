@@ -4,17 +4,21 @@
   import Home from './views/Home.svelte';
   import Library from './views/Library.svelte';
   import Notarize from './views/Notarize.svelte';
-  import Qanda from './views/Qanda.svelte';
-  import Verify from './views/Verify.svelte';
-  import { ROUTES, type View } from './nav';
+import Verify from './views/Verify.svelte';
+  import { ALIASES, ROUTES, type View } from './nav';
   import SiteBar from './site/SiteBar.svelte';
 
-  function viewFromHash(): View {
-    const raw = location.hash.replace(/^#\/?/, '');
-    return (ROUTES as readonly string[]).includes(raw) ? (raw as View) : 'home';
+  /** `#/help/pending` is the Help page, opened at one question. */
+  function routeFromHash(): { view: View; topic: string } {
+    const [first = '', topic = ''] = location.hash.replace(/^#\/?/, '').split('/');
+    const id = ALIASES[first] ?? first;
+    return (ROUTES as readonly string[]).includes(id)
+      ? { view: id as View, topic }
+      : { view: 'home', topic: '' };
   }
 
-  let view = $state<View>(viewFromHash());
+  let view = $state<View>(routeFromHash().view);
+  let topic = $state(routeFromHash().topic);
   /**
    * The maturity notice is revealed rather than displayed: it opens on hover
    * and on focus. Focus rather than click is what makes it reachable without a
@@ -29,12 +33,13 @@
 
   function go(next: View) {
     view = next;
+    topic = '';
     history.replaceState(null, '', next === 'home' ? '#/' : `#/${next}`);
     scrollTo({ top: 0 });
   }
 
   $effect(() => {
-    const onHash = () => (view = viewFromHash());
+    const onHash = () => ({ view, topic } = routeFromHash());
     const setOnline = () => (online = navigator.onLine);
     addEventListener('hashchange', onHash);
     addEventListener('online', setOnline);
@@ -81,8 +86,8 @@
 {#if !online}
   <div class="band">
     <div>
-      <strong>You are offline.</strong> Checking a document against a certificate still works for the
-      hash check, but confirming a Bitcoin anchor and creating new timestamps both need a connection.
+      <strong>You are offline.</strong> Matching a document to its certificate still works; timestamping
+      and checking Bitcoin do not.
     </div>
   </div>
 {/if}
@@ -93,24 +98,21 @@
   {:else if view === 'notarize'}
     <Notarize onstored={() => libraryRevision++} {go} />
   {:else if view === 'attest'}
-    <Attest {go} />
+<Attest />
   {:else if view === 'verify'}
     <Verify />
   {:else if view === 'library'}
     <Library revision={libraryRevision} {go} />
-  {:else if view === 'qanda'}
-    <Qanda />
   {:else}
-    <Help {go} />
+    <Help {go} {topic} />
   {/if}
 </main>
 
 <footer class="site">
   <div>
-    Your files never leave this device — only a SHA-256 digest is sent to public OpenTimestamps
-    calendars. xNotary is free and open source under the
+    Your files never leave this device. Free and open source under the
     <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">
       AGPL-3.0</a
-    >. It is not a law firm and this is not legal advice.
+    >. Not legal advice.
   </div>
 </footer>

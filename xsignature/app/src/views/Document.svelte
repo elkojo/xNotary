@@ -13,6 +13,7 @@
    * saved document. What is saved is the original bytes with a path drawn on
    * top, so the text in the document stays text.
    */
+  import Info from '../../../../app/src/site/Info.svelte';
   import { openPdf, UnreadablePdf, type OpenPdf } from '../lib/document/pdf/inspect';
   import { renderPage } from '../lib/document/pdf/render';
   import { fitInside, displayedSize } from '../lib/document/place/placement';
@@ -1091,23 +1092,24 @@
     <div class="page-head">
       <div>
         <h1>Put a signature on a document</h1>
-        <p>
-          Open a PDF, place your signature on it and save the result. The file is read in this
-          browser and never sent anywhere.
-        </p>
       </div>
-      <span class="secure-note">Processed in this browser</span>
+      <span class="secure-note"
+        >Processed in this browser<Info
+          >The document, the signature and any key file are read here and never sent. The only
+          thing that can leave is a 32-byte digest, if you ask for a timestamp.</Info
+        ></span
+      >
     </div>
 
     <div class="flow-shell">
       <div class="flow-main">
         <div class="flow-panel">
-          <h2 class="panel-title">1 · Choose a document</h2>
-          <p class="panel-copy">
-            A PDF can be stamped straight away. Plain text and Markdown are laid out here in a
-            moment, on this device. Nothing else is read: a word processor's own Save As or Print
-            to PDF will do a better job of its formatting than anything this page could.
-          </p>
+          <h2 class="panel-title">
+            1 · Choose a document<Info
+              >Plain text and Markdown are laid out as a PDF on this device. For anything else, a
+              word processor's own Save As or Print to PDF will do a better job.</Info
+            >
+          </h2>
 
           {#if verdict}
             <div class="picked">
@@ -1123,11 +1125,10 @@
               <div class="notice bad"><strong>Cannot use this file.</strong> {openError}</div>
             {:else if verdict.route === 'text'}
               <div class="notice ok">
-                <strong>Laid out as a PDF.</strong>
-                Set on this device in faces that came with the app and are embedded in the file,
-                so it reads the same anywhere — accents included, which PDF's built-in fonts
-                cannot spell. It is plain setting rather than typesetting: check it reads the way
-                you want before signing.
+                <strong>Laid out as a PDF.</strong> Check it reads the way you want before signing.<Info
+                  >Set on this device in faces embedded in the file, so it reads the same anywhere —
+                  accents included. Plain setting rather than typesetting.</Info
+                >
               </div>
             {:else if verdict.route === 'reject'}
               <div class="notice bad"><strong>Cannot read this one.</strong> {verdict.reason}</div>
@@ -1172,11 +1173,6 @@
         {#if opened}
           <div class="flow-panel">
             <h2 class="panel-title">2 · Bring in a signature</h2>
-            <p class="panel-copy">
-              Paste one with <kbd>Ctrl</kbd>+<kbd>V</kbd>, drop the file here, or choose it. Make
-              one on the <a href="#/signature">signature screen</a> first and copy or save it from
-              there — typed or drawn, either works.
-            </p>
 
             {#if signature}
               <div class="picked">
@@ -1209,16 +1205,14 @@
                 -->
                 <div class="notice bad">
                   <strong>This picture has no transparent background.</strong>
-                  It will cover the document with a solid rectangle wherever it is placed. Use a PNG
-                  from the signature screen, which keeps its background transparent.
+                  It will cover the document with a solid rectangle. Use a PNG from the signature
+                  screen.
                 </div>
               {:else if placedResolution?.sharpness === 'soft'}
                 <div class="notice warn">
                   <strong>Small for the size it is placed at.</strong>
-                  About {describeDpi(placedResolution.dpi)} where it sits now, which will look soft
-                  in print. Make it smaller on the page, or copy it again at 4× from the signature
-                  screen — around {neededPixels.toLocaleString()} pixels wide would print cleanly
-                  here.
+                  About {describeDpi(placedResolution.dpi)}, soft in print. Make it smaller, or copy it
+                  again at 4× — around {neededPixels.toLocaleString()} pixels wide prints cleanly.
                 </div>
               {/if}
 
@@ -1246,7 +1240,10 @@
               >
                 <div>
                   <strong>Paste, drop or choose a signature</strong>
-                  <div class="drop-hint">PNG or SVG — from the signature screen or anywhere else</div>
+<div class="drop-hint">
+                    PNG or SVG — <a href="#/signature">make one</a>, then
+                    <kbd>Ctrl</kbd>+<kbd>V</kbd>
+                  </div>
                 </div>
                 <input
                   bind:this={signatureInput}
@@ -1269,14 +1266,12 @@
             <h2 class="panel-title">3 · Place it</h2>
             <p class="panel-copy">
               {#if placingBlock}
-                Drag the signature block to where it goes. Arrow keys nudge it; hold shift to move
-                further. The block is what lands on the page — your signature sits inside it.
+                Drag the block into place; arrow keys nudge it, Shift further.
               {:else if alreadySigned}
-                This document is already signed, so nothing is drawn on the page. Choose a
-                certificate below; a visible signature puts your name in a block of its own.
+                Already signed, so nothing is drawn on the page; a visible certificate signature
+                gets a block of its own.
               {:else}
-                Drag the signature to where it goes. Arrow keys nudge it; hold shift to move
-                further.
+                Drag the signature into place; arrow keys nudge it, Shift further.
               {/if}
             </p>
 
@@ -1431,10 +1426,11 @@
                       </span>
                     {/each}
                   </span>
-                  Yours is appended, leaving every byte they signed untouched, so theirs keep
-                  holding. Nothing can be drawn on the page: that means rewriting the file, which
-                  their signatures would not survive. A certificate is the only thing that can be
-                  added here.
+                  Yours is appended, so theirs keep holding.<Info
+                    >Nothing can be drawn on the page: that means rewriting the file, which their
+                    signatures would not survive. A certificate is the only thing that can be added
+                    here.</Info
+                  >
                 </div>
               {/if}
 
@@ -1445,8 +1441,8 @@
                       ? 'The signature already on this document does not hold.'
                       : 'Signatures already on this document do not hold.'}
                   </strong>
-                  It was changed after signing, so yours would be the only signature that
-                  verifies. Check where the file came from before adding your name to it.
+                  It was changed after signing. Check where the file came from before adding your
+                  name.
                 </div>
               {/if}
             {/if}
@@ -1470,9 +1466,8 @@
               4 · Sign with a certificate <span class="panel-optional">Optional</span>
             </h2>
             <p class="panel-copy">
-              Everything above puts a picture on a page. This signs the finished bytes with a key
-              you supply, which is the one thing here that proves anything: that whoever held that
-              key signed this file, and that it has not changed since.
+              The one thing here that proves anything: that whoever held the key signed this file,
+              and that it has not changed since.
             </p>
 
             <div class="field timestamp-field">
@@ -1480,10 +1475,7 @@
                 <input type="checkbox" bind:checked={wantCertificate} />
                 <span>
                   <strong>Use a certificate</strong>
-                  <span class="check-note">
-                    Your key file is read in this browser and never sent anywhere; the password
-                    opens it and is then forgotten.
-                  </span>
+                  <span class="check-note">An advanced electronic signature — never a qualified one.</span>
                 </span>
               </label>
             </div>
@@ -1506,9 +1498,8 @@
                     onchange={(event) => void takeKeyFile(event.currentTarget.files?.[0])}
                   />
                   <p class="field-note">
-                    A <code>.p12</code>, <code>.pfx</code> or <code>.pem</code> with your
-                    certificate and key. Read here, never sent; the password opens it and is then
-                    forgotten.
+                    A <code>.p12</code>, <code>.pfx</code> or <code>.pem</code>. Read here, never sent;
+                    the password is then forgotten.
                   </p>
                 </div>
               {/if}
@@ -1602,9 +1593,7 @@
                           ? 'past its expiry date'
                           : 'not valid yet'}.
                       </strong>
-                      It still makes a sound signature; the mathematics do not expire. But a reader
-                      will say so, and whether that matters is between you and whoever receives
-                      it.
+                      The signature is still sound, but readers will say so.
                     </div>
                   {/if}
 
@@ -1622,20 +1611,17 @@
                     <div class="notice">
                       <strong>What this certificate says about itself.</strong>
                       {#if signerClaims.qualified}
-                        It declares that it is a <em>qualified certificate</em> under eIDAS{signerClaims.purpose ===
+                        It declares itself a <em>qualified certificate</em> under eIDAS{signerClaims.purpose ===
                         'signature'
                           ? ', issued to a person for signing'
                           : signerClaims.purpose === 'seal'
                             ? ', issued to an organisation for sealing'
-                            : ''}, and it does <strong>not</strong> declare that its private key is
-                        held on a qualified signature creation device — which it could not, being a
-                        file. What you are about to make is therefore an advanced signature
-                        supported by a qualified certificate. That is a real standing, and a better
-                        one than an advanced signature alone; it is still not a qualified
-                        electronic signature.
+                            : ''} — but not that its key sits on a qualified signature creation
+                        device, which a file cannot. So this makes an advanced signature supported by
+                        a qualified certificate, not a qualified electronic signature.
                       {:else}
-                        It makes no claim to being a qualified certificate under eIDAS, so what you
-                        are about to make is an advanced electronic signature.
+                        It makes no claim to being a qualified certificate under eIDAS, so this makes
+                        an advanced electronic signature.
                         {#if signerClaims.purpose === 'website'}
                           It declares itself a website certificate, which is not meant for signing
                           documents at all.
@@ -1645,16 +1631,16 @@
                         It declares a transaction limit of {signerClaims.limit.value.toLocaleString()}
                         {signerClaims.limit.currency}.
                       {/if}
-                      The authority's own statements, read out of the certificate. Nothing here
-                      checks they are true.
+                      Nothing here checks these statements are true.
                     </div>
 
                     {#if signerClaims.keyUsage.stated && !signerClaims.keyUsage.digitalSignature && !signerClaims.keyUsage.nonRepudiation}
                       <div class="notice warn">
                         <strong>This certificate was not issued for signing.</strong>
-                        Its key usage permits neither digital signature nor non-repudiation, so
-                        whatever it was for, it was not this. The signature would still be sound
-                        arithmetic; a reader that enforces key usage will reject it anyway.
+                        Readers that enforce key usage will reject the signature.<Info
+                          >Its key usage permits neither digital signature nor non-repudiation. The
+                          signature would still be sound arithmetic.</Info
+                        >
                       </div>
                     {/if}
                   {/if}
@@ -1664,15 +1650,13 @@
                       It carries {identity.chain.length} issuer certificate{identity.chain
                         .length === 1
                         ? ''
-                        : 's'} as well as your own. They go into the signature, so a recipient can
-                      trace it back rather than take the name on trust.
+: 's'}, embedded so a recipient can trace your name back.
                     </div>
                   {:else if supplied.length === 0}
                     <div class="notice">
                       <strong>This file holds no issuer certificates.</strong>
-                      A signature should carry the certificates above it. Without them, a reader
-                      that does not already hold <strong>{identity.issuer}</strong> shows your name
-                      and no way to check it.
+                      Without them, a reader that lacks <strong>{identity.issuer}</strong> shows your
+                      name with no way to check it.
                       {#if signerClaims?.issuerUrl}
                         Your certificate says where that one is published:
                         <span class="outgoing-list">
@@ -1685,9 +1669,11 @@
                           </span>
                         </span>
                         Fetch it and add it below, or re-export the key file with its full
-                        certification path, which carries it already. Online readers often follow
-                        that address themselves — but a signature that encloses its chain does not
-                        depend on them being online, and this app will not fetch it for you.
+                        certification path.<Info
+                          >Online readers often follow that address themselves — but a signature that
+                          encloses its chain does not depend on them being online, and this app will
+                          not fetch it for you.</Info
+                        >
                       {:else}
                         Add them below, or re-export the key file with its full certification path
                         — your authority publishes both.
@@ -1706,9 +1692,8 @@
                         onchange={(event) => void takeIssuers(event.currentTarget.files?.[0])}
                       />
                       <p class="field-note">
-                        A <code>.pem</code> bundle, a <code>.crt</code> or a <code>.p7b</code>.
-                        Public certificates, not secrets — read here and embedded in the
-                        signature. Nothing is sent.
+                        A <code>.pem</code>, <code>.crt</code> or <code>.p7b</code>. Public, embedded
+                        in the signature; nothing is sent.
                       </p>
                     </div>
 
@@ -1729,10 +1714,9 @@
                             </span>
                           {/each}
                         </span>
-                        Checked link by link, which is arithmetic and all that is checked.
-                        Whether {links[links.length - 1]?.issuer ?? 'the authority at the top'}
-                        deserves belief is the reader's PDF software's call, against a list this
-                        app does not ship.
+                        Only the arithmetic is checked: whether
+                        {links[links.length - 1]?.issuer ?? 'the authority at the top'} deserves
+                        belief is the reader's PDF software's call.
                       </div>
                     {/if}
                   {/if}
@@ -1800,9 +1784,7 @@
                     </div>
                   </div>
                   <p class="field-note">
-                    All voluntary; an empty one is left out, not written blank. They go into the
-                    signature, so nobody else can change them — and nothing checks they are
-                    true.
+                    Optional, and written into the signature. Nothing checks they are true.
                   </p>
 
                   {#if visibleBlock}
@@ -1844,30 +1826,27 @@
                     {#if blockPreview && !blockPreview.fits}
                       <div class="notice warn">
                         <strong>More text here than the block can hold.</strong>
-                        It is as small as it usefully goes and still does not fit. Widen the block
-                        or shorten the reason — otherwise the text is cut off, and a signed document
-                        is the wrong place for a sentence that stops halfway.
+                        Widen the block or shorten the reason, or the text is cut off.
                       </div>
                     {/if}
 
                     {#if collisions.length > 0}
                       <div class="notice warn">
                         <strong>This lands on something already on the page.</strong>
-                        It would cover {collisions.map(nameOf).join(', ')}. The signature stays
-                        valid, but validators flag overlapping annotations — that is how a document
-                        is made to show one thing while being signed as another, and the check
-                        cannot tell your placement from it. Move clear of the outlined areas, or
-                        leave it if you mean it.
+                        It would cover {collisions.map(nameOf).join(', ')}, which validators flag.
+                        Move clear of the outlined areas, or leave it if you mean it.<Info
+                          >The signature stays valid, but an overlapping annotation is how a document
+                          is made to show one thing while being signed as another, and the check
+                          cannot tell your placement from it.</Info
+                        >
                       </div>
                     {/if}
 
                     {#if blockUnsupported.length > 0}
                       <div class="notice warn">
                         <strong>Some characters cannot be drawn in the block.</strong>
-                        The face covers Latin and its accents, not
-                        <code>{blockUnsupported.join(' ')}</code>, which come out as empty boxes.
-                        Change the text or turn the block off — the words still go into the
-                        signature as they are.
+                        <code>{blockUnsupported.join(' ')}</code> come out as empty boxes. They still go
+                        into the signature as typed.
                       </div>
                     {/if}
                   {/if}
@@ -1879,29 +1858,24 @@
 
           <div class="flow-panel">
             <h2 class="panel-title">
-              5 · Add a timestamp <span class="panel-optional">Optional</span>
+              5 · Add a timestamp<Info
+                >{#if wantCertificate && identity}
+                  An independent authority dates your signature, so its time does not rest on this
+                  computer's clock. It says nothing about who you are.
+                {:else}
+                  An independent authority records that this exact file existed at a particular
+                  time. It records nothing about who made it.
+                {/if}</Info
+              >
+              <span class="panel-optional">Optional</span>
             </h2>
-            <p class="panel-copy">
-              {#if wantCertificate && identity}
-                An independent authority dates your signature, so when it was made does not rest
-                on this computer's clock. It goes inside the signature rather than beside it, and
-                it is separate from the certificate you sign with — it says nothing about who you
-                are.
-              {:else}
-                An independent authority records that this exact file existed at a particular
-                time. It records nothing about who made it.
-              {/if}
-            </p>
 
             <div class="field timestamp-field">
               <label class="check">
                 <input type="checkbox" bind:checked={wantTimestamp} />
                 <span>
                   <strong>Add a timestamp</strong>
-                  <span class="check-note">
-                    The one thing this app sends anywhere. What goes, and where, is set out in
-                    full below before it happens.
-                  </span>
+                  <span class="check-note">Sends a 32-byte digest — shown below before it goes.</span>
                 </span>
               </label>
             </div>
@@ -1913,10 +1887,12 @@
                 afterwards in a changelog.
               -->
               <div class="notice warn">
-                <strong>This sends one request off your device.</strong>
-                It is the only one the app makes, and a timestamp cannot work without
-                it: somebody independent has to see the file's fingerprint and sign it,
-                or the time means nothing.
+                <strong>This sends one request off your device</strong> — the only one the app
+                makes.<Info
+                  >A timestamp cannot work without it: somebody independent has to see the file's
+                  fingerprint and sign it. A digest cannot be turned back into the file, so the
+                  authority learns that something existed, not what.</Info
+                >
                 <span class="outgoing-list">
                   <span>
                     <strong>What goes:</strong>
@@ -1929,16 +1905,16 @@
                     <code>{endpoint ?? 'nowhere — the address below is not valid'}</code></span
                   >
                 </span>
-                A digest cannot be turned back into the file it came from, so the authority
-                learns that something existed, not what.
+
               </div>
 
               <div class="field">
-                <span class="field-label">Timestamp authority</span>
-                <p class="field-note authority-note">
-                  Who independently dates it. This is not the certificate you sign with, and it
-                  neither issues nor checks that certificate.
-                </p>
+                <span class="field-label"
+                  >Timestamp authority<Info
+                    >Who independently dates it. Not the certificate you sign with, and it neither
+                    issues nor checks that certificate.</Info
+                  ></span
+                >
                 <div class="authority-list">
                   {#each AUTHORITIES as option}
                     <button
@@ -1979,16 +1955,14 @@
                     bind:value={customUrl}
                   />
                   <p class="field-note">
-                    Most authorities refuse requests that come from a web page, and there is
-                    nothing this app can do about that from inside a browser. If one does not
-                    work, that is usually why.
+                    Many authorities refuse requests from a web page; if one fails, that is usually
+                    why.
                   </p>
                 </div>
               {:else if !authority.adobeTrusted}
                 <div class="notice">
-                  Acrobat will not recognise {authority.signedBy}'s certificate and will say the
-                  timestamp is of unknown origin. The token is still a real timestamp and any tool
-                  with {authority.signedBy}'s published certificate can check it.
+                  Acrobat will call this timestamp of unknown origin. It is still real, and checkable
+                  with {authority.signedBy}'s published certificate.
                 </div>
               {/if}
 
@@ -2004,20 +1978,15 @@
                 <div class="notice bad">
                   <strong>Saved, without a timestamp.</strong>
                   {timestampError}
-                  {#if wantCertificate && identity}
-                    The document was signed anyway — the signature is the part that matters, and
-                    it is unaffected. Only the independent time is missing.
-                  {:else}
-                    The PDF was written anyway, with the signature on it.
-                  {/if}
+                  {wantCertificate && identity
+                    ? 'The signature is unaffected; only the independent time is missing.'
+                    : 'The PDF was written anyway.'}
                 </div>
               {:else if stamped && wantCertificate && identity}
                 <div class="notice ok">
                   <strong>Saved, signed and timestamped.</strong>
-                  The signature covers every byte of the file, and
-                  {authority.signedBy} states that the signature existed at
+                  {authority.signedBy} dates the signature to
                   <strong>{stamped.time.toISOString().replace('T', ' ').replace('.000Z', ' UTC')}</strong>.
-                  The time no longer rests on this computer's clock.
                   {#if sent}
                     <span class="outgoing-list">
                       <span><strong>Sent:</strong> <code>{groupHex(sent.digestHex)}</code></span>
@@ -2028,16 +1997,14 @@
               {:else if saved && wantCertificate && identity}
                 <div class="notice ok">
                   <strong>Saved, and signed.</strong>
-                  The signature covers every byte of the file. The time on it is this computer's
-                  clock, asserted by you and checked by nobody — a timestamp is what makes that
-                  claim somebody else's.
+                  Its time is this computer's clock, checked by nobody.
                 </div>
               {:else if stamped}
                 <div class="notice ok">
                   <strong>Saved, and timestamped.</strong>
                   {authority.signedBy} states that this exact file existed at
                   <strong>{stamped.time.toISOString().replace('T', ' ').replace('.000Z', ' UTC')}</strong>.
-                  It states nothing about who made it, and neither does the file.
+                  Nothing about who made it.
                   {#if sent}
                     <span class="outgoing-list">
                       <span><strong>Sent:</strong> <code>{groupHex(sent.digestHex)}</code></span>
@@ -2048,8 +2015,7 @@
               {:else}
                 <div class="notice ok">
                   <strong>Saved.</strong>
-                  The original document is untouched — what was written is a copy with the signature
-                  drawn on it.
+                  A copy; the original is untouched.
                 </div>
               {/if}
             {/if}
@@ -2082,81 +2048,37 @@
         -->
         {#if wantCertificate && identity}
           <div class="notice">
-            <strong>What this signature proves, and what it does not.</strong>
-            It proves that whoever held the key in that file signed these exact bytes, and that
-            nothing has changed since. That is an advanced electronic signature, and a real claim.
-            <br /><br />
-            It is <strong>not</strong> a qualified one, and nothing here can make it one: that
-            needs the key to live in certified hardware only you can use, and a key file a browser
-            can read is one that can be copied. Nor does this app check whose certificate it is —
-            whether {identity.subject} is who they say they are is for the reader's PDF software to
-            judge, against a list of trusted authorities this app does not ship.
-            <br /><br />
-            It carries no <strong>revocation data</strong> either. Whether {identity.issuer} has
-            since withdrawn that certificate
+            <strong>An advanced electronic signature — not a qualified one.</strong> It proves that
+            whoever held this key signed these exact bytes. It does not check who {identity.subject}
+            is, and carries no revocation data.<Info
+              >Qualified needs the key in certified hardware only you can use; a key file a browser
+              can read can be copied. Whose certificate it is, the reader's PDF software judges
+              against a list of trusted authorities this app does not ship. Whether
+              {identity.issuer} has since withdrawn the certificate
             {#if signerClaims?.ocspUrl || signerClaims?.crlUrls.length}
-              is answered at these addresses, and this app calls none of them:
-              <span class="outgoing-list">
-                {#if signerClaims.ocspUrl}
-                  <span><strong>Asked at:</strong> <code>{signerClaims.ocspUrl}</code></span>
-                {/if}
-                {#each signerClaims.crlUrls as url}
-                  <span><strong>Listed at:</strong> <code>{url}</code></span>
-                {/each}
-              </span>
-              Read out of your certificate, shown rather than called: reaching them is a second
-              network request, and this app makes one or none. So a reader that is offline cannot
-              settle it, and after {identity.validTo.toISOString().slice(0, 10)}, when the
-              certificate expires, it may not be answerable at all — what Acrobat calls "not LTV
-              enabled". The arithmetic does not decay either way.
+              is answered at
+              {[signerClaims.ocspUrl, ...signerClaims.crlUrls].filter(Boolean).join(', ')}, which
+              this app does not call: that would be a second network request.
             {:else}
-              is a question a reader puts to the authority over the network, and this app does not
-              ask it: that is a second request, and it makes one or none. So an offline reader
-              cannot settle it, and after {identity.validTo.toISOString().slice(0, 10)} it may not
-              be answerable at all — what Acrobat calls "not LTV enabled". The arithmetic does not
-              decay either way.
-            {/if}
+              is a question a reader puts to the authority over the network; this app does not ask
+              it.
+            {/if} After {identity.validTo.toISOString().slice(0, 10)} it may not be answerable at
+              all — what Acrobat calls "not LTV enabled".</Info
+            >
           </div>
         {/if}
 
         <div class="notice warn">
-          <strong>A signature image is not an electronic signature.</strong>
-          A picture of your name proves nothing about who put it there — anyone holding the image
-          can do the same to any file. Use it for letterheads, forms and returning paperwork, not
-          as evidence that you agreed to something.
-          {#if !wantCertificate}
-            Signing with a certificate above is what proves who signed.
-          {/if}
-          <br /><br />
-          <strong>A timestamp does not change that.</strong>
-          It establishes one fact and no others: that this file existed at a particular time. A
-          timestamped document with a picture of your name on it is still a document with a
-          picture of your name on it.
+          <strong>A signature image is not an electronic signature</strong>, and a timestamp does not
+          make it one.<Info
+            >A picture of your name proves nothing about who put it there — anyone holding the image
+            can do the same to any file. Use it for letterheads, forms and returning paperwork, not
+            as evidence that you agreed to something.{#if !wantCertificate}
+              Signing with a certificate above is what proves who signed.{/if} A timestamp establishes
+            only that this file existed at a particular time.</Info
+          >
         </div>
       </div>
-
-      <aside class="side-card">
-        <h3>What you get</h3>
-        <p>A copy of your document with the signature drawn onto it.</p>
-        <div class="side-list">
-          <div>The text of the document stays text — it is not flattened to an image</div>
-          <div>
-            Optionally a real signature, made with your own certificate, covering every byte of
-            the finished file
-          </div>
-          <div>
-            An SVG signature goes on as paths, sharp at any size; a PNG goes on as a picture, and
-            the app says whether it is big enough for where you put it
-          </div>
-          <div>Read and written in this browser: no server, no account, no analytics</div>
-          <div>
-            A PDF that is already signed can be signed again — yours is appended, leaving every
-            byte theirs covers untouched, so both hold
-          </div>
-          <div>Optionally a timestamp, which sends a 32-byte digest and nothing else</div>
-          <div>Your key file and its password are read here and never leave the device</div>
-        </div>
-      </aside>
     </div>
   </div>
 </section>

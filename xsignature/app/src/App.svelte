@@ -95,13 +95,10 @@
 
 <footer class="site">
   <div>
-    The name you type, the strokes you draw, the documents you open and any key file you use stay
-    on this device. The only thing this app ever sends is a 32-byte digest, when you ask it for a
-    timestamp, and it says so before it does. xSignature is free and open source under the
+    What you type, draw, open and sign with stays on this device. Free and open source under the
     <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">
       AGPL-3.0</a
-    >. It makes signature pictures, which prove nothing, and — if you bring a certificate — real
-    signatures, which prove who signed and that nothing changed. It never makes qualified ones.
+    >. Never makes qualified signatures.
     <!--
       Inside the footer's own div rather than beside it: `footer.site > div`
       carries the padding, and a second child would repeat all of it. So a

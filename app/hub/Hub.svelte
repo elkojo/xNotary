@@ -19,10 +19,7 @@
       <div class="hero">
         <div class="eyebrow">Independent document tools</div>
         <h1>Documents you can <mark class="hlm">prove.</mark></h1>
-        <p>
-          Free, open-source tools that work on your document in this browser. Nothing is uploaded,
-          there is no account, and every result can be checked without us.
-        </p>
+        <p>Free tools that work on your document in this browser. Every result checks without us.</p>
         <p class="hint">
           Not sure which tool?
           <button
@@ -56,10 +53,7 @@
             <span class="brand-mark"><span>+</span></span>
             <h2>More services</h2>
           </div>
-          <p>
-            Next, perhaps, remote multiparty agreements. Each new service gets a card here and an
-            entry in the switcher.
-          </p>
+          <p>Next, perhaps: remote multiparty agreements.</p>
         </div>
       </div>
 
@@ -68,15 +62,6 @@
         <span>No account</span>
         <span>No backend</span>
         <span>Open source</span>
-      </div>
-
-      <div class="future-note">
-        <p>
-          <strong>Proof for people today. Verifiable authority for software tomorrow.</strong><br />
-          The same evidence layer could carry remote multiparty agreements, and contracts between
-          authorised software agents.
-        </p>
-        <span>Our direction</span>
       </div>
     </div>
   </section>
@@ -89,14 +74,12 @@
         <a href={s.href}>{s.name}{s.external ? ' ↗' : ''}</a>
       {/each}
     </div>
-    Your documents never leave your device. xNotary.digital is free and open source under the
+    Your documents never leave your device. Free and open source under the
     <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">
       AGPL-3.0</a
     >{#if revisionUrl}, built from
       <a href={revisionUrl} target="_blank" rel="noopener noreferrer"
         ><span class="mono">{revision}</span></a
-      >{/if}. Third-party code is listed in
-    <a href="/xnotary/THIRD-PARTY.txt">THIRD-PARTY.txt</a>. It is not a law firm and this is not
-    legal advice.
+    >{/if}. <a href="/xnotary/THIRD-PARTY.txt">Third-party code</a>. Not legal advice.
   </div>
 </footer>

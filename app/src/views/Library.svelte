@@ -1,5 +1,6 @@
 <script lang="ts">
   import StatusBadge from '../components/StatusBadge.svelte';
+  import Info from '../site/Info.svelte';
   import { buildCertificate1 } from '../lib/certificate1';
   import { baseName, downloadBytes, formatBytes, formatDate } from '../lib/download';
   import { fromHex, groupHex } from '../lib/hash';
@@ -154,8 +155,10 @@
       <div>
         <h1>My certificates</h1>
         <p>
-          Kept in this browser, on this address, so pending timestamps can be upgraded. Save what
-          you want to keep — this is not a backup.
+          Kept in this browser only — not a backup.<Info more="#/help/keep"
+            >Kept here so pending timestamps can be upgraded. Nothing is uploaded, and clearing this
+            browser's data removes them. The saved PDF is your real copy.</Info
+          >
         </p>
       </div>
       <button class="button dark" onclick={() => go('notarize')}>Timestamp a document</button>
@@ -183,7 +186,7 @@
       {#if !loaded}
         <div class="empty">Loading…</div>
       {:else if records.length === 0}
-        <div class="empty">No certificates yet. Timestamp a file to create your first one.</div>
+<div class="empty">No certificates yet.</div>
       {:else if shown.length === 0}
         <div class="empty">Nothing here matches “{filter}”.</div>
       {:else}
@@ -314,9 +317,10 @@
       <div class="notice {message.tone}">{message.text}</div>
     {/if}
 
-    <div class="storage-note">
-      Nothing here is uploaded — there is no xNotary backend. Clearing this browser's data removes them{#if storage && records.length > 0}
-        ({formatBytes(storage.usage)} of ~{formatBytes(storage.quota)}){/if}.
-    </div>
+    {#if storage && records.length > 0}
+      <div class="storage-note">
+        {formatBytes(storage.usage)} of ~{formatBytes(storage.quota)} used in this browser.
+      </div>
+    {/if}
   </div>
 </section>

@@ -12,6 +12,7 @@
    * and the rasterizer.
    */
   import { untrack } from 'svelte';
+  import Info from '../../../../app/src/site/Info.svelte';
   import type SignaturePad from 'signature_pad';
 
   import { createPad, fitPad, inkFrom, padHasPressure, undoStroke } from '../lib/signature/draw/pad';
@@ -372,12 +373,13 @@
     <div class="page-head">
       <div>
         <h1>Make a signature image</h1>
-        <p>
-          Type your name in a handwriting face, or draw one, and export a transparent PNG or a
-          vector SVG. It is a picture of a signature, not a signature.
-        </p>
       </div>
-      <span class="secure-note">Processed in this browser</span>
+      <span class="secure-note"
+        >Processed in this browser<Info
+          >Nothing you type or draw is sent anywhere, or kept when you close the page. Works offline
+          once loaded.</Info
+        ></span
+      >
     </div>
 
     <div class="flow-shell">
@@ -397,10 +399,6 @@
 
         <div class="flow-panel" bind:this={panels[0]}>
           <h2 class="panel-title">Type a name, or draw one</h2>
-          <p class="panel-copy">
-            Either way it becomes the same outlines, so the PNG and the SVG are the same picture.
-            Nothing you type or draw is sent anywhere, or kept when you close the page.
-          </p>
 
           <div class="mode-tabs" role="tablist" aria-label="How to make the signature">
             <button
@@ -524,13 +522,14 @@
         </div>
 
         <div class="flow-panel" bind:this={panels[1]}>
-          <h2 class="panel-title">Style it</h2>
-          <p class="panel-copy">
-            {mode === 'type'
-              ? 'Size sets the em size the glyphs are laid out at, so a large signature is drawn large rather than magnified.'
-              : 'A drawn signature carries its own size and weight, so only the ink applies here.'}
-            Your choices are remembered; what you write is not.
-          </p>
+          <h2 class="panel-title">
+            Style it<Info
+              >{mode === 'type'
+                ? 'Size sets the em size the glyphs are laid out at, so a large signature is drawn large rather than magnified.'
+                : 'A drawn signature carries its own size and weight, so only the ink applies here.'}
+              Your choices are remembered; what you write is not.</Info
+            >
+          </h2>
 
           {#if mode === 'type'}
           <div class="field">
@@ -571,7 +570,12 @@
           {/if}
 
           <div class="field">
-            <span class="field-label">Underline</span>
+            <span class="field-label"
+              >Underline<Info
+                >Flourish is a drawn stroke rather than a ruled line: thin at both ends, heavier where
+                a hand would bear down, and lifting away at the finish.</Info
+              ></span
+            >
             <div class="choice-row">
               <button
                 type="button"
@@ -592,10 +596,7 @@
                 Flourish
               </button>
             </div>
-            <p class="field-help">
-              A drawn stroke rather than a ruled line: thin at both ends, heavier where a hand
-              would bear down, and lifting away at the finish.
-            </p>
+
           </div>
 
           <div class="field">
@@ -640,17 +641,22 @@
         </div>
 
         <div class="flow-panel" bind:this={panels[2]}>
-          <h2 class="panel-title">Export it</h2>
-          <p class="panel-copy">
-            Both come from the same outlines, so they are the same picture. The PNG has a
-            transparent background; the SVG is paths only, so it opens anywhere
-            — {mode === 'type'
-              ? `with or without ${face.name} installed`
-              : 'at any size, without turning into a blurry bitmap'}.
-          </p>
+          <h2 class="panel-title">
+            Export it<Info
+              >PNG and SVG come from the same outlines, so they are the same picture. The SVG is paths
+              only, so it opens anywhere — {mode === 'type'
+                ? `with or without ${face.name} installed`
+                : 'at any size, without turning into a blurry bitmap'}.</Info
+            >
+          </h2>
 
           <div class="field">
-            <span class="field-label">PNG size</span>
+            <span class="field-label"
+              >PNG size<Info
+                >The multiples enlarge the signature as it is. The preset fits it inside a box of
+                exactly that many pixels, centred — for a slot whose size is already decided.</Info
+              ></span
+            >
             <div class="choice-row">
               {#each OUTPUTS as option}
                 <button
@@ -664,15 +670,16 @@
                 </button>
               {/each}
             </div>
-            <p class="field-help">
-              The multiples enlarge the signature as it is. The preset fits it inside a box of
-              exactly that many pixels, centred, keeping its proportions — for a slot whose size is
-              already decided.
-            </p>
+
           </div>
 
           <div class="field">
-            <span class="field-label">Background</span>
+            <span class="field-label"
+              >Background<Info
+                >Choose white for tools that draw transparency as a black rectangle. The SVG is
+                unaffected.</Info
+              ></span
+            >
             <div class="choice-row">
               <button
                 type="button"
@@ -693,10 +700,7 @@
                 White
               </button>
             </div>
-            <p class="field-help">
-              Transparent is what you usually want. Choose white for the tools that draw an alpha
-              channel as a black rectangle. The SVG is unaffected either way.
-            </p>
+
           </div>
 
           <!--
@@ -744,24 +748,15 @@
           rather than one product away.
         -->
         <div class="notice warn">
-          <strong>This is an image, not an electronic signature.</strong>
-          It proves nothing about who made it — anyone who has the file can put it on any document.
-          Use it for letterheads, email footers and form fields, not as evidence that you signed
-          something. Proving who signed a document takes a certificate and a private key —
-          <em>Sign a document</em> does that with one you already have.
+          <strong>This is an image, not an electronic signature.</strong> It proves nothing about who
+          made it.<Info
+            >Anyone who has the file can put it on any document. Use it for letterheads, email footers
+            and form fields, not as evidence that you signed something. Proving who signed takes a
+            certificate and a private key — <em>Sign a document</em> does that with one you already
+            have.</Info
+          >
         </div>
       </div>
-
-      <aside class="side-card">
-        <h3>What you get</h3>
-        <p>Two files of the same signature, drawn from the same outlines.</p>
-        <div class="side-list">
-          <div>A PNG with a transparent background</div>
-          <div>An SVG made of paths — no font needed to open it</div>
-          <div>Nothing uploaded: no server, no account, no analytics</div>
-          <div>Works offline once the page has loaded</div>
-        </div>
-      </aside>
     </div>
   </div>
 </section>

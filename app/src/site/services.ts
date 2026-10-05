@@ -34,9 +34,7 @@ export const SERVICES: readonly Service[] = [
     external: false,
     home: 'home',
     tagline: 'Timestamp a document in Bitcoin and certify who signed it.',
-    description:
-      'Prove that an exact file existed no later than a particular Bitcoin block, and record who ' +
-      'put their name to it. Only a 32-byte fingerprint is ever sent.',
+    description: 'Prove an exact file existed by a given Bitcoin block, and record who signed it.',
     tabs: NAV,
   },
   {
@@ -46,10 +44,10 @@ export const SERVICES: readonly Service[] = [
     href: '/xsignature/',
     external: false,
     home: 'signature',
-    tagline: 'Make a signature image, sign a PDF, check a signed PDF.',
+    tagline: 'Make a signature image, sign a PDF with your certificate and a qualified timestamp.',
     description:
-      'Type or draw a signature and export a PNG or SVG, put it on a PDF — optionally with your ' +
-      'own certificate and a timestamp — and read a PDF back to see what it claims.',
+      'Make a signature, put it on a PDF. Sign with your own certificate to produce an advanced ' +
+      'electronic signature with a qualified timestamp.',
     tabs: XSIGNATURE_NAV,
   },
 ];
@@ -62,7 +60,7 @@ export const TASKS: ReadonlyArray<{
   readonly description: string;
 }> = [
   { service: 'xnotary', page: 'notarize', title: 'Prove a file existed', description: 'A Bitcoin-anchored timestamp of the exact file.' },
-  { service: 'xsignature', page: 'document', title: 'Sign a PDF', description: 'Place your signature, optionally with your own certificate.' },
+  { service: 'xsignature', page: 'document', title: 'Sign a PDF',description: 'Place your signature, sign with your certificate and a qualified timestamp.' },
   { service: 'xnotary', page: 'attest', title: 'Record who signed', description: 'Certify the signers of a file that was signed elsewhere.' },
   { service: 'xsignature', page: 'signature', title: 'Make a signature image', description: 'Type or draw it; export PNG or SVG.' },
   { service: 'xnotary', page: 'verify', title: 'Verify an xNotary proof', description: 'Match a document to its xNotary certificate.' },

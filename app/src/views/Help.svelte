@@ -1,12 +1,34 @@
+<!--
+  How it works and the questions people ask, on one page. Everything past the
+  three steps is folded, so the page shows its questions and nothing else until
+  one is opened: the screens keep their explanations in ⓘ bubbles, and each
+  bubble's "More" link lands on its answer here (`#/help/<topic>`), opened.
+
+  The answers carried over from the former Q&A screen keep their wording.
+  The rest is what "How it works" said, regrouped under the question it answers.
+-->
 <script lang="ts">
+  import { tick } from 'svelte';
   import { DSS_SOURCE_URL } from '../lib/certificate2';
   import { CALENDAR_URLS } from '../lib/ots';
   import type { View } from '../nav';
 
   interface Props {
     go: (view: View) => void;
+    /** The question to open and scroll to, from `#/help/<topic>`. */
+    topic?: string;
   }
-  let { go }: Props = $props();
+  let { go, topic = '' }: Props = $props();
+
+  $effect(() => {
+    if (!topic) return;
+    tick().then(() => {
+      const target = document.getElementById(`q-${topic}`);
+      if (!(target instanceof HTMLDetailsElement)) return;
+      target.open = true;
+      target.scrollIntoView({ block: 'start' });
+    });
+  });
 
   /** The Commission's own explanation of what qualified status actually confers. */
   const ESIGNATURE_FAQ_URL =
@@ -41,75 +63,666 @@
   <div class="workspace">
     <div class="page-head">
       <div>
-        <h1>How xNotary works</h1>
-        <p>An evidence layer for documents — without sending the document to anyone.</p>
+        <h1>Help</h1>
       </div>
-      <button class="button dark" onclick={() => go('notarize')}>Create your first proof</button>
+      <button class="button dark" onclick={() => go('notarize')}>Timestamp a document</button>
     </div>
 
     <div class="single-card">
-      <h2 class="section-title">From file to verifiable proof</h2>
-      <p class="section-copy">Three steps. The original document stays under your control.</p>
-
+      <h2 class="section-title">How it works</h2>
       <div class="how-grid">
         <article class="how-step">
           <span class="how-number">01 / Fingerprint</span>
           <h3>Your browser reads the file</h3>
-          <p>
-            It computes a SHA-256 fingerprint on this device. The file itself never leaves it, and
-            the digest reveals nothing about what is inside.
-          </p>
+          <p>It computes a SHA-256 fingerprint. The file never leaves this device.</p>
         </article>
         <article class="how-step">
           <span class="how-number">02 / Anchor</span>
           <h3>The fingerprint goes into Bitcoin</h3>
-          <p>
-            Only the 32-byte digest is sent, to public OpenTimestamps calendars, which batch many
-            digests into one Bitcoin transaction. xNotary itself receives and keeps nothing.
-          </p>
+          <p>Public OpenTimestamps calendars anchor the 32-byte fingerprint, and nothing else.</p>
         </article>
         <article class="how-step">
           <span class="how-number">03 / Verify</span>
           <h3>Anyone can check it</h3>
-          <p>
-            The document and its certificate can be checked later by anyone — here, or with the
-            reference OpenTimestamps client and no xNotary at all.
-          </p>
+          <p>Here, or with the reference OpenTimestamps client and no xNotary at all.</p>
         </article>
       </div>
+    </div>
 
-      <div class="boundary-grid">
-        <div class="boundary yes">
-          <h3>What a certificate shows</h3>
-          <ul>
-            <li>The exact fingerprint of one file</li>
-            <li>That it existed no later than a particular Bitcoin block</li>
-            <li>Who signed it, among those who consented to be named</li>
-            <li>That further signatures exist, without naming them</li>
-            <li>Whether a file you hold still matches</li>
-          </ul>
-        </div>
-        <div class="boundary no">
-          <h3>What it does not show</h3>
-          <ul>
-            <li>That anything stated inside the document is true</li>
-            <li>A signer's authority, unless verified separately</li>
-            <li>Verification of a signature by a public authority</li>
-            <li>That a signature meets any framework's highest tier</li>
-          </ul>
-        </div>
+    <div class="single-card">
+      <h2 class="section-title">About xNotary</h2>
+      <div class="case-list">
+        <details class="explain" id="q-what">
+          <summary>What is xNotary?</summary>
+          <div>
+            xNotary is building a way to prove who agreed to what, without an official witnessing
+            each transaction, an appointment or physical presence. The beta covers two layers:
+            verifiable evidence of a digital document’s exact contents and existence in time, and
+            the collection of qualified electronic signatures made over that evidence. Verified
+            identity and authoritative signature validation are the layers still to come, not
+            capabilities to assume from a timestamp.
+          </div>
+        </details>
+
+        <details class="explain" id="q-does">
+          <summary>What does each screen do?</summary>
+          <div>
+            <div class="review-box">
+              <div class="review-row">
+                <span>Timestamp</span>
+                <div>
+                  <strong>Certificate 1 — integrity and existence.</strong> This exact file existed
+                  no later than a particular Bitcoin block. Your file is hashed here and never
+                  leaves the device.
+                </div>
+              </div>
+              <div class="review-row">
+                <span>Sign</span>
+                <div>
+                  <strong>With your own tools, not here.</strong> You and the other parties sign —
+                  ideally the document itself, otherwise its Certificate 1 — using signatures from a
+                  provider you already trust. xNotary never issues, holds or sees a signing key, and
+                  never sends anyone a signing invitation.
+                </div>
+              </div>
+              <div class="review-row">
+                <span>Certify signers</span>
+                <div>
+                  <strong>Certificate 2 — who signed.</strong> Drop in the signed files, confirm who
+                  may be named, and get a one-page PDF listing them with their issuing authority and
+                  signing time, the signed documents embedded inside it. Add the Certificate 1 or its
+                  <span class="mono">proof.ots</span> and it also establishes that the signatures
+                  are over the timestamped document itself.
+                </div>
+              </div>
+              <div class="review-row">
+                <span>Verify proof</span>
+                <div>
+                  <strong>For whoever receives it.</strong> Anyone holding the document and its
+                  Certificate 1 can check that this file is the one the certificate is about, and
+                  that the timestamp is real. It does not check signatures.
+                </div>
+              </div>
+              <div class="review-row">
+                <span>My certificates</span>
+                <div>
+                  The Certificate 1s made in this browser, kept so a pending timestamp can be
+                  upgraded once Bitcoin catches up.
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details class="explain" id="q-cost">
+          <summary>What does xNotary cost? Do I need bitcoin?</summary>
+          <div>
+            <p>
+              Nothing. xNotary is free and open source, with no accounts, no charge per document and
+              no transaction fees — your fingerprint is aggregated with many others before it
+              reaches Bitcoin, which is why timestamping costs nothing.
+            </p>
+            <p>
+              You do not need to buy bitcoin or connect a wallet. Bitcoin supplies the public record
+              used for verification. A change in its market price does not itself change your file
+              or erase its proof.
+            </p>
+          </div>
+        </details>
+
+        <details class="explain" id="q-beta">
+          <summary>What can the beta prove today?</summary>
+          <div>
+            Two things. A completed and verified proof — Certificate 1 — supports that the exact
+            file existed before the relevant Bitcoin block, and lets you check whether a file
+            matches it. Where the parties then sign with certificates of their own, Certificate 2
+            records who signed and which authority issued each certificate; given the timestamp
+            proof as well, it also establishes that the signatures are over the timestamped document
+            itself. It reads those signatures rather than validating them against a trust list, so
+            it reports what they claim rather than confirming it.
+          </div>
+        </details>
+
+        <details class="explain" id="q-direction">
+          <summary>Where is this going?</summary>
+          <div>
+            Proof for people today; verifiable authority for software tomorrow. We intend to extend
+            the same evidence layer from human signatures to remote multiparty agreements, delegated
+            authority and contracts between authorised software agents. None of that exists yet.
+          </div>
+        </details>
+
+        <details class="explain" id="q-licence">
+          <summary>Licence and source</summary>
+          <div>
+            <p>
+              xNotary is free software: <strong>AGPL-3.0-or-later</strong>. The
+              <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">source</a> is public,
+              which is what lets anyone check that the claims here are true of the code actually
+              running.
+            </p>
+            <div class="review-box">
+              <div class="review-row">
+                <span>This build</span>
+                <div>
+                  {#if revisionUrl}
+                    <a href={revisionUrl} target="_blank" rel="noopener noreferrer">
+                      <span class="mono">{revision}</span>
+                    </a> — the exact source this page was built from. Anyone running xNotary as a service
+                    owes you that, not merely a link to the project.
+                  {:else}
+                    <span class="mono">{revision}</span> — built from changes that are not in any published
+                    commit, so there is nothing to link. A deployed build should never say this.
+                  {/if}
+                </div>
+              </div>
+              <div class="review-row">
+                <span>Third-party code</span>
+                <div>
+                  Everything your browser downloaded, with its licence, is listed in
+                  <a href={NOTICES_URL}>THIRD-PARTY.txt</a> — generated at build time from the modules
+                  actually present, so it cannot drift from what was shipped.
+                </div>
+              </div>
+              <div class="review-row">
+                <span>OpenTimestamps library</span>
+                <div>
+                  The OpenTimestamps client is licensed LGPL-3.0-or-later. It is loaded as a
+                  separate module rather than bundled in, so you can build your own version of it
+                  and have this app run against yours instead: see
+                  <a href={RELINKING_URL}>how to relink it</a>.
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
       </div>
+    </div>
 
-      <!-- Direction, not capability — the same words as the landing page. -->
-      <div class="vision-strip">
-        <div>
-          <strong>One evidence layer, more kinds of agreement.</strong>
-          <p>
-            We intend to extend this from human signatures to delegated authority and contracts
-            between authorised software agents. None of that exists yet.
-          </p>
-        </div>
-        <span>Documents → people → agents</span>
+    <div class="single-card">
+      <h2 class="section-title">Timestamps</h2>
+      <div class="case-list">
+        <details class="explain" id="q-how">
+          <summary>How does the timestamp work?</summary>
+          <div>
+            <p>
+              Your browser calculates a digital fingerprint of your file — a 32-byte SHA-256 digest
+              that reveals nothing about its contents. Only that digest is sent, to public
+              OpenTimestamps calendar servers, which batch many digests into a single Bitcoin
+              transaction. Verification recalculates the fingerprint and checks the connection. Even
+              a tiny change to the file produces a different fingerprint, so the changed file will
+              not match the original proof.
+            </p>
+            <div class="review-box">
+              <div class="review-row">
+                <span>Calendars used</span>
+                <div>
+                  {#each CALENDAR_URLS as url}
+                    <div class="mono">{url.hostname}</div>
+                  {/each}
+                </div>
+              </div>
+              <div class="review-row">
+                <span>Confirmed</span>
+                <div>
+                  Once anchored, the proof stands on its own: it can be checked against the Bitcoin
+                  blockchain by anyone, forever, with no calendar and no xNotary involved.
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details class="explain" id="q-pending">
+          <summary>Why does my proof say “Pending anchor”?</summary>
+          <div>
+            The request has been accepted, but its Bitcoin proof is not complete yet. Anchoring
+            waits for at least one Bitcoin block and often several, so expect anywhere from about
+            twenty minutes to a few hours. Save the pending proof, return later and use Upgrade,
+            then verify and save the completed version. The proof establishes existence before the
+            relevant Bitcoin block, not the exact moment you created or signed the document.
+          </div>
+        </details>
+
+        <details class="explain" id="q-shows">
+          <summary>What does a certificate show — and what not?</summary>
+          <div>
+            <div class="boundary-grid">
+              <div class="boundary yes">
+                <h3>It shows</h3>
+                <ul>
+                  <li>The exact fingerprint of one file</li>
+                  <li>That it existed no later than a particular Bitcoin block</li>
+                  <li>Who signed it, among those who consented to be named</li>
+                  <li>That further signatures exist, without naming them</li>
+                  <li>Whether a file you hold still matches</li>
+                </ul>
+              </div>
+              <div class="boundary no">
+                <h3>It does not show</h3>
+                <ul>
+                  <li>That anything stated inside the document is true</li>
+                  <li>A signer's authority, unless verified separately</li>
+                  <li>Verification of a signature by a public authority</li>
+                  <li>That a signature meets any framework's highest tier</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details class="explain" id="q-backdate">
+          <summary>Can someone timestamp a fake document or backdate it?</summary>
+          <div>
+            A false statement, copied work or AI-generated image can be timestamped. The proof
+            establishes that file’s existence, not its truth or ownership. Changing a computer’s
+            clock cannot create a valid proof linking a newly created file to an earlier Bitcoin
+            block. Changing a timestamped file breaks its match with the original proof.
+          </div>
+        </details>
+
+        <details class="explain" id="q-accredited">
+          <summary>Is it an accredited timestamp?</summary>
+          <div>
+            No. The Bitcoin anchor is strong evidence, and it is checkable by anyone anywhere without
+            trusting a provider — but it is not a timestamp from an accredited trust service, which
+            in the EU means a qualified electronic timestamp under eIDAS. Support for an RFC 3161
+            timestamp alongside it is the first post-MVP milestone.
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="single-card">
+      <h2 class="section-title">Signatures</h2>
+      <div class="case-list">
+        <details class="explain" id="q-signing">
+          <summary>Where do I get a signature?</summary>
+          <div>
+            <p>
+              From a provider you already trust — xNotary deliberately does not issue, hold, or
+              broker signing keys, and your private key never touches it. Any PAdES signature can be
+              read and attested, wherever it was issued. How much legal weight it carries is a
+              question for the law that applies to you: most frameworks define a highest tier and a
+              list of providers entitled to issue one.
+            </p>
+            <p>
+              In the EU that tier is the qualified electronic signature (QES) under eIDAS — a
+              qualified certificate on a qualified signature creation device, issued by a qualified
+              trust service provider. In Czechia those providers are:
+            </p>
+            <div class="review-box">
+              <div class="review-row">
+                <span>I.CA</span>
+                <div>
+                  První certifikační autorita —
+                  <a href="https://www.ica.cz/" target="_blank" rel="noopener noreferrer">ica.cz</a>
+                </div>
+              </div>
+              <div class="review-row">
+                <span>PostSignum</span>
+                <div>
+                  Česká pošta —
+                  <a href="https://www.postsignum.cz/" target="_blank" rel="noopener noreferrer">
+                    postsignum.cz</a
+                  >
+                </div>
+              </div>
+              <div class="review-row">
+                <span>eIdentity</span>
+                <div>
+                  eIdentity a.s. —
+                  <a href="https://www.eidentity.cz/" target="_blank" rel="noopener noreferrer">
+                    eidentity.cz</a
+                  >
+                </div>
+              </div>
+            </div>
+            <p>
+              Outside the EU, use whatever your own framework recognises: xNotary reads the signature
+              the same way either way, and names the authority that issued it.
+            </p>
+          </div>
+        </details>
+
+        <details class="explain" id="q-what-to-sign">
+          <summary>Should we sign the document itself, or its Certificate 1?</summary>
+          <div>
+            Have everyone sign the document rather than the Certificate 1, then drop the signed
+            document into <em>Certify signers</em> together with its Certificate 1 (or the
+            <span class="mono">proof.ots</span>). xNotary checks that the timestamped bytes really
+            are a revision of the file they signed, and Certificate 2 then says the signatures are
+            over the document — carrying the proof along inside it. Signing the Certificate 1 still
+            works; it just attests to the certificate rather than to the document.
+          </div>
+        </details>
+
+        <details class="explain" id="q-parallel">
+          <summary>Signing in parallel or in sequence?</summary>
+          <div>
+            In parallel, each signer gets their own copy to sign; drop all of them together and
+            their signatures are pooled onto one certificate. In sequence, one file ends up carrying
+            every signature — drop just that. Either way, xNotary first checks the files really are
+            signatures over the same document, and refuses to combine them if they are not. There is
+            no “complete” state and nothing expires: collect another signature later and issue a new
+            Certificate 2.
+          </div>
+        </details>
+
+        <details class="explain" id="q-contract">
+          <summary>Can I use xNotary to sign a contract with someone?</summary>
+          <div>
+            Yes, with signatures from a provider each party already trusts. Timestamp the contract,
+            and have everyone sign the contract itself in their own tool — each their own copy, or
+            one file passed along. Then drop the signed files into <em>Certify signers</em> together
+            with the Certificate 1 or its <span class="mono">proof.ots</span>. xNotary first
+            establishes that every file is a signature over the same document, and that it is the
+            document that was timestamped; Certificate 2 then names the signers who agreed to be
+            named and attaches the signed files. One limit applies: xNotary reads the signatures
+            without validating them against a trust list, so whether each one has the standing the
+            contract needs — in the EU, typically a QES — is for an external validator to say.
+          </div>
+        </details>
+
+        <details class="explain" id="q-naming">
+          <summary>If I leave a signer off, are they anonymous?</summary>
+          <div>
+            No. Choosing not to name a signatory keeps them off the certificate's overview page,
+            which says only how many others signed. It does not remove them from anything.
+            Certificate 2 embeds the signed document unmodified — that is what makes it evidence —
+            and every signature in it carries the certificate naming its signer, often with an email
+            address and a personal identifier besides. That is where xNotary read the name in the
+            first place, and any PDF reader can open the attachment and read it too. Nothing could
+            strip it either: the certificate sits inside the bytes the signature is computed over,
+            so removing it would break the signature it belongs to. If someone must not be
+            identifiable at all, a certificate over that signed file is the wrong instrument — every
+            Certificate 2 says so on its face.
+          </div>
+        </details>
+
+        <details class="explain" id="q-validation">
+          <summary>Does xNotary tell me whether a signature is qualified?</summary>
+          <div>
+            No. Certificate 2 reports what each signature and its certificate <em>claim</em>. xNotary
+            can check integrity and read certificate data, but it does not check those certificates
+            against any trust list, so it never states what legal status a signature has. This
+            matters wherever you are: a law that treats an electronic signature as equivalent to a
+            handwritten one makes that equivalence conditional on the signature actually meeting the
+            conditions. In the EU that is the QES under eIDAS — see the Commission's
+            <a href={ESIGNATURE_FAQ_URL} target="_blank" rel="noopener noreferrer"> eSignature FAQ</a
+            >. Every Certificate 2 prints how to get that determination from something that can give
+            it:
+            <a href={DSS_SOURCE_URL} target="_blank" rel="noopener noreferrer">DSS</a> run on your own
+            machine, or a validation service from a trust provider. In the EU, only a qualified
+            provider's validation carries the presumption eIDAS attaches.
+          </div>
+        </details>
+
+        <details class="explain" id="q-bankid">
+          <summary>Is Bank iD SIGN a qualified signature?</summary>
+          <div>
+            <p>
+              <strong>No.</strong> Bank iD is an identity scheme, not a signing certificate: your
+              bank confirms who you are, and the document is then sealed with Bank iD's own qualified
+              electronic <em>seal</em>. What the signer ends up with is an advanced electronic
+              signature — <em>zaručený elektronický podpis</em> — carrying strong identity evidence,
+              but not the qualified status that only a qualified certificate on a qualified device
+              confers. The difference is legal, not cosmetic: where a law, an authority, or a
+              counterparty requires a QES, Bank iD SIGN will not satisfy it.
+            </p>
+            <p>
+              xNotary accepts it all the same. Certificate 2 records the signature and reports what
+              its certificate claims — it never upgrades an advanced signature into a qualified one,
+              and it never states that any signature is qualified.
+            </p>
+          </div>
+        </details>
+
+        <details class="explain" id="q-viewer-name">
+          <summary>Does the name shown in the signature viewer prove who signed?</summary>
+          <div>
+            No. <em>Certify signers</em> reads the name from the certificate inside each signature
+            and checks that the signed content still matches the digest the signature records —
+            that is what “Signed content intact” means. It does not verify the signature value
+            against the signer's key, and it checks no certificate against a trust list. A
+            displayed name is therefore what the signature claims, not a verified identity. To
+            authenticate the signer, validate the signed document with
+            <a href={DSS_SOURCE_URL} target="_blank" rel="noopener noreferrer">DSS</a> or a trust
+            provider.
+          </div>
+        </details>
+
+        <details class="explain" id="q-ltv">
+          <summary>Does it add long-term validation data?</summary>
+          <div>
+            Not yet: xNotary does not embed PAdES-LTA/LTV data. Certificates and revocation
+            information can expire; signers' own tools often add this.
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="single-card">
+      <h2 class="section-title">Verifying</h2>
+      <div class="case-list">
+        <details class="explain" id="q-verified">
+          <summary>What does “verified” mean?</summary>
+          <div>
+            That the file matches the certificate's fingerprint byte for byte, and the proof checks
+            out against Bitcoin as far as it could be checked. Nothing more: not who signed — that
+            is Certificate 2 — and nothing about what the document says or means. Checking the
+            timestamp only asks public block explorers about a block that is already public; the
+            files themselves are read on your device.
+          </div>
+        </details>
+
+        <details class="explain" id="q-without">
+          <summary>How do I verify without xNotary?</summary>
+          <div>
+            <p>
+              If xNotary disappears tomorrow, your certificates must still be provable — so nothing
+              here is a proprietary format.
+            </p>
+            <ol>
+              <li>Install the reference client: <code>pip install opentimestamps-client</code></li>
+              <li>
+                Detach <code>proof.ots</code> from the Certificate 1 PDF — or from a Certificate 2,
+                which carries it too when the document itself was signed — using any reader with an
+                attachments panel. Or use the <code>.ots</code> file you saved.
+              </li>
+              <li>Run <code>ots verify -f your-document.pdf proof.ots</code></li>
+            </ol>
+            <p>
+              The client recomputes the digest itself and queries Bitcoin directly. It will print
+              the block height and the attested time.
+            </p>
+          </div>
+        </details>
+
+        <details class="explain" id="q-no-official">
+          <summary>How can evidence be trusted without an official witnessing it?</summary>
+          <div>
+            For timestamping, trust comes from a verifiable calculation linked to Bitcoin’s public
+            history. No official needs to inspect or approve the file. For proving agreement,
+            additional checks must reliably connect a person, their signing action and the exact
+            document. Removing physical attendance does not remove the need for those checks.
+          </div>
+        </details>
+
+        <details class="explain" id="q-stronger">
+          <summary>Can xNotary provide stronger evidence than a signature on paper?</summary>
+          <div>
+            For detecting changes to a digital file and proving its existence in time, a verified
+            cryptographic proof can provide stronger technical evidence than a handwritten signature
+            and written date alone. It checks an exact digital fingerprint. Our goal is to combine
+            that precision with trusted identity and verified signatures. Stronger technical
+            evidence does not automatically mean greater legal authority.
+          </div>
+        </details>
+
+        <details class="explain" id="q-email">
+          <summary>Why should I trust xNotary rather than just keep an email?</summary>
+          <div>
+            Emails can be useful evidence of communication. xNotary adds a separate proof of the
+            exact file’s existence that can be checked beyond one inbox or provider. Completed
+            OpenTimestamps proofs use an open format and can be verified outside xNotary. The web
+            verifier uses external Bitcoin data services; a compatible verifier using your own
+            Bitcoin node offers greater independence.
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="single-card">
+      <h2 class="section-title">Privacy and keeping your evidence</h2>
+      <div class="case-list">
+        <details class="explain" id="q-keeps">
+          <summary>What does xNotary keep?</summary>
+          <div>
+            <p>
+              Nothing, anywhere — there is no xNotary backend to keep it on. xNotary is a static page
+              that runs entirely in your browser.
+            </p>
+            <div class="review-box">
+              <div class="review-row">
+                <span>Your files</span>
+                <div>
+                  Never uploaded. They are hashed on this device and only the 32-byte digest is
+                  sent, to the public OpenTimestamps calendars.
+                </div>
+              </div>
+              <div class="review-row">
+                <span>Certificate 2</span>
+                <div>
+                  Not stored at all, not even here. It is built in the tab and handed to you to
+                  save. Close the tab and it is gone — though it can be rebuilt at any time from the
+                  same signed files.
+                </div>
+              </div>
+              <div class="review-row">
+                <span>Certificate 1</span>
+                <div>
+                  The one exception, kept in this browser's own storage on this device, so that a
+                  pending Bitcoin timestamp can be upgraded to confirmed later. It is not sent
+                  anywhere, and you can delete it from <em>My certificates</em> whenever you like.
+                </div>
+              </div>
+            </div>
+            <p>
+              This is the point of the design rather than a gap in it. A service that never holds
+              your documents cannot leak them, cannot be compelled to hand them over, and cannot
+              lose them.
+            </p>
+          </div>
+        </details>
+
+        <details class="explain" id="q-public">
+          <summary>Will my document become public?</summary>
+          <div>
+            Timestamping does not publish your document on Bitcoin. Your browser calculates its
+            fingerprint, and the timestamping process sends a cryptographic commitment rather than
+            the document itself. Check what you share afterwards: an exported certificate may
+            include the original PDF, including names and signatures. This is not anonymization — a
+            signatory who does not appear in the app’s overview has not been removed from anything,
+            and their details may still sit inside that attached PDF. If a document has to be shared
+            without someone’s details, remove them before you timestamp it.
+          </div>
+        </details>
+
+        <details class="explain" id="q-keep">
+          <summary>What should I keep, and what happens if xNotary disappears?</summary>
+          <div>
+            Keep the exact original file and its completed OpenTimestamps proof, including the .ots
+            file. Compatible tools can verify a completed standard proof without xNotary. A pending
+            proof may still need calendar servers to complete it. A PDF certificate or screenshot
+            alone is not a substitute for verification, and the proof cannot recover a lost original
+            document. Do not treat <em>My certificates</em> as the place you keep them: that list
+            lives in this browser under this address, xnotary.digital, and clearing your browser
+            data or opening the app from a different address leaves it empty.
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="single-card">
+      <h2 class="section-title">Notaries and legal standing</h2>
+      <div class="case-list">
+        <details class="explain" id="q-visit">
+          <summary>Do I need to visit a notary or government office?</summary>
+          <div>
+            No visit or official is needed to create and verify an xNotary timestamp. You can do it
+            from your browser. Where a transaction requires an officially certified signature, a
+            notarial deed or another prescribed form, the beta’s timestamp alone does not fulfil
+            that requirement.
+          </div>
+        </details>
+
+        <details class="explain" id="q-official">
+          <summary>Does xNotary replace an officially certified signature?</summary>
+          <div>
+            <p>
+              Not in the reviewed beta. Official signature certification connects an identified
+              person to a signature they made or acknowledged. A timestamp connects a file to a time
+              record. Replacing the practical need for an official requires reliable identity and
+              signature verification; satisfying a legal certification requirement also depends on
+              the country and transaction.
+            </p>
+            <p>
+              Where a law requires a signature to be verified by an official — notarized — an
+              electronic signature stands in for it only on that jurisdiction's own terms, and
+              xNotary neither checks those terms nor certifies that they are met. Czechia is the
+              worked example: § 6(2) of Act 12/2020 Sb. grants the right, but only where it can be
+              verified <em>from population register data</em> that the qualified certificate belongs
+              to the signer — a check requiring register access that a page running in your browser
+              does not have. § 6(3) excludes some cases outright. See the
+              <a href={DIA_SUBSTITUTION_URL} target="_blank" rel="noopener noreferrer">
+                DIA methodology</a
+              >.
+            </p>
+          </div>
+        </details>
+
+        <details class="explain" id="q-copy">
+          <summary>Does xNotary replace a certified true copy?</summary>
+          <div>
+            For a digital original, fingerprint verification can establish that another file is an
+            exact match, without someone visually comparing pages. That addresses a similar
+            practical need, but it is not official copy certification, also called vidimation. The
+            beta does not compare a paper original with a scan or certify that the scan faithfully
+            reproduces it.
+          </div>
+        </details>
+
+        <details class="explain" id="q-court">
+          <summary>Can I use the proof in court?</summary>
+          <div>
+            It can support evidence about a file’s contents and existence in time. Its legal weight
+            depends on the jurisdiction, the dispute and other evidence. A timestamp does not
+            guarantee an outcome, establish someone’s agreement or replace the required legal form
+            of a transaction.
+          </div>
+        </details>
+
+        <details class="explain" id="q-trust-service">
+          <summary>Is xNotary a qualified trust service or an online notary?</summary>
+          <div>
+            The reviewed beta provides Bitcoin-based timestamp evidence and collects qualified
+            electronic signatures made with the parties’ own tools. That does not make it a
+            qualified timestamping service, an official signature-certification service or a notary.
+            Our direction is to make document evidence and agreement verifiable remotely; any claim
+            of a particular legal status requires the corresponding requirements to be met.
+          </div>
+        </details>
+
+        <details class="explain" id="q-borders">
+          <summary>Can I use xNotary across borders?</summary>
+          <div>
+            You can create and verify timestamp proofs remotely from a suitable browser with an
+            internet connection. No official needs to attend the timestamping process, wherever you
+            are. The technical evidence can be checked across borders; legal requirements and
+            recognition may differ between countries.
+          </div>
+        </details>
       </div>
     </div>
 
@@ -117,20 +730,23 @@
       Examples, not features. Each one is here because it is the only place a
       particular property is shown concretely — the agreement check, the file
       never leaving the device, the recipient needing nothing, the limit on what
-      a timestamp can mean, and a certificate outliving this app. Folded by
-      default: five open cases would bury the page they are meant to introduce.
+      a timestamp can mean, and a certificate outliving this app.
     -->
     <div class="single-card">
       <h2 class="section-title">What people use it for</h2>
-      <p class="section-copy">
-        Timestamping fixes <em>what</em> a document was and <em>when</em>. It says nothing about
-        <em>who</em> — that is what a signature adds. A trust provider checks a person's identity
-        before issuing their certificate, so a signed document carries a name someone stood behind
-        rather than one typed into a form. Certificate 2 records those names with the authority that
-        issued each, and points you to the check that confirms them.
-      </p>
-
       <div class="case-list">
+        <details class="explain" id="q-uses">
+          <summary>What would I use the beta for?</summary>
+          <div>
+            Keep evidence of a design before sharing it, a quotation before negotiations or a report
+            before delivery. If someone disputes which version existed, you have a precise file and
+            proof to verify. The beta is deliberately general rather than built for one industry or
+            one document type — if you find a use we have not thought of, tell us. Evidence of
+            delivery, acceptance or authorship must come from additional records or verified
+            signatures.
+          </div>
+        </details>
+
         <details class="explain">
           <summary>A contract signed in two countries, with no shared platform</summary>
           <div>
@@ -188,356 +804,6 @@
             that the bytes are unchanged. That is the test every certificate here is built to pass.
           </div>
         </details>
-      </div>
-    </div>
-
-    <div class="single-card">
-      <h2 class="section-title">What xNotary does</h2>
-      <p class="section-copy">
-        Two kinds of proof, in the order you would actually use them. Both work today. Step 2
-        happens outside xNotary — that is the point of it, not a gap.
-      </p>
-      <div class="review-box">
-        <div class="review-row">
-          <span>1 · Timestamp</span>
-          <div>
-            <strong>Certificate 1 — integrity and existence.</strong> This exact file existed no
-            later than a particular Bitcoin block. Your file is hashed here and never leaves the
-            device.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>2 · Sign</span>
-          <div>
-            <strong>With your own tools, not here.</strong> You and the other parties sign — ideally
-            the document itself, otherwise its Certificate 1 — using signatures from a provider you
-            already trust. xNotary never issues, holds or sees a signing key, and never sends anyone
-            a signing invitation.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>3 · Signatures</span>
-          <div>
-            <strong>Certificate 2 — who signed.</strong> Drop in the signed files, confirm who may
-            be named, and get a one-page PDF listing them with their issuing authority and signing
-            time, the signed documents embedded inside it. Anyone you leave off is disclosed as a
-            count and never named on the page — though the attached file still carries their name,
-            which is not something xNotary can change. Add the Certificate 1 or its
-            <span class="mono">proof.ots</span> and it also establishes that the signatures are over
-            the timestamped document itself.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>4 · Verify</span>
-          <div>
-            <strong>For whoever receives it.</strong> Anyone holding the document and its
-            Certificate 1 can check two things: that this file is the one the certificate is about,
-            and that the timestamp is real. It does not check signatures — see
-            <em>Not a validation result</em> below.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>My certificates</span>
-          <div>
-            The Certificate 1s made on this device, kept in this browser only so a pending timestamp
-            can be upgraded to confirmed once Bitcoin catches up. Nothing else is stored, anywhere.
-            Browsers keep this storage separate per address, so the list belongs to
-            <strong>xnotary.digital</strong> in this browser and nowhere else — not another browser,
-            not another device, and not the same app served from a different address.
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="single-card">
-      <h2 class="section-title">How the timestamp works</h2>
-      <p class="section-copy">
-        Your file is hashed here, in your browser. Only the resulting 32-byte SHA-256 digest is sent
-        — to public OpenTimestamps calendar servers, which batch many digests into a single Bitcoin
-        transaction. The digest reveals nothing about the file's contents, and the file itself is
-        never uploaded to anyone, including us. There is no “us”: xNotary has no backend.
-      </p>
-      <div class="review-box">
-        <div class="review-row">
-          <span>Calendars used</span>
-          <div>
-            {#each CALENDAR_URLS as url}
-              <div class="mono">{url.hostname}</div>
-            {/each}
-          </div>
-        </div>
-        <div class="review-row">
-          <span>Pending</span>
-          <div>
-            Right after stamping, a calendar has promised to anchor your digest but no Bitcoin block
-            contains it yet. This is normal and usually resolves within a few hours.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>Confirmed</span>
-          <div>
-            Once anchored, the proof stands on its own: it can be checked against the Bitcoin
-            blockchain by anyone, forever, with no calendar and no xNotary involved.
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="single-card">
-      <h2 class="section-title">Verifying without xNotary</h2>
-      <p class="section-copy">
-        This matters more than the app. If xNotary disappears tomorrow, your certificates must still
-        be provable — so nothing here is a proprietary format.
-      </p>
-      <ol style="color:var(--ink-soft);font-size:13px;line-height:1.8">
-        <li>Install the reference client: <code>pip install opentimestamps-client</code></li>
-        <li>
-          Detach <code>proof.ots</code> from the Certificate 1 PDF — or from a Certificate 2, which
-          carries it too when the document itself was signed — using any reader with an attachments
-          panel. Or use the <code>.ots</code> file you saved.
-        </li>
-        <li>Run <code>ots verify -f your-document.pdf proof.ots</code></li>
-      </ol>
-      <p class="section-copy" style="margin:12px 0 0">
-        The client recomputes the digest itself and queries Bitcoin directly. It will print the
-        block height and the attested time.
-      </p>
-    </div>
-
-    <div class="single-card">
-      <h2 class="section-title">Getting a signature</h2>
-      <p class="section-copy">
-        Certificate 2 records signatures made over the document, or over its Certificate 1. xNotary
-        deliberately does not issue, hold, or broker signing keys — you bring your own signature,
-        from a provider you already trust. Any PAdES signature can be read and attested, wherever it
-        was issued. How much legal weight it carries is a question for the law that applies to you:
-        most frameworks define a highest tier and a list of providers entitled to issue one.
-      </p>
-      <p class="section-copy">
-        In the EU that tier is the qualified electronic signature (QES) under eIDAS — a qualified
-        certificate on a qualified signature creation device, issued by a qualified trust service
-        provider. In Czechia those providers are:
-      </p>
-      <div class="review-box">
-        <div class="review-row">
-          <span>I.CA</span>
-          <div>
-            První certifikační autorita —
-            <a href="https://www.ica.cz/" target="_blank" rel="noopener noreferrer">ica.cz</a>
-          </div>
-        </div>
-        <div class="review-row">
-          <span>PostSignum</span>
-          <div>
-            Česká pošta —
-            <a href="https://www.postsignum.cz/" target="_blank" rel="noopener noreferrer">
-              postsignum.cz</a
-            >
-          </div>
-        </div>
-        <div class="review-row">
-          <span>eIdentity</span>
-          <div>
-            eIdentity a.s. —
-            <a href="https://www.eidentity.cz/" target="_blank" rel="noopener noreferrer">
-              eidentity.cz</a
-            >
-          </div>
-        </div>
-      </div>
-      <p class="section-copy" style="margin:16px 0 0">
-        Outside the EU, use whatever your own framework recognises: xNotary reads the signature the
-        same way either way, and names the authority that issued it. You sign with the tool your
-        provider gives you — the document itself for preference, otherwise its Certificate 1 — then
-        send the signed PDF back to whoever is assembling Certificate 2. Your private key never
-        touches xNotary.
-      </p>
-    </div>
-
-    <div class="single-card">
-      <h2 class="section-title">Bank iD SIGN is not a qualified signature</h2>
-      <div class="notice warn" style="margin-top:0">
-        Bank iD SIGN does <strong>not</strong> produce a qualified electronic signature. It is listed
-        here separately because it is often assumed to.
-      </div>
-      <p class="section-copy" style="margin-top:16px">
-        Bank iD is an identity scheme, not a signing certificate: your bank confirms who you are,
-        and the document is then sealed with Bank iD's own qualified electronic <em>seal</em>. What
-        the signer ends up with is an advanced electronic signature —
-        <em>zaručený elektronický podpis</em> — carrying strong identity evidence, but not the
-        qualified status that only a qualified certificate on a qualified device confers. The
-        difference is legal, not cosmetic: where a law, an authority, or a counterparty requires a
-        QES, Bank iD SIGN will not satisfy it.
-      </p>
-      <p class="section-copy" style="margin-bottom:0">
-        xNotary accepts it all the same. Certificate 2 records the signature and reports what its
-        certificate claims — it never upgrades an advanced signature into a qualified one, and it
-        never states that any signature is qualified. Validate the certificate the way every
-        Certificate 2 describes, to find out which of the two you are holding.
-      </p>
-    </div>
-
-    <div class="single-card">
-      <h2 class="section-title">What xNotary keeps</h2>
-      <p class="section-copy">
-        Nothing, anywhere — because there is no xNotary backend to keep it on. xNotary is a static
-        page that runs entirely in your browser; there is nowhere for it to put your documents even
-        if it wanted to.
-      </p>
-      <div class="review-box">
-        <div class="review-row">
-          <span>Your files</span>
-          <div>
-            Never uploaded. They are hashed on this device and only the 32-byte digest is sent, to
-            the public OpenTimestamps calendars.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>Certificate 2</span>
-          <div>
-            Not stored at all, not even here. It is built in the tab and handed to you to save.
-            Close the tab and it is gone — so save it somewhere you back up. Nothing is lost if you
-            forget: it can be rebuilt at any time from the same signed files.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>Certificate 1</span>
-          <div>
-            The one exception, kept in this browser's own storage on this device, so that a pending
-            Bitcoin timestamp can be upgraded to confirmed later. It is not sent anywhere, and you
-            can delete it from <em>My certificates</em> whenever you like. Clearing your browser data
-            removes it too — keep the downloaded PDF as your real copy.
-          </div>
-        </div>
-      </div>
-      <p class="section-copy" style="margin:16px 0 0">
-        This is the point of the design rather than a gap in it. A service that never holds your
-        documents cannot leak them, cannot be compelled to hand them over, and cannot lose them.
-      </p>
-    </div>
-
-    <div class="single-card">
-      <h2 class="section-title">Limits you should know about</h2>
-      <div class="review-box">
-        <div class="review-row">
-          <span>Not a signature</span>
-          <div>
-            Certificate 1 proves a file existed at a time. It says nothing about who made it or what
-            it means. Certificate 2 records who signed, and what they signed: the document itself
-            when the proof links the two, otherwise its Certificate 1 — which is not the same thing,
-            and the certificate says which of them it is.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>Not a validation result</span>
-          <div>
-            Certificate 2 reports what each signature and its certificate <em>claim</em>. xNotary
-            can check integrity and read certificate data, but it does not check those certificates
-            against any trust list, so it never states what legal status a signature has. This
-            matters wherever you are: a law that treats an electronic signature as equivalent to a
-            handwritten one makes that equivalence conditional on the signature actually meeting the
-            conditions. In the EU that is the QES under eIDAS — see the Commission's
-            <a href={ESIGNATURE_FAQ_URL} target="_blank" rel="noopener noreferrer">
-              eSignature FAQ</a
-            >. Every Certificate 2 prints how to get that determination from something that can give
-            it:
-            <a href={DSS_SOURCE_URL} target="_blank" rel="noopener noreferrer">DSS</a> run on your own
-            machine, or a validation service from a trust provider.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>Not officially verified</span>
-          <div>
-            Where a law requires a signature to be verified by an official — notarized — an
-            electronic signature stands in for it only on that jurisdiction's own terms, and xNotary
-            neither checks those terms nor certifies that they are met. Czechia is the worked
-            example: § 6(2) of Act 12/2020 Sb. grants the right, but only where it can be verified
-            <em>from population register data</em> that the qualified certificate belongs to the
-            signer — a check requiring register access that a page running in your browser does not
-            have. § 6(3) excludes some cases outright. See the
-            <a href={DIA_SUBSTITUTION_URL} target="_blank" rel="noopener noreferrer">
-              DIA methodology</a
-            >.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>Not an accredited timestamp</span>
-          <div>
-            The Bitcoin anchor is strong evidence, and it is checkable by anyone anywhere without
-            trusting a provider — but it is not a timestamp from an accredited trust service, which
-            in the EU means a qualified electronic timestamp under eIDAS. Support for an RFC 3161
-            timestamp alongside it is the first post-MVP milestone.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>No long-term validation</span>
-          <div>
-            xNotary does not yet embed PAdES-LTA/LTV data. Certificates and revocation information
-            can expire; signers' own tools often add this.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>Not anonymization</span>
-          <div>
-            Choosing not to name a signatory keeps them off the certificate's overview page. It does
-            not remove them from anything. Certificate 2 embeds the signed document unmodified —
-            that is what makes it evidence — and every signature in it carries the certificate
-            naming its signer, often with an email address and a personal identifier besides. That is
-            where xNotary read the name in the first place, and any PDF reader can open the
-            attachment and read it too. Nothing could strip it either: the certificate sits inside
-            the bytes the signature is computed over, so removing it would break the signature it
-            belongs to. If someone must not be identifiable at all, a certificate over that signed
-            file is the wrong instrument — every Certificate 2 says so on its face.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>Nothing is backed up</span>
-          <div>
-            Self-custody cuts both ways. Clear your browser data and your library is gone. Save your
-            certificates somewhere you keep things.
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="single-card">
-      <h2 class="section-title">Licensing</h2>
-      <p class="section-copy">
-        xNotary is free software: <strong>AGPL-3.0-or-later</strong>. The
-        <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">source</a> is public, which is
-        what lets anyone check that the claims on this page are true of the code actually running.
-      </p>
-      <div class="review-box">
-        <div class="review-row">
-          <span>This build</span>
-          <div>
-            {#if revisionUrl}
-              <a href={revisionUrl} target="_blank" rel="noopener noreferrer">
-                <span class="mono">{revision}</span>
-              </a> — the exact source this page was built from. Anyone running xNotary as a service owes
-              you that, not merely a link to the project.
-            {:else}
-              <span class="mono">{revision}</span> — built from changes that are not in any published
-              commit, so there is nothing to link. A deployed build should never say this.
-            {/if}
-          </div>
-        </div>
-        <div class="review-row">
-          <span>Third-party code</span>
-          <div>
-            Everything your browser downloaded, with its licence, is listed in
-            <a href={NOTICES_URL}>THIRD-PARTY.txt</a> — generated at build time from the modules actually
-            present, so it cannot drift from what was shipped.
-          </div>
-        </div>
-        <div class="review-row">
-          <span>OpenTimestamps library</span>
-          <div>
-            The OpenTimestamps client is licensed LGPL-3.0-or-later. It is loaded as a separate
-            module rather than bundled in, so you can build your own version of it and have this app
-            run against yours instead: see <a href={RELINKING_URL}>how to relink it</a>.
-          </div>
-        </div>
       </div>
     </div>
   </div>

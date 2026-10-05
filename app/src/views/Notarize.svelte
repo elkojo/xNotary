@@ -10,6 +10,7 @@
    */
   import FileDrop from '../components/FileDrop.svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
+  import Info from '../site/Info.svelte';
   import { buildCertificate1 } from '../lib/certificate1';
   import { baseName, downloadBytes, formatBytes } from '../lib/download';
   import { groupHex, sha256File, toHex } from '../lib/hash';
@@ -140,12 +141,13 @@
     <div class="page-head">
       <div>
         <h1>Timestamp a document</h1>
-        <p>
-          Create independent proof that an exact file existed at a specific time, anchored in the
-          Bitcoin blockchain.
-        </p>
       </div>
-      <span class="secure-note">Processed in this browser</span>
+      <span class="secure-note"
+        >Processed in this browser<Info more="#/help/keeps"
+          >The file never leaves this device. Only its 32-byte SHA-256 fingerprint is sent, to
+          public OpenTimestamps calendars.</Info
+        ></span
+      >
     </div>
 
     <div class="flow-shell">
@@ -162,15 +164,11 @@
 
         {#if step === 1}
           <div class="flow-panel">
-            <h2 class="panel-title">Choose the file you want to prove</h2>
-            <p class="panel-copy">
-              We calculate its unique fingerprint on this device. The document itself is never
-              uploaded.
-            </p>
+            <h2 class="panel-title">Choose a file</h2>
 
             <FileDrop
               label="Drop a file here"
-              hint="Any file type. Large files are hashed in chunks."
+              hint="Any file type"
               onselect={pick}
             />
 
@@ -185,29 +183,27 @@
           </div>
         {:else if step === 2}
           <div class="flow-panel">
-            <h2 class="panel-title">Review before creating proof</h2>
-            <p class="panel-copy">
-              This fingerprint identifies this exact version. Any change to the file produces a
-              different one.
-            </p>
-
+            <h2 class="panel-title">Review</h2>
             <div class="review-box">
               <div class="review-row">
                 <span>File</span>
                 <strong>{file?.name} · {formatBytes(file?.size ?? 0)}</strong>
               </div>
               <div class="review-row">
-                <span>Fingerprint</span>
+                <span
+                  >Fingerprint<Info
+                    >Identifies this exact version: any change to the file gives a different one.
+                    It is the only thing sent.</Info
+                  ></span
+                >
                 <strong class="mono">{groupHex(digestHex)}</strong>
-              </div>
-              <div class="review-row">
-                <span>Sent</span>
-                <strong>Only the digest above, to public OpenTimestamps calendars.</strong>
               </div>
             </div>
 
             <div class="field">
-              <label for="note">Note (optional)</label>
+              <label for="note"
+                >Note (optional)<Info>Printed on the certificate. Never sent.</Info></label
+              >
               <input
                 id="note"
                 class="input"
@@ -215,9 +211,6 @@
                 bind:value={note}
                 placeholder="e.g. Lease agreement, v3"
               />
-              <p class="field-help">
-                The note is printed on the certificate. It is not sent to the calendars.
-              </p>
             </div>
 
             <div class="flow-actions">
@@ -246,16 +239,11 @@
             <div class="success">
               <div class="success-mark" aria-hidden="true">✓</div>
               <h2>Certificate 1 created</h2>
-              <p>
-                {#if result.status.kind === 'confirmed'}
-                  This certificate proves that your exact document existed no later than
-                  <strong>{utcStamp(result.status.blockTime)}</strong>.
-                {:else}
-                  The calendars have accepted your fingerprint. The attested time becomes provable
-                  once it reaches a Bitcoin block — usually within a few hours.
-                {/if}
-              </p>
-
+              {#if result.status.kind === 'confirmed'}
+                <p>
+                  Existed no later than <strong>{utcStamp(result.status.blockTime)}</strong>.
+                </p>
+              {/if}
               <div class="certificate-mini">
                 <div class="review-row">
                   <span>Status</span>
@@ -306,24 +294,23 @@
                     )}>Save proof (.ots)</button
                 >
               </div>
-              <p class="keep-note">
-                Keep the original file. A certificate proves it; it cannot restore it.
-              </p>
             </div>
 
             {#if result.status.kind === 'pending'}
               <div class="notice warn">
-                <strong>Not yet in a Bitcoin block.</strong> Come back to
-                <button class="link-button" onclick={() => go('library')}>My certificates</button>
-                in a few hours and press <em>Upgrade</em> — the certificate will then state the
-                block's own time, and verify with no calendar involved.
+                <strong>Not in a Bitcoin block yet.</strong> In a few hours, press <em>Upgrade</em> in
+                <button class="link-button" onclick={() => go('library')}>My certificates</button
+                >.<Info more="#/help/pending"
+                  >The upgraded certificate states the block's own time and verifies with no
+                  calendar involved.</Info
+                >
               </div>
             {/if}
 
             {#if calendarWarnings.length}
               <div class="notice">
-                Some calendars did not respond ({calendarWarnings.length}). The proof is still valid
-                — it only needs one.
+                {calendarWarnings.length} calendar{calendarWarnings.length === 1 ? '' : 's'} did not
+                respond — one is enough.
                 <details class="raw">
                   <summary>Details</summary>
                   <pre>{calendarWarnings.join('\n')}</pre>
@@ -332,9 +319,11 @@
             {/if}
 
             <div class="notice">
-              <strong>Back these up.</strong> The certificate lives in this browser only — xNotary
-              keeps no copy. The proof is embedded in the PDF, so the PDF alone verifies; keep the
-              original file too, or there is nothing to check it against.
+              <strong>Save the PDF and keep the original file.</strong> xNotary keeps no copy.<Info
+                more="#/help/keep"
+                >The proof is embedded in the PDF, so the PDF alone verifies — against the original
+                file, which it cannot restore. My certificates lives only in this browser.</Info
+              >
             </div>
 
             <details class="raw">
@@ -348,20 +337,6 @@
           </div>
         {/if}
       </div>
-
-      <aside class="side-card">
-        <h3>What you get</h3>
-        <p>
-          A certificate anyone can verify against the original — with the reference client, no
-          xNotary involved.
-        </p>
-        <div class="side-list">
-          <div>The document's SHA-256 fingerprint</div>
-          <div>An independent time proof, anchored in Bitcoin</div>
-          <div>The proof file embedded in the PDF</div>
-          <div>Printed instructions for verifying it elsewhere</div>
-        </div>
-      </aside>
     </div>
   </div>
 </section>
