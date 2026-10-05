@@ -1,6 +1,45 @@
 # Where things stand — handoff
 
-**Last updated:** 2026-10-03 · `main` · v0.6.0 (front page, xNotary at `/xnotary/`, xSignature at `/xsignature/`) is tagged and released but **not deployed yet**; more local changes come first, and the operator then deploys a later tag (v0.6.x or v0.7.0)
+## Pick up here (2026-10-05)
+
+**Open: [PR #12](https://github.com/elkojo/xNotary/pull/12)**, branch `less-text-and-xconvert-spike`,
+not merged. It holds two pieces of work:
+
+1. **Less text on every page.** ⓘ bubbles (`app/src/site/Info.svelte`), "How it works" and "Q&A"
+   merged into one Help page, qualified timestamp authorities in xSignature (Izenpe default),
+   new front-page texts.
+2. **xConvert at `/xconvert/`**: pandoc 3.12 plus our own Typst wrapper (`xconvert/typst-pdf`)
+   produce PDF/A-2b in the browser, with offline use and a licences page. Steps 1–5 of the plan
+   are done. The design record is `docs/xconvert-spike.md`; the rules are in `xconvert/CLAUDE.md`
+   (gitignored, local only).
+
+**First thing to do:** check the latest CI run on PR #12 (`gh pr checks 12`).
+- The new CI steps had never run on GitHub before this PR. Runs 1 and 2 failed and were fixed:
+  an unlisted host in `hosts-in-build.txt`, then Chrome not starting on the runner (now polled,
+  with `--no-sandbox` on CI only).
+- Run 3 was still in progress at hand-off.
+- If the browser test still fails, its log now includes Chrome's own error output:
+  `gh run view <id> --log-failed`.
+- GitHub also warns that `actions/*@v4` run on deprecated Node 20, and that `ubuntu-latest`
+  moves to Ubuntu 26 on 2026-10-19. Neither blocks; bumping the actions is a small follow-up.
+
+**After CI is green:** merge only when the user says so. Then version, tag and release as below.
+The operator deploys; agents never touch the Cloudflare account.
+
+**Still unchecked for xConvert:**
+- a real phone;
+- DOCX files saved by Microsoft Word itself (the fixtures are LibreOffice's), tracked changes,
+  headers and footers;
+- CJK and right-to-left text (the bundled fonts have no CJK).
+
+**Running xConvert locally**, from `xconvert/app/`:
+1. `npm ci && npm run vendor`. This needs the Rust `wasm32` target, from rustup in `~/.cargo`.
+2. `npm test`.
+3. Run `npm run build:only` in `app/`.
+4. `npm run verapdf:install` (needs Java), then `npm run e2e`.
+
+
+**Last updated:** 2026-10-05 (see *Pick up here*); below as of 2026-10-03 · `main` · v0.6.0 (front page, xNotary at `/xnotary/`, xSignature at `/xsignature/`) is tagged and released but **not deployed yet**; more local changes come first, and the operator then deploys a later tag (v0.6.x or v0.7.0)
 
 M0, M1 and M2 are done. Both certificates work end to end, the app is public and live, and
 `pades.ts` has been measured against real qualified signatures rather than only synthetic ones.
