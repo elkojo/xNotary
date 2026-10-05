@@ -13,13 +13,14 @@ not merged. It holds two pieces of work:
    are done. The design record is `docs/xconvert-spike.md`; the rules are in `xconvert/CLAUDE.md`
    (gitignored, local only).
 
-**First thing to do:** check the latest CI run on PR #12 (`gh pr checks 12`).
-- The new CI steps had never run on GitHub before this PR. Runs 1 and 2 failed and were fixed:
-  an unlisted host in `hosts-in-build.txt`, then Chrome not starting on the runner (now polled,
-  with `--no-sandbox` on CI only).
-- Run 3 was still in progress at hand-off.
-- If the browser test still fails, its log now includes Chrome's own error output:
-  `gh run view <id> --log-failed`.
+**CI on PR #12 is green** (run 37355547290). Getting there took four fixes, because these CI steps
+had never run on GitHub before:
+- an unlisted host in `hosts-in-build.txt`;
+- Chrome not starting on the runner (now polled, with `--no-sandbox` on CI only);
+- the e2e polling a page that had not finished navigating;
+- **a real bug: Letter paper failed every PDF conversion.** Typst names it `us-letter`. It was
+  found only because the runner's locale is en-US. The e2e now chooses A4 and Letter explicitly
+  and checks each page size.
 - GitHub also warns that `actions/*@v4` run on deprecated Node 20, and that `ubuntu-latest`
   moves to Ubuntu 26 on 2026-10-19. Neither blocks; bumping the actions is a small follow-up.
 
