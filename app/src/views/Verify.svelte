@@ -98,7 +98,7 @@
   <div class="workspace">
     <div class="page-head">
       <div>
-        <h1>Verify a document</h1>
+        <h1>Verify a proof</h1>
       </div>
       <span class="secure-note"
         >Checked in this browser<Info more="#/help/verified"

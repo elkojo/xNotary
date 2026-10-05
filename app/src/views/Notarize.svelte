@@ -141,7 +141,7 @@
   <div class="workspace">
     <div class="page-head">
       <div>
-        <h1>Timestamp a document</h1>
+        <h1>Timestamp a document on Bitcoin</h1>
       </div>
       <span class="secure-note"
         >Processed in this browser<Info more="#/help/keeps"
@@ -233,8 +233,14 @@
         {:else if result}
           <div class="flow-panel">
             <div class="success">
-              <div class="success-mark" aria-hidden="true">✓</div>
-              <h2>Certificate 1 created</h2>
+              {#if result.status.kind === 'pending'}
+                <!-- No ✓ while pending: it read as finished, and people sent it on. -->
+                <div class="success-mark pending" aria-hidden="true"></div>
+                <h2>Certificate 1 created — waiting for Bitcoin</h2>
+              {:else}
+                <div class="success-mark" aria-hidden="true">✓</div>
+                <h2>Certificate 1 created</h2>
+              {/if}
               {#if result.status.kind === 'confirmed'}
                 <p>
                   Existed no later than <strong>{utcStamp(result.status.blockTime)}</strong>.
@@ -270,6 +276,18 @@
                 {/if}
               </div>
 
+              {#if result.status.kind === 'pending'}
+                <div class="notice warn">
+                  <strong>Not in a Bitcoin block yet.</strong> In a few hours, press <em>Upgrade</em> in
+                  <button class="link-button" onclick={() => go('library')}>My certificates</button
+                  >, in this browser, where it is kept. Save both files now either way.<Info
+                    more="#/help/pending"
+                    >The upgraded certificate states the block's own time and verifies with no
+                    calendar involved.</Info
+                  >
+                </div>
+              {/if}
+
               <div class="success-actions">
                 <button
                   class="button dark"
@@ -292,16 +310,6 @@
               </div>
             </div>
 
-            {#if result.status.kind === 'pending'}
-              <div class="notice warn">
-                <strong>Not in a Bitcoin block yet.</strong> In a few hours, press <em>Upgrade</em> in
-                <button class="link-button" onclick={() => go('library')}>My certificates</button
-                >.<Info more="#/help/pending"
-                  >The upgraded certificate states the block's own time and verifies with no
-                  calendar involved.</Info
-                >
-              </div>
-            {/if}
 
             {#if calendarWarnings.length}
               <div class="notice">

@@ -164,7 +164,7 @@
   <div class="workspace">
     <div class="page-head">
       <div>
-        <h1>Attest signatures</h1>
+        <h1>Certify signers</h1>
       </div>
       <span class="secure-note"
         >Read in this browser<Info more="#/help/keeps"

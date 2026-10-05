@@ -18,7 +18,7 @@
           Timestamp a document →
         </button>
         <button class="button secondary" onclick={() => go('verify')}>
-          Check a certificate
+          Verify a proof
         </button>
       </div>
     </div>

@@ -48,10 +48,10 @@ export const SERVICES: readonly Service[] = [
     href: '/xsignature/',
     external: false,
     home: 'signature',
-    tagline: 'Make a signature image, sign a PDF with your certificate and a qualified timestamp.',
+    tagline: 'Make a signature image, sign a PDF with your certificate and an independent timestamp.',
     description:
       'Make a signature, put it on a PDF. Sign with your own certificate to produce an advanced ' +
-      'electronic signature with a qualified timestamp.',
+      'electronic signature with an independent timestamp.',
     tabs: XSIGNATURE_NAV,
     notices: 'THIRD-PARTY.md',
   },
@@ -80,7 +80,7 @@ export const TASKS: ReadonlyArray<{
 }> = [
   { service: 'xconvert', page: 'convert', title: 'Convert a document', description: 'To an archival PDF/A, DOCX, ODT and more.' },
   { service: 'xnotary', page: 'notarize', title: 'Prove a file existed', description: 'A Bitcoin-anchored timestamp of the exact file.' },
-  { service: 'xsignature', page: 'document', title: 'Sign a PDF', description: 'Place your signature, sign with your certificate and a qualified timestamp.' },
+  { service: 'xsignature', page: 'document', title: 'Sign a PDF', description: 'Place your signature, sign with your certificate and an independent timestamp.' },
   { service: 'xnotary', page: 'attest', title: 'Record who signed', description: 'Certify the signers of a file that was signed elsewhere.' },
   { service: 'xsignature', page: 'signature', title: 'Make a signature image', description: 'Type or draw it; export PNG or SVG.' },
   { service: 'xnotary', page: 'verify', title: 'Verify an xNotary proof', description: 'Match a document to its xNotary certificate.' },
