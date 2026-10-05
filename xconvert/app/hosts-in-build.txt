@@ -10,6 +10,7 @@
 pandoc.org          # the converter it is built on
 typst.app           # the typesetter it is built on
 www.gnu.org         # the AGPL-3.0 text
+github.com          # #/licences: the source of this build, and pandoc 3.12's
 
 # --- Never fetched: namespaces and library strings --------------------------
 www.w3.org          # SVG and XML namespaces in Svelte's runtime
