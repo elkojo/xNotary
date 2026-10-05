@@ -445,6 +445,7 @@ footer.site :focus-visible {
 }
 
 .info-mark {
+  position: relative;
   display: inline-grid;
   width: 16px;
   height: 16px;
@@ -457,6 +458,13 @@ footer.site :focus-visible {
   cursor: help;
   font: italic 700 10px/1 Georgia, 'Times New Roman', serif;
   opacity: 0.75;
+}
+
+/* The mark stays 16px; the target is 24px, so a thumb can hit it (WCAG 2.5.8). */
+.info-mark::after {
+  position: absolute;
+  inset: -5px;
+  content: '';
 }
 
 .info-mark:hover,
@@ -661,7 +669,7 @@ footer.site :focus-visible {
   font-size: clamp(38px, 7vw, 68px);
   font-weight: 500;
   line-height: 1.02;
-  letter-spacing: -0.052em;
+  letter-spacing: -0.04em;
 }
 
 .hero > p {
@@ -1173,7 +1181,7 @@ footer.site :focus-visible {
   align-items: center;
   padding: 5px 9px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 780;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1412,7 +1420,7 @@ footer.site :focus-visible {
   padding: 12px 22px;
   color: var(--table-head-fg);
   background: var(--table-head-bg);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 780;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1433,7 +1441,7 @@ footer.site :focus-visible {
 .doc-hash {
   color: var(--hash-fg);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: 11px;
   overflow-wrap: anywhere;
 }
 
@@ -1803,7 +1811,7 @@ footer.site a {
     padding: 0 16px;
   }
   .step {
-    font-size: 10px;
+    font-size: 11px;
   }
   .nav {
     gap: 12px;
