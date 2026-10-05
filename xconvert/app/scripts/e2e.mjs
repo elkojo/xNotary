@@ -205,6 +205,28 @@ try {
   await pick('.e2e-poznamky.txt');
   check('plain text is refused, with a way forward', await waitFor(`document.body.innerText.includes('Rename it to .md')`, 5000));
 
+  // 5. A Word drawing (WMF) Typst cannot draw: noted, not fatal
+  await pick('vykres-metafile.docx');
+  await waitFor(`document.body.innerText.includes('Convert to')`, 5000);
+  // The screen keeps the last format chosen (Word, above); choose PDF/A again.
+  await ev(`[...document.querySelectorAll('.choice')].find((b) => b.textContent.includes('PDF/A')).click()`);
+  await click('Convert to PDF/A');
+  check('a document with a WMF drawing still converts to PDF', await waitFor(`document.body.innerText.includes('Converted')`, 60000),
+    await ev(`(document.querySelector('details.raw pre')?.textContent ?? document.querySelector('.flow-panel')?.innerText ?? '').slice(0, 600)`));
+  check('the reader is told which image was left out, in plain words',
+    (await text()).includes('Image not shown in the PDF') && (await text()).includes('WMF') && !(await text()).includes('xconvert-undrawable.lua'));
+  before = readdirSync(downloads);
+  await click('Save ');
+  file = await nextDownload(before);
+  if (file && hasPdftotext) {
+    const words = execFileSync('pdftotext', [file, '-']).toString();
+    check('the PDF says where the image was, and keeps the PNG', words.includes('[Image not shown: WMF') && words.includes('Za obrázkem'));
+  }
+  if (file && verapdf) {
+    const out = execFileSync(verapdf, ['--format', 'text', '--flavour', '2b', file]).toString();
+    check('veraPDF passes that PDF too', out.startsWith('PASS'), out.trim().split('\n')[0]);
+  }
+
   // 5. Licences: every notice the page links to is really served
   await send('Page.navigate', { url: `${BASE}#/licences` });
   await waitFor(`document.body.innerText.includes('Licences and source')`, 10000);

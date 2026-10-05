@@ -6,6 +6,7 @@
  * markup and extracts the images, and our Typst wrapper typesets that into PDF/A-2b.
  */
 import type { Pandoc } from './pandoc';
+import UNDRAWABLE_FILTER from './undrawable.lua?raw';
 import type { TypstPdf } from './typst-pdf';
 
 export type Paper = 'a4' | 'letter';
@@ -96,6 +97,7 @@ export function defaultPaper(locale: string): Paper {
 }
 
 const DEFAULTS_FILE = 'xconvert-defaults.yaml';
+const UNDRAWABLE_FILE = 'xconvert-undrawable.lua';
 const OUTPUT_FILE = 'output';
 
 export async function convert(
@@ -114,6 +116,7 @@ export async function convert(
     [DEFAULTS_FILE]: new TextEncoder().encode(`lang: ${JSON.stringify(request.fallbackLang)}\n`),
   };
   for (const resource of request.resources) files[resource.name] = resource.bytes;
+  if (toPdf) files[UNDRAWABLE_FILE] = new TextEncoder().encode(UNDRAWABLE_FILTER);
 
   const result = pandoc.convert(
     {
@@ -123,12 +126,17 @@ export async function convert(
       'output-file': OUTPUT_FILE,
       'metadata-files': [DEFAULTS_FILE],
       standalone: toPdf || STANDALONE.has(writer),
-      ...(toPdf ? { 'extract-media': 'media', variables: { papersize: request.paper } } : {}),
+      // For PDF: images Typst cannot draw become a visible note (undrawable.lua).
+      ...(toPdf ? { 'extract-media': 'media', variables: { papersize: request.paper }, filters: [UNDRAWABLE_FILE] } : {}),
     },
     files,
   );
 
-  const warnings = result.warnings.filter((w) => w.verbosity !== 'INFO').map((w) => w.pretty);
+  // A warning from our own filter is shown as its message alone: where in our Lua it was
+  // raised is no business of the reader's.
+  const warnings = result.warnings
+    .filter((w) => w.verbosity !== 'INFO')
+    .map((w) => (w.type === 'ScriptingWarning' && w.message ? w.message : w.pretty));
   if (!result.output) {
     throw new ConversionError('pandoc could not convert this document.', result.stderr.trim() || 'No output, and no reason given.');
   }

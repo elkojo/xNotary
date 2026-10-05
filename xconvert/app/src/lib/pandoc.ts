@@ -15,6 +15,8 @@ export interface PandocWarning {
   readonly type: string;
   readonly verbosity: 'INFO' | 'WARNING' | 'ERROR';
   readonly pretty: string;
+  /** Set on some types, e.g. ScriptingWarning: the message without pandoc's preamble. */
+  readonly message?: string;
 }
 
 export interface PandocResult {

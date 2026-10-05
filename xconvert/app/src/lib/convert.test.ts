@@ -68,6 +68,12 @@ describe('convert', () => {
     expect(calls[0].options['input-files']).toEqual(['notes.md']);
   });
 
+  it('keeps every image for formats other than PDF', async () => {
+    const { pandoc, calls } = fakePandoc({ output: bytes('ODT') });
+    await convert(request({ to: 'odt' }), pandoc, unused);
+    expect(calls[0].options).not.toHaveProperty('filters');
+  });
+
   it('writes Markdown as a fragment, HTML as a whole page', async () => {
     const { pandoc, calls } = fakePandoc({ output: bytes('x') });
     await convert(request({ to: 'markdown' }), pandoc, unused);
@@ -87,6 +93,21 @@ describe('convert', () => {
     expect(result.warnings).toEqual(['Could not fetch resource diagram.png']);
   });
 
+  it('shows a warning from our own filter without pandoc’s preamble', async () => {
+    const { pandoc } = fakePandoc({
+      output: bytes('x'),
+      warnings: [
+        {
+          type: 'ScriptingWarning',
+          verbosity: 'WARNING',
+          pretty: 'Scripting warning at xconvert-undrawable.lua line 14 column 1: Image not shown in the PDF: a.wmf',
+          message: 'Image not shown in the PDF: a.wmf',
+        },
+      ],
+    });
+    expect((await convert(request(), pandoc, unused)).warnings).toEqual(['Image not shown in the PDF: a.wmf']);
+  });
+
   it('says why when pandoc writes nothing', async () => {
     const { pandoc } = fakePandoc({ stderr: 'Unknown input format foo\n' });
     const failure = await convert(request(), pandoc, unused).catch((e) => e);
@@ -103,6 +124,9 @@ describe('convert', () => {
       const result = await convert(request({ to: 'pdf', paper: 'letter' }), pandoc, typst.typst);
 
       expect(calls[0].options).toMatchObject({ to: 'typst', standalone: true, 'extract-media': 'media', variables: { papersize: 'letter' } });
+      // Images Typst cannot draw are replaced by a note before they can stop the PDF.
+      expect(calls[0].options.filters).toEqual(['xconvert-undrawable.lua']);
+      expect(new TextDecoder().decode(calls[0].files['xconvert-undrawable.lua'])).toContain('function Image');
       expect(typst.calls[0].source).toBe('= Smlouva');
       expect([...typst.calls[0].files.keys()]).toEqual(['/media/media/image1.png']);
       expect(typst.calls[0].standard).toBe('pdf-a-2b');
