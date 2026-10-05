@@ -281,6 +281,42 @@ try {
     check('veraPDF passes that PDF too', out.startsWith('PASS'), out.trim().split('\n')[0]);
   }
 
+  // 5b. Keep the layout: LibreOffice, in the browser, under the same CSP, cross-origin isolated
+  await click('Convert another document');
+  await waitFor(`document.body.innerText.includes('Drop a document here')`, 5000);
+  check('the page is cross-origin isolated (LibreOffice needs threads)', await ev('self.crossOriginIsolated'));
+  await pick('poznamka.docx');
+  await waitFor(`document.body.innerText.includes('Convert to')`, 5000);
+  await ev(`[...document.querySelectorAll('.choice')].find((b) => b.textContent.includes('PDF/A')).click()`);
+  check('Keep the layout is offered for a Word document on a computer', await waitFor(`!!document.querySelector('[aria-label=Layout]')`, 3000));
+  await ev(`[...document.querySelectorAll('.choice')].find((b) => b.textContent.trim() === 'Keep the layout').click()`);
+  check('the download size is said before anything is fetched', (await text()).includes('MB, downloaded once'));
+  check('the reader is told the comments are left out', await waitFor(`document.body.innerText.includes('Comments are not included')`, 5000));
+  check('no paper choice: LibreOffice keeps the document’s own page', !(await ev(`!!document.querySelector('.field.paper')`)));
+  await click('Convert to PDF/A');
+  check('LibreOffice converts it to PDF', await waitFor(`document.body.innerText.includes('Converted')`, 300000),
+    await ev(`(document.querySelector('details.raw pre')?.textContent ?? document.querySelector('.flow-panel')?.innerText ?? '').slice(0, 600)`));
+  check('step 3 says LibreOffice laid it out', (await text()).includes('LibreOffice laid it out'));
+  before = readdirSync(downloads);
+  await click('Save ');
+  file = await nextDownload(before);
+  check('the layout PDF is saved under the document’s name', file?.endsWith('poznamka.pdf'), file ?? 'no download');
+  if (file) {
+    const pdf = readFileSync(file).toString('latin1');
+    check('it declares PDF/A-2b', pdf.includes('<pdfaid:part>2</pdfaid:part>') && pdf.includes('<pdfaid:conformance>B</pdfaid:conformance>'));
+    check('it carries no comment annotations', !/\/Subtype\s*\/Text\b/.test(pdf));
+    if (hasPdftotext) {
+      const words = execFileSync('pdftotext', [file, '-']).toString();
+      check('the page header is kept (pandoc would drop it)', words.includes('Záhlaví zkušební smlouvy'));
+      check('the Czech text survives LibreOffice too', words.includes('Řehoř Čížek'));
+      check('the comment’s text is not in it', !words.includes('Ověřit cenu'));
+    }
+    if (verapdf) {
+      const out = execFileSync(verapdf, ['--format', 'text', '--flavour', '2b', file]).toString();
+      check('veraPDF passes the LibreOffice PDF as PDF/A-2b', out.startsWith('PASS'), out.trim().split('\n')[0]);
+    }
+  }
+
   // 6. Offline: after a conversion, everything needed is cached; cut the network, reload, convert
   check('a service worker controls the page', await waitFor(`navigator.serviceWorker.controller !== null`, 10000));
   const cached = await ev(`(async () => {
@@ -288,6 +324,7 @@ try {
     for (const key of await caches.keys()) for (const r of await (await caches.open(key)).keys()) out.push(key + ' ' + new URL(r.url).pathname);
     return out;
   })()`);
+  check('LibreOffice’s parts are in the converter cache too', ['libreoffice/soffice.wasm.gz.00', 'libreoffice/soffice.data.gz.00'].every((f) => cached.some((c) => c.endsWith(f))));
   check('both converters are in the converter cache', ['vendor/pandoc.wasm.gz', 'vendor/typst-pdf.wasm.gz'].every((f) => cached.some((c) => /\/vendor:[0-9a-f]{16} /.test(c) && c.endsWith(f))),
     cached.filter((c) => c.includes('vendor')).join(', '));
   await send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });

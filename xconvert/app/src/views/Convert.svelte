@@ -1,13 +1,23 @@
 <script lang="ts">
   import Stepper from '../../../../app/src/site/Stepper.svelte';
   import Info from '../../../../app/src/site/Info.svelte';
-  import { defaultPaper, type ConvertResult, type Paper } from '../lib/convert';
+  import { defaultPaper, outputName, type ConvertResult, type Paper } from '../lib/convert';
   import { ConverterError, convertDocument, formats, preload } from '../lib/converter';
   import { COMMON_INPUTS, COMMON_OUTPUTS, detectInput } from '../lib/formats';
   import type { Progress } from '../lib/protocol';
   import { canRunPandoc } from '../lib/support';
+  import {
+    DOWNLOAD_MB,
+    canKeepLayout,
+    convertKeepingLayout,
+    hasComments,
+    keepsLayout,
+    type LayoutProgress,
+  } from '../lib/libreoffice';
 
   const supported = canRunPandoc();
+  /** "Keep the layout" (LibreOffice) is offered on computers only: see lib/libreoffice.ts. */
+  const offerLayout = canKeepLayout();
   const locale = navigator.language || 'en';
 
   let main = $state<File | null>(null);
@@ -17,6 +27,12 @@
   let to = $state('pdf');
   let paper = $state<Paper>(defaultPaper(locale));
   let over = $state(false);
+  let layout = $state<'retypeset' | 'keep'>('retypeset');
+  /** Whether the document has comments, which "Keep the layout" leaves out. */
+  let comments = $state(false);
+  let layoutProgress = $state<LayoutProgress | null>(null);
+  /** Whether the result on screen came from LibreOffice, for what step 3 says about it. */
+  let keptLayout = $state(false);
 
   let all = $state<{ inputs: string[]; outputs: string[] } | null>(null);
   let showAll = $state(false);
@@ -26,6 +42,7 @@
   let failure = $state<{ message: string; detail: string } | null>(null);
 
   const step = $derived(result ? 3 : main && from ? 2 : 1);
+  const keeping = $derived(offerLayout && to === 'pdf' && keepsLayout(from) && layout === 'keep');
   const readable = COMMON_INPUTS.map((f) => f.extensions[0].toUpperCase()).join(', ');
   const labelFor = (id: string) => COMMON_OUTPUTS.find((f) => f.id === id)?.label ?? id;
   const inputLabel = (id: string) => COMMON_INPUTS.find((f) => f.id === id)?.label ?? id;
@@ -52,6 +69,14 @@
     from = detectInput(document.name)?.id ?? null;
     result = null;
     failure = null;
+    comments = false;
+    const format = from;
+    if (offerLayout && keepsLayout(format)) {
+      document.arrayBuffer().then(
+        async (b) => (comments = await hasComments(new Uint8Array(b), format)),
+        () => (comments = false),
+      );
+    }
     if (supported) warmUp();
   }
 
@@ -65,6 +90,13 @@
     busy = true;
     failure = null;
     try {
+      if (keeping && keepsLayout(from)) {
+        const bytes = await convertKeepingLayout(new Uint8Array(await main.arrayBuffer()), from, (p) => (layoutProgress = p));
+        result = { bytes, fileName: outputName(main.name, 'pdf'), mime: 'application/pdf', warnings: [] };
+        keptLayout = true;
+        return;
+      }
+      keptLayout = false;
       result = await convertDocument(
         {
           input: { name: main.name, bytes: new Uint8Array(await main.arrayBuffer()), format: from },
@@ -84,6 +116,7 @@
     } finally {
       busy = false;
       progress = null;
+      layoutProgress = null;
     }
   }
 
@@ -191,8 +224,10 @@
               sign or timestamp it.<Info
                 >Headings, paragraphs, lists, tables, images and footnotes carry over. Page layout,
                 headers and footers, text boxes, tracked changes and comments may not. Any signature
-                inside the original is not carried over: the converted file is new bytes. For an
-                exact copy of a Word layout, use Word's own Save as PDF.</Info
+                inside the original is not carried over: the converted file is new bytes.{#if offerLayout}
+                  For Word and OpenDocument files, Keep the layout lays the document out with
+                  LibreOffice instead, as a word processor prints it.{:else} For an exact copy of a
+                  Word layout, use Word's own Save as PDF.{/if}</Info
               >
             </div>
           </div>
@@ -235,7 +270,41 @@
               <button class="link-button" onclick={revealAll}>Show all formats</button>
             {/if}
 
-            {#if to === 'pdf'}
+            {#if offerLayout && to === 'pdf' && keepsLayout(from)}
+              <div class="field layout">
+                <span class="field-label"
+                  >Layout<Info
+                    >Re-typeset keeps the structure and sets it afresh. Keep the layout lays the
+                    document out with LibreOffice, as a word processor prints it: headers and
+                    footers, fonts, tables and page breaks.</Info
+                  ></span
+                >
+                <div class="choice-row" role="radiogroup" aria-label="Layout">
+                  <button type="button" class="choice" class:selected={layout === 'retypeset'} role="radio"
+                    aria-checked={layout === 'retypeset'} onclick={() => (layout = 'retypeset')}>Re-typeset</button
+                  >
+                  <button type="button" class="choice" class:selected={layout === 'keep'} role="radio"
+                    aria-checked={layout === 'keep'} onclick={() => (layout = 'keep')}>Keep the layout</button
+                  >
+                </div>
+                {#if layout === 'keep'}
+                  <p class="field-help">
+                    Uses LibreOffice: about {DOWNLOAD_MB} MB, downloaded once, then kept on this device.
+                  </p>
+                {/if}
+              </div>
+              {#if keeping && comments}
+                <div class="notice warn">
+                  <strong>Comments are not included.</strong> The document's comments are left out of the
+                  PDF/A.<Info
+                    >PDF/A does not allow comments in the form LibreOffice writes them. The text
+                    they are attached to is kept.</Info
+                  >
+                </div>
+              {/if}
+            {/if}
+
+            {#if to === 'pdf' && !keeping}
               <div class="field paper">
                 <span class="field-label">Paper</span>
                 <div class="choice-row">
@@ -243,6 +312,12 @@
                   <button type="button" class="choice" class:selected={paper === 'letter'} onclick={() => (paper = 'letter')}>Letter</button>
                 </div>
               </div>
+            {/if}
+
+            {#if layoutProgress}
+              <p class="field-help">
+                {layoutProgress.message}{#if layoutProgress.percent !== null} — {layoutProgress.percent}%{/if}…
+              </p>
             {/if}
 
             {#if progress}
@@ -289,7 +364,11 @@
             {/if}
 
             <div class="notice">
-              Check it before you sign or timestamp it — it was re-typeset, not copied.
+              {#if keptLayout}
+                Check it before you sign or timestamp it — LibreOffice laid it out; it is a new file.
+              {:else}
+                Check it before you sign or timestamp it — it was re-typeset, not copied.
+              {/if}
             </div>
 
             <div class="flow-actions">
