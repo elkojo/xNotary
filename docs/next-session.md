@@ -1,46 +1,65 @@
 # Where things stand — handoff
 
-## Pick up here (2026-10-05)
+## Pick up here (2026-10-06): deploy v0.8.0
 
-**v0.7.0 is tagged and released** ([release](https://github.com/elkojo/xNotary/releases/tag/v0.7.0),
-`xnotary-v0.7.0-dist.zip` attached) but **not deployed**. The operator deploys that zip to
-Cloudflare Pages; agents never touch the Cloudflare account.
+**For the operator: deploy v0.8.0.** It is tagged and released
+([release](https://github.com/elkojo/xNotary/releases/tag/v0.8.0)), with
+`xnotary-v0.8.0-dist.zip` attached. It supersedes every earlier undeployed release
+(0.6.0, 0.7.0, 0.7.1, 0.7.2): one deploy brings all of them. Agents never touch the Cloudflare
+account.
 
-v0.7.0 contains PR #12, merged:
+### What changes for visitors, against the build that is live now
+- **The front page** at `/`, with xNotary at `/xnotary/` (old `/#/…` links are forwarded).
+  xSignature is at `/xsignature/` and xConvert at `/xconvert/`, all under one top bar.
+- **xConvert** (new) converts documents in the browser, to archival PDF/A by default. From
+  0.8.0, on a computer, **Keep the layout** lays out Word and ODT files with LibreOffice, compiled
+  to WebAssembly: about 77 MB, downloaded on first use only.
+- **Fixes and clarity.** A pending timestamp no longer looks finished. Every tab is reachable on
+  phones. Screen readers hear step changes. Inter is served from the site.
 
-1. **Less text on every page.** ⓘ bubbles (`app/src/site/Info.svelte`), "How it works" and "Q&A"
-   merged into one Help page, qualified timestamp authorities in xSignature (Izenpe default),
-   new front-page texts.
-2. **xConvert at `/xconvert/`**: pandoc 3.12 plus our own Typst wrapper (`xconvert/typst-pdf`)
-   produce PDF/A-2b in the browser, with offline use and a licences page. Steps 1–5 of the plan
-   are done. The design record is `docs/xconvert-spike.md`; the rules are in `xconvert/CLAUDE.md`
-   (gitignored, local only).
+### Deploy
+1. Download `xnotary-v0.8.0-dist.zip` from the release. Its contents are the site root.
+2. Unzip it and run `wrangler pages deploy <dir> --project-name xnotary` (the project behind
+   `xnotary.pages.dev`), using the operator's own credentials, as before.
+3. Do not rebuild locally. The zip is what CI tested.
 
-Its CI steps had never run on GitHub before, and getting them green took four fixes:
-- an unlisted host in `hosts-in-build.txt`;
-- Chrome not starting on the runner (now polled, with `--no-sandbox` on CI only);
-- the e2e polling a page that had not finished navigating;
-- **a real bug: Letter paper failed every PDF conversion.** Typst names it `us-letter`. It was
-  found only because the runner's locale is en-US. The e2e now chooses A4 and Letter explicitly
-  and checks each page size.
+### Check afterwards (production, apex domain)
+- `/`, `/xnotary/`, `/xsignature/` and `/xconvert/` each return 200 with the right page. `/sw.js`
+  returns 200. It must never 404, because it retires the pre-0.5.0 worker.
+- The headers come from `_headers` inside the zip, one CSP per path. New in 0.8.0, `/xconvert/`
+  must also send:
+  - `Cross-Origin-Opener-Policy: same-origin`
+  - `Cross-Origin-Embedder-Policy: require-corp`
 
-GitHub also warns that `actions/*@v4` run on deprecated Node 20, and that `ubuntu-latest` moves to
-Ubuntu 26 on 2026-10-19. Neither blocks; bumping the actions is a small follow-up.
+  `curl -sI https://xnotary.digital/xconvert/ | grep -i cross-origin` should print both. Without
+  them, Keep the layout is simply not offered, and pandoc still works.
+- `/xconvert/vendor/libreoffice/soffice.wasm.parts.json` returns 200, and so does each part it
+  lists. Every file is under 25 MiB, and CI checks this before the release.
+- In a desktop browser, convert a Word file at `/xconvert/` with Keep the layout. Expect the
+  first conversion to wait for the 77 MB download; later ones take a few seconds.
 
-**Still unchecked for xConvert:**
-- a real phone;
-- DOCX files saved by Microsoft Word itself (the fixtures are LibreOffice's), tracked changes,
-  headers and footers;
-- CJK and right-to-left text (the bundled fonts have no CJK).
+### Not yet checked
+- xConvert on a real phone.
+- Keep the layout in Firefox and Safari. It was verified in Chrome on a real document.
+- Tracked changes. Fonts LibreOffice's bundled set lacks (CJK).
+- For the pandoc route: DOCX from Microsoft Word itself, CJK, right-to-left text.
+
+`docs/xconvert-spike.md` ("LibreOffice route") records how Keep the layout works and why. That
+includes a trap: polling the page over the DevTools protocol during an export stalls LibreOffice.
+
+GitHub warns that `actions/*@v4` run on deprecated Node 20, and that `ubuntu-latest` moves to
+Ubuntu 26 on 2026-10-19. Neither blocks. Hosted runners were often not assigned on
+2026-10-05 and 06; a re-run fixed it each time.
 
 **Running xConvert locally**, from `xconvert/app/`:
-1. `npm ci && npm run vendor`. This needs the Rust `wasm32` target, from rustup in `~/.cargo`.
+1. `npm ci && npm run vendor`. This needs the Rust `wasm32` target from rustup in `~/.cargo`,
+   and downloads about 250 MB for LibreOffice, cached in `.vendor-cache/`.
 2. `npm test`.
 3. Run `npm run build:only` in `app/`.
 4. `npm run verapdf:install` (needs Java), then `npm run e2e`.
 
 
-**Last updated:** 2026-10-05 (see *Pick up here*); below as of 2026-10-03 · `main` · v0.6.0 (front page, xNotary at `/xnotary/`, xSignature at `/xsignature/`) was tagged and released but never deployed; v0.7.0 (2026-10-05) supersedes it as the tag to deploy
+**Last updated:** 2026-10-06 (see *Pick up here*); below as of 2026-10-03 · `main` · **v0.8.0 is the release to deploy**, superseding the never-deployed 0.6.0, 0.7.0, 0.7.1 and 0.7.2
 
 M0, M1 and M2 are done. Both certificates work end to end, the app is public and live, and
 `pades.ts` has been measured against real qualified signatures rather than only synthetic ones.
@@ -52,7 +71,7 @@ What is left before a real release is not code: two reviews, and documents only 
 | | |
 |---|---|
 | Live app | <https://xnotary.digital/xnotary/> — served from Cloudflare Pages on the operator's account. **Production still runs the pre-0.6.0 build** (checked 2026-10-03: `/xsignature/` answers with xNotary's page). Since 0.5.0 `dist/` is the whole site: the xNotary.digital front page at `/` (`app/hub/`) and xNotary at `/xnotary/`; the front page forwards old `/#/…` links there. The apex is canonical; `www` 301s to it, and `xnotary.pages.dev` is the same build under its project name |
-| xSignature | `xsignature/app` — joined this repository with its history in 2026-10 and is built to be served at <https://xnotary.digital/xsignature/> with the shared bar — live once the operator deploys a 0.6.0-or-later release. `npm run build:only` in `app/` builds it into `dist/xsignature/`, so both `app/` and `xsignature/app/` need `npm ci`; CI runs its typecheck, tests, host allow-list and font-licence checks. Its CSP is the `/xsignature/*` rule (`connect-src 'self' https:`). The old repo `elkojo/xSignature` is frozen; its GitHub Pages site stays up as a standalone copy |
+| xSignature | `xsignature/app` — joined this repository with its history in 2026-10 and is built to be served at <https://xnotary.digital/xsignature/> with the shared bar — live once the operator deploys v0.8.0 (or any 0.6.0-or-later release). `npm run build:only` in `app/` builds it into `dist/xsignature/`, so both `app/` and `xsignature/app/` need `npm ci`; CI runs its typecheck, tests, host allow-list and font-licence checks. Its CSP is the `/xsignature/*` rule (`connect-src 'self' https:`). The old repo `elkojo/xSignature` is frozen; its GitHub Pages site stays up as a standalone copy |
 | Old address | <https://elkojo.github.io/xNotary/> — a **redirect stub**, published by `deploy.yml`. Not a mirror and not a fallback. Certificates saved while the app was served from that origin stay in that browser under that origin and do not appear on the new one; the downloaded PDF is the real copy |
 | Security headers | `app/hub/public/_headers` — CSP per path (`/*` for the front page, `/xnotary/*` for the app, detaching the general one with `! Content-Security-Policy`), `frame-ancestors 'none'`, `nosniff`, `no-referrer`. Vite copies it into `dist/`, so it travels with the deploy. `connect-src` is the app's entire network surface: three calendars, two explorers |
 | Repo | <https://github.com/elkojo/xNotary> — **public**, AGPL-3.0, 19 releases, all marked pre-release |
