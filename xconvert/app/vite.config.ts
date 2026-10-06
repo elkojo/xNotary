@@ -76,6 +76,18 @@ The 280 crates compiled into it, each with its licence:
 vendor/licences/typst-pdf-THIRD-PARTY.txt
 
 ${rule}
+LibreOffice 24.8 — MPL-2.0, with third-party components under their own licences
+
+Used by "Keep the layout". vendor/libreoffice/ is LibreOffice compiled to WebAssembly by
+@matbee/libreoffice-converter 2.7.2 (MPL-2.0), from LibreOffice's libreoffice-24-8 branch
+with that project's patches:
+  https://github.com/matbeedotcom/libreoffice-document-converter/tree/v2.7.2
+  https://github.com/LibreOffice/core/tree/libreoffice-24-8
+soffice.js and the worker are changed by xconvert/app/scripts/patch-libreoffice.mjs in the
+repository above. Licences: vendor/licences/libreoffice-license.xml,
+vendor/licences/libreoffice-NOTICE.txt, vendor/licences/MPL-2.0.txt
+
+${rule}
 Fonts — Libertinus Serif (OFL-1.1), DejaVu Sans Mono (Bitstream Vera licence),
 New Computer Modern Math (GUST Font License), from typst-assets v0.15.0
 

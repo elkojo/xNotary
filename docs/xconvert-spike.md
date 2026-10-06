@@ -114,8 +114,53 @@ network, and was not run.
 Word drawings Typst cannot draw (EMF, WMF, TIFF, BMP) no longer stop the PDF: a pandoc Lua
 filter replaces each with a visible note and a warning. Lua is in pandoc's wasm build.
 
+## LibreOffice route: "Keep the layout" (2026-10-06)
+
+**Why.** A real, layout-heavy Word document (a technical specification with comments, not
+committed) went through pandoc as structure: no page headers or footers, a serif face instead
+of Arial, table borders and merged cells lost, heading numbers gone, 24 pages instead of 18.
+That is pandoc working as designed. It converts structure, not layout. Desktop LibreOffice
+printed the same document faithfully.
+
+**What.** LibreOffice compiled to WebAssembly: the prebuilt `@matbee/libreoffice-converter`
+2.7.2 (MPL-2.0; LibreOffice's `libreoffice-24-8` branch with that project's patches, Emscripten
+3.1.51), pinned by SHA-256 in `vendor.sh`. It is offered on computers only, opt-in, for DOCX and
+ODT to PDF.
+
+| | pandoc (re-typeset) | LibreOffice (keep the layout) |
+|---|---|---|
+| The real document | 24 pages, layout lost | 18 pages, identical to desktop LibreOffice |
+| veraPDF 2b | PASS | PASS, with comments left out |
+| Time (desktop) | ~1 s | ~3 s headless, under 2 s in the owner's Chrome |
+| Peak memory | small | ~2 GB across Chrome's processes |
+| First download | 18 MB | 77 MB in 5 parts (147 MB wasm + 100 MB data, gzipped) |
+
+**What it took. Each item is in `scripts/patch-libreoffice.mjs` or `vendor.sh`:**
+
+- **No `'unsafe-eval'`.** Embind's glue builds two families of call wrappers with
+  `new Function`. Both become plain closures, which is what `-sDYNAMIC_EXECUTION=0` generates.
+  Only `soffice.js` changes, and every replacement must match exactly once, or the vendor
+  step fails.
+- **Under 25 MiB per file.** The worker fetches `<name>.parts.json`, streams the gzipped parts
+  through `DecompressionStream` and compiles with `compileStreaming`. It hands Emscripten the
+  module via `instantiateWasm` and the data via `getPreloadedPackage`. The loader is unchanged.
+- **Threads.** These need `SharedArrayBuffer`, which needs COOP `same-origin` and COEP
+  `require-corp` on `/xconvert/*`. All of xConvert is same-origin, so this costs nothing.
+- **PDF/A.** Word comments become PDF Text annotations without an appearance stream (veraPDF
+  6.3.3-1). `ExportNotes=false` fixes it, and the screen says "Comments are not included" when
+  the document has any. `ExportNotesInMargin` hangs this build.
+- **Logging.** The worker set `SAL_LOG=+ALL` and printed everything. It is now errors only.
+
+**A trap in testing.** Driving the page over the DevTools protocol, a `Runtime.evaluate` poll
+during LibreOffice's PDF export can stall the export indefinitely. That took two hours to tell
+apart from a real bug. The same page in a normal browser converts the same document in under
+2 s. The e2e polls only while the small fixture converts, and that passes. Don't poll the page
+while a large document exports.
+
 ## Not yet checked
 
 - A real phone.
-- Inputs beyond the two fixtures: Word's own DOCX (not LibreOffice's), tracked changes,
-  comments, headers and footers, right-to-left text, CJK (the bundled faces have none).
+- Inputs beyond the fixtures, for the pandoc route: Word's own DOCX (not LibreOffice's),
+  tracked changes, right-to-left text, CJK (the bundled faces have none).
+- For Keep the layout: browsers other than Chrome (Firefox, Safari), tracked changes, and
+  documents whose fonts LibreOffice's bundled set lacks (CJK needs extra fonts).

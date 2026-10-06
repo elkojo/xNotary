@@ -28,7 +28,7 @@ let worker: Worker | null = null;
  * the cache — so on a first visit they would never be kept for offline use. Two seconds at
  * most: without a service worker xConvert still works, from the network.
  */
-async function controlled(): Promise<void> {
+export async function controlled(): Promise<void> {
   if (!('serviceWorker' in navigator) || !import.meta.env.PROD || navigator.serviceWorker.controller) return;
   await Promise.race([
     new Promise<void>((resolve) => navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true })),
@@ -68,6 +68,19 @@ function ask(message: Without<ToWorker, 'id'>, onProgress?: (p: Progress) => voi
     pending.set(id, { resolve, reject, onProgress });
     start().then((w) => w.postMessage({ ...message, id } as ToWorker, transfer), reject);
   });
+}
+
+/**
+ * Stops pandoc's worker and frees its memory; the next request starts it again. Called before
+ * LibreOffice ("Keep the layout") converts, which needs about 2 GB on its own.
+ */
+export function stopPandoc(): void {
+  if (!worker) return;
+  for (const waiting of pending.values()) waiting.reject(new ConverterError('The converter was stopped.', 'stopped for Keep the layout'));
+  pending.clear();
+  worker.terminate();
+  worker = null;
+  starting = null;
 }
 
 /** Fetches and starts pandoc ahead of the first conversion. */

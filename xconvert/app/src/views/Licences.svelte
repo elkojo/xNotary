@@ -58,6 +58,21 @@
           </div>
         </div>
         <div class="review-row">
+          <span>LibreOffice 24.8</span>
+          <div>
+            Used by Keep the layout. MPL-2.0, by The Document Foundation and contributors, with the
+            third-party code it includes under their own licences:
+            <a href="{base}vendor/licences/libreoffice-license.xml">licences</a>,
+            <a href="{base}vendor/licences/libreoffice-NOTICE.txt">notice</a>. Compiled to
+            WebAssembly by
+            <a href="https://github.com/matbeedotcom/libreoffice-document-converter/tree/v2.7.2" target="_blank" rel="noopener noreferrer">libreoffice-document-converter 2.7.2</a>
+            (<a href="{base}vendor/licences/MPL-2.0.txt">MPL-2.0</a>) from LibreOffice's
+            <a href="https://github.com/LibreOffice/core/tree/libreoffice-24-8" target="_blank" rel="noopener noreferrer">libreoffice-24-8</a>
+            branch with that project's patches. Two of its JavaScript files are changed here: so it
+            needs no <span class="mono">'unsafe-eval'</span>, and so it loads in parts.
+          </div>
+        </div>
+        <div class="review-row">
           <span>Fonts</span>
           <div>
             Libertinus Serif, DejaVu Sans Mono and New Computer Modern Math, embedded in the PDFs
