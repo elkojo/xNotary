@@ -1,16 +1,22 @@
 <script lang="ts">
-  import { formatBytes } from '../lib/download';
+  import { formatBytes } from '../site/size';
 
   interface Props {
+    /** "Drop … here": the family's wording, shared with xSignature and xConvert. */
     label: string;
+    /** What to choose, after "or click to choose one — ". */
     hint?: string;
     accept?: string;
-    file?: File | null;
+    /**
+     * What has been chosen. Once there is something, the zone gives way to the
+     * family's summary card and a button to choose again — as xSignature does.
+     */
+    files?: readonly File[];
     /** Accept several files at once — parallel signing produces one per signer. */
     multiple?: boolean;
     /** The two-up variant used where a screen needs more than one drop target. */
     compact?: boolean;
-    /** Glyph in the file mark. Kept short: it is set at 20px in a 48px box. */
+    /** The format in the file mark — PDF, FILE. Kept short: it is set in a 48px box. */
     icon?: string;
     onselect: (file: File) => void;
     /** Called instead of `onselect` when `multiple` is set. */
@@ -21,16 +27,18 @@
     label,
     hint = '',
     accept = '',
-    file = null,
+    files = [],
     multiple = false,
     compact = false,
-    icon = '+',
+    icon = 'FILE',
     onselect,
     onselectmany,
   }: Props = $props();
 
   let over = $state(false);
   let input: HTMLInputElement;
+
+  const totalSize = $derived(files.reduce((sum, f) => sum + f.size, 0));
 
   function take(list: FileList | null | undefined) {
     const picked = [...(list ?? [])];
@@ -40,50 +48,67 @@
   }
 </script>
 
-<div
-  class="dropzone"
-  class:over
-  class:compact
-  role="button"
-  tabindex="0"
-  ondragover={(e) => {
-    e.preventDefault();
-    over = true;
-  }}
-  ondragleave={() => (over = false)}
-  ondrop={(e) => {
-    e.preventDefault();
-    over = false;
-    take(e.dataTransfer?.files);
-  }}
-  onclick={() => input.click()}
-  onkeydown={(e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      input.click();
-    }
-  }}
->
+<!-- One element, so a grid of drops (Verify) lays out one cell per drop. -->
+<div>
+  <!-- Outside the zone, so the button below can reach it once the zone is gone. -->
   <input
     bind:this={input}
     type="file"
+    hidden
     {accept}
     {multiple}
-    onchange={(e) => take(e.currentTarget.files)}
+    onchange={(e) => {
+      take(e.currentTarget.files);
+      // Choosing the same file again should still count as a choice.
+      e.currentTarget.value = '';
+    }}
   />
 
-  <div>
-    <span class="file-icon" aria-hidden="true">{file ? '✓' : icon}</span>
-    {#if file}
-      <strong>{file.name}</strong>
-      <p>{formatBytes(file.size)} · click to choose a different file</p>
-    {:else}
-      <strong>{label}</strong>
-      {#if hint}<p>{hint}</p>{/if}
-      <!-- Looks like a button, is not one: the whole zone is already the control. -->
-      {#if !compact}
-        <span class="button dark small">Choose a file</span>
-      {/if}
-    {/if}
-  </div>
+  {#if files.length > 0}
+    <div class="picked">
+      <div class="picked-name">{files.map((f) => f.name).join(', ')}</div>
+      <div class="picked-facts">
+        {#if files.length > 1}{files.length} files · {/if}{formatBytes(totalSize)}
+      </div>
+    </div>
+    <div class="action-group">
+      <button class="button secondary small" type="button" onclick={() => input.click()}>
+        {files.length > 1 ? 'Choose different files' : 'Choose a different file'}
+      </button>
+    </div>
+  {:else}
+    <div
+      class="dropzone"
+      class:over
+      class:compact
+      role="button"
+      tabindex="0"
+      ondragover={(e) => {
+        e.preventDefault();
+        over = true;
+      }}
+      ondragleave={() => (over = false)}
+      ondrop={(e) => {
+        e.preventDefault();
+        over = false;
+        take(e.dataTransfer?.files);
+      }}
+      onclick={() => input.click()}
+      onkeydown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          input.click();
+        }
+      }}
+    >
+      <div>
+        <div class="file-icon" class:long={icon.length > 3} aria-hidden="true">{icon}</div>
+        <strong>{label}</strong>
+        <!-- The whole zone is the control, so the hint says so rather than drawing a button. -->
+        <div class="drop-hint">
+          or click to choose {multiple ? 'them' : 'one'}{hint ? ` — ${hint}` : ''}
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>

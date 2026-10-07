@@ -265,11 +265,33 @@ marks are diamonds (rotated squares) with a letter or two inside.
   with a yellow outline.
 - **Mobile:** below 720px the bar stacks, and the tabs become a sideways-scrolling row.
 
-### Drop zone (signature component)
-- A recessed well with a dashed rule and a file icon that casts the Sheet shadow. It reads
-  "Drop a document here" and then "or click to choose one — <formats>". The whole zone is the
-  control: it is a `<label>` around a hidden file input, so **nothing interactive may sit
-  inside it before the input**. An ⓘ belongs in the panel title.
+### Drop zone (one design, every service)
+- A recessed well with a dashed rule and a file icon that casts the Sheet shadow. The icon
+  names the format (`PDF`, `DOC`, `FILE`). It reads "Drop a document here" and then
+  "or click to choose one — <formats>". There is no button: the whole zone is the control, a
+  `<label>` around a hidden file input (in xNotary, `FileDrop.svelte`, which adds keyboard
+  handling), so **nothing interactive may sit inside it before the input**. An ⓘ belongs in the
+  panel title. xNotary, xSignature and xConvert all draw it this way. Change it in one place,
+  change it in all three.
+- **Once a file is chosen** the zone gives way to the summary card (`.picked`: the name in
+  ink, then facts in soft ink, such as format, size, pages and what was found) and, beneath it, a
+  secondary "Choose a different file" button in an `.action-group`. Nothing is shown inside the
+  zone itself. Both classes live in `app/src/app.css`. Sizes are always written by
+  `formatBytes` in `app/src/site/size.ts` (`512 B`, `8.4 KB`, `86 KB`, `1.2 MB`), never by a local helper.
+
+### Signature level (one design, every service)
+- A signature's level is read from what its certificate says about itself: three steps (●●● / ●●○
+  / ●○○) and a plain name. "Qualified signature" needs the certificate to say both that it is
+  qualified and that the key is on a certified device. "Advanced signature with a qualified
+  certificate" is the qualified claim alone. "Signature with a certificate" is neither.
+- One line beneath the name says what the certificate says. One visible sentence says it was not
+  checked against a trust list. The EU names (QES, AdES/QC) belong in the ⓘ.
+- The steps are ink, never traffic-light colours: green would read as "valid", which nothing on the
+  site establishes. Nothing in the wording may say "verified".
+- `app/src/site/SignatureLevel.svelte` implements it; `compact` is the one-line form for a list of
+  signers.
+- Where it appears: xSignature's Sign a document (step 4) and Check a PDF, and xNotary's Certify
+  signers.
 
 ### ⓘ Info mark
 - A 16px circled italic serif "i" with a 24px hit area. It opens a bubble on hover and pins it

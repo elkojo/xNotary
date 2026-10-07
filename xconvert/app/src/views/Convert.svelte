@@ -1,6 +1,7 @@
 <script lang="ts">
   import Stepper from '../../../../app/src/site/Stepper.svelte';
   import Info from '../../../../app/src/site/Info.svelte';
+  import { formatBytes } from '../../../../app/src/site/size';
   import { defaultPaper, outputName, type ConvertResult, type Paper } from '../lib/convert';
   import { ConverterError, convertDocument, formats, preload } from '../lib/converter';
   import { COMMON_INPUTS, COMMON_OUTPUTS, detectInput } from '../lib/formats';
@@ -46,8 +47,6 @@
   const readable = COMMON_INPUTS.map((f) => f.extensions[0].toUpperCase()).join(', ');
   const labelFor = (id: string) => COMMON_OUTPUTS.find((f) => f.id === id)?.label ?? id;
   const inputLabel = (id: string) => COMMON_INPUTS.find((f) => f.id === id)?.label ?? id;
-  const size = (n: number) =>
-    n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`;
   const percent = (p: Progress) => (p.total ? Math.min(100, Math.round((p.loaded / p.total) * 100)) : null);
 
   /** Starts pandoc's download as soon as there is a document: by then the intent is clear. */
@@ -238,7 +237,7 @@
             <div class="review-box">
               <div class="review-row">
                 <span>Document</span>
-                <strong>{main.name} · {inputLabel(from)} · {size(main.size)}</strong>
+                <strong>{main.name} · {inputLabel(from)} · {formatBytes(main.size)}</strong>
               </div>
               {#if resources.length}
                 <div class="review-row">
@@ -348,7 +347,7 @@
             <div class="success">
               <div class="success-mark" aria-hidden="true">✓</div>
               <h2>Converted</h2>
-              <p>{result.fileName} · {size(result.bytes.byteLength)}</p>
+              <p>{result.fileName} · {formatBytes(result.bytes.byteLength)}</p>
               <div class="success-actions">
                 <button class="button dark" onclick={() => result && save(result)}>Save {result.fileName}</button>
               </div>

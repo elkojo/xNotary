@@ -108,7 +108,7 @@ try {
   const { root } = await send('DOM.getDocument', { depth: -1 });
   const { nodeId: input } = await send('DOM.querySelector', {
     nodeId: root.nodeId,
-    selector: '.dropzone input[type=file]',
+    selector: '.flow-panel input[type=file]',
   });
   check('file input is present', Boolean(input));
   await send('DOM.setFileInputFiles', { nodeId: input, files: [docPath] });
@@ -117,7 +117,7 @@ try {
   // input is still mounted. Choosing a file advances the flow to the review
   // step, which unmounts it.
   await evaluate(
-    `document.querySelector('.dropzone input[type=file]')
+    `document.querySelector('.flow-panel input[type=file]')
        ?.dispatchEvent(new Event('change', { bubbles: true }))`,
   );
   await sleep(800);
@@ -205,14 +205,14 @@ try {
   const doc2 = await send('DOM.getDocument', { depth: -1 });
   const { nodeIds } = await send('DOM.querySelectorAll', {
     nodeId: doc2.root.nodeId,
-    selector: '.dropzone input[type=file]',
+    selector: '.flow-panel input[type=file]',
   });
   check('verify screen offers two drop zones', nodeIds.length === 2, `${nodeIds.length}`);
 
   await send('DOM.setFileInputFiles', { nodeId: nodeIds[0], files: [docPath] });
   await send('DOM.setFileInputFiles', { nodeId: nodeIds[1], files: [otsPath] });
   await evaluate(
-    `document.querySelectorAll('.dropzone input[type=file]')
+    `document.querySelectorAll('.flow-panel input[type=file]')
        .forEach((i) => i.dispatchEvent(new Event('change', { bubbles: true })))`,
   );
   await sleep(600);
@@ -250,11 +250,11 @@ try {
   const doc3 = await send('DOM.getDocument', { depth: -1 });
   const q3 = await send('DOM.querySelectorAll', {
     nodeId: doc3.root.nodeId,
-    selector: '.dropzone input[type=file]',
+    selector: '.flow-panel input[type=file]',
   });
   await send('DOM.setFileInputFiles', { nodeId: q3.nodeIds[0], files: [tamperedPath] });
   await evaluate(
-    `document.querySelectorAll('.dropzone input[type=file]')[0]
+    `document.querySelectorAll('.flow-panel input[type=file]')[0]
        .dispatchEvent(new Event('change', { bubbles: true }))`,
   );
   await sleep(400);

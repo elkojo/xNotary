@@ -391,20 +391,6 @@
   }
 }
 
-/*
- * The secondary actions, kept together.
- *
- * .flow-actions spreads its children apart, which reads correctly with two
- * buttons and wrongly with three — the middle one ends up floating. Grouping
- * keeps "go back / do something else" on the left and the action that finishes
- * the job on the right, which is the arrangement the rest of the app uses.
- */
-.action-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
 @media (max-width: 560px) {
   /* Two rows of two: saves above, copies below, each pair sharing a width. */
   .flow-actions {

@@ -13,7 +13,8 @@
   import StatusBadge from '../components/StatusBadge.svelte';
   import Info from '../site/Info.svelte';
   import { buildCertificate1 } from '../lib/certificate1';
-  import { baseName, downloadBytes, formatBytes } from '../lib/download';
+  import { baseName, downloadBytes } from '../lib/download';
+  import { formatBytes } from '../site/size';
   import { groupHex, sha256File, toHex } from '../lib/hash';
   import { putCertificate, requestPersistence, type CertificateRecord } from '../lib/library';
   import { checkStatus, describeProof, parseOts, stamp, type OtsStatus } from '../lib/ots';
@@ -161,7 +162,7 @@
 
             <FileDrop
               label="Drop a file here"
-              hint="Any file type"
+              hint="any type"
               onselect={pick}
             />
 

@@ -131,7 +131,6 @@
   --step-done: #3a3527;
   --drop-line: #8f8668;
   --drop-over-bg: #fff3c4;
-  --drop-fg: #57513f;
   --selected-line: #111111;
   --selected-bg: #fff3c4;
   --file-icon-line: #8f8668;
@@ -1017,12 +1016,22 @@ footer.site :focus-visible {
   box-shadow: 6px 6px 0 var(--file-icon-shadow);
 }
 
+.file-icon.long {
+  width: 54px;
+  font-size: 15px;
+}
+
 .dropzone.compact .file-icon {
   width: 34px;
   height: 39px;
   margin-bottom: 9px;
-  font-size: 15px;
+  font-size: 12px;
   box-shadow: 4px 4px 0 var(--file-icon-shadow);
+}
+
+.dropzone.compact .file-icon.long {
+  width: 39px;
+  font-size: 11px;
 }
 
 .dropzone strong {
@@ -1043,16 +1052,52 @@ footer.site :focus-visible {
   line-height: 1.5;
 }
 
-.dropzone p,
-.dropzone .meta {
-  margin: 0 0 4px;
-  color: var(--drop-fg);
-  font-size: 12px;
+/* Once a file is chosen the zone gives way to this card and a button to choose
+   again. One design on every service: FileDrop in xNotary, by hand in xSignature. */
+.picked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: baseline;
+  padding: 14px 16px;
+  border: 1px solid var(--line-dark);
+  border-radius: 12px;
+  background: var(--well);
+}
+
+.picked-name {
+  color: var(--ink);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.picked-facts {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.picked ~ .action-group {
+  margin-top: 12px;
+}
+
+/*
+ * The secondary actions, kept together.
+ *
+ * .flow-actions spreads its children apart, which reads correctly with two
+ * buttons and wrongly with three — the middle one ends up floating. Grouping
+ * keeps "go back / do something else" on the left and the action that finishes
+ * the job on the right, which is the arrangement the rest of the app uses.
+ */
+.action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .verify-uploader {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  align-items: start;
   gap: 12px;
 }
 
@@ -1738,6 +1783,59 @@ details.raw pre {
   border-radius: 10px;
   background: var(--well);
   font-size: 11px;
+}
+
+/* ------------------------------------------------------- signature level -- */
+/* One design on every service: app/src/site/SignatureLevel.svelte. */
+
+.signature-level {
+  display: grid;
+  gap: 4px;
+}
+
+.level-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.level-marks {
+  display: inline-flex;
+  flex: none;
+  gap: 3px;
+}
+
+/* Three steps, filled as far as the certificate's own statements reach. Ink, not
+   traffic-light colours: a green would read as "valid", which nothing here establishes. */
+.level-marks > span {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+}
+
+.level-marks > span.on {
+  background: var(--ink);
+}
+
+.level-limit {
+  color: var(--ink-soft);
+}
+
+.level-compact {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  align-items: center;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.level-compact .level-marks > span {
+  width: 7px;
+  height: 7px;
 }
 
 /* -------------------------------------------------------------- progress -- */

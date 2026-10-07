@@ -11,6 +11,7 @@
    * cannot say the authority deserves to be believed, and it does not imply it.
    */
   import Info from '../../../../app/src/site/Info.svelte';
+  import SignatureLevel from '../../../../app/src/site/SignatureLevel.svelte';
   import { checkSignatures, type CheckedSignature } from '../lib/document/verify/verify';
   import {
     checkLinks,
@@ -411,41 +412,20 @@
 
             {#if result.claims && !result.isTimestamp}
               <!--
-                The certificate's own statements, kept carefully apart from the
-                app's findings. "This certificate declares itself qualified" is
-                a fact about the file; "this signature is qualified" is a
-                judgement, and not one this app is entitled to make.
+                The level, from the certificate's own statements, kept apart from the app's
+                findings: "this certificate says it is qualified" is a fact about the file; "this
+                signature is qualified" is a judgement this app is not entitled to make.
               -->
-              <div class="notice">
-                <strong>What the certificate says about itself.</strong>
-                {#if result.claims.qualified}
-                  It declares itself a <em>qualified certificate</em> under eIDAS{result.claims
-                    .purpose === 'signature'
-                    ? ', issued to a person for signing'
-                    : result.claims.purpose === 'seal'
-                      ? ', issued to an organisation for sealing'
-                      : ''}.
-                  {#if result.claims.onQualifiedDevice}
-                    It also declares the private key is held on a qualified signature creation
-                    device.
-                  {:else}
-                    It does <strong>not</strong> declare the key is on a qualified signature
-                    creation device, so this is an advanced signature made with a qualified
-                    certificate — not a qualified electronic signature.
-                  {/if}
-                {:else}
-                  It makes no claim to being a qualified certificate under eIDAS.
-                  {#if result.claims.purpose === 'website'}
-                    It declares itself a website certificate, which is not meant for signing
-                    documents at all.
-                  {/if}
+              <SignatureLevel qualified={result.claims.qualified} onQualifiedDevice={result.claims.onQualifiedDevice}>
+                {#if result.claims.purpose === 'seal'}Issued to an organisation, as a seal.{/if}
+                {#if result.claims.purpose === 'website'}
+                  It is a website certificate, which is not meant for signing documents.
                 {/if}
                 {#if result.claims.limit}
                   It declares a transaction limit of {result.claims.limit.value.toLocaleString()}
                   {result.claims.limit.currency}.
                 {/if}
-                Nothing here checks these statements are true.
-              </div>
+              </SignatureLevel>
 
               {#if result.claims.keyUsage.stated && !result.claims.keyUsage.digitalSignature && !result.claims.keyUsage.nonRepudiation}
                 <div class="notice warn">
@@ -522,25 +502,23 @@
                 >That takes a list of trusted authorities, which this app chooses not to ship, and a
                 revocation check, which needs a network it does not use. The name above is read out
                 of the token, not vouched for.{#if !result.isTimestamp}
-                  Reason and Location were typed by whoever signed; nothing makes them true.{/if}</Info
-              >
-              {#if result.claims?.ocspUrl || result.claims?.crlUrls.length}
+                  Reason and Location were typed by whoever signed; nothing makes them true.{/if}
                 <!--
-                  Named, not called. The same fact the signing screen states
-                  about a signature being made, said here about one being read —
-                  a refusal is easier to weigh against the addresses it applies
-                  to than in the abstract.
+                  Named, not called: a refusal is easier to weigh against the addresses it
+                  applies to than in the abstract. In the bubble, so the screen stays short.
                 -->
-                Where that check would go, uncalled:
-                <span class="outgoing-list">
-                  {#if result.claims.ocspUrl}
-                    <span><strong>Asked at:</strong> <code>{result.claims.ocspUrl}</code></span>
-                  {/if}
-                  {#each result.claims.crlUrls as url}
-                    <span><strong>Listed at:</strong> <code>{url}</code></span>
-                  {/each}
-                </span>
-              {/if}
+                {#if result.claims?.ocspUrl || result.claims?.crlUrls.length}
+                  Where that check would go, uncalled:
+                  <span class="outgoing-list">
+                    {#if result.claims.ocspUrl}
+                      <span><strong>Asked at:</strong> <code>{result.claims.ocspUrl}</code></span>
+                    {/if}
+                    {#each result.claims.crlUrls as url}
+                      <span><strong>Listed at:</strong> <code>{url}</code></span>
+                    {/each}
+                  </span>
+                {/if}</Info
+              >
 
             </div>
           </div>

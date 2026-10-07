@@ -18,18 +18,6 @@ export function baseName(fileName: string): string {
   return dot > 0 ? fileName.slice(0, dot) : fileName;
 }
 
-export function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  let value = n / 1024;
-  let i = 0;
-  while (value >= 1024 && i < units.length - 1) {
-    value /= 1024;
-    i++;
-  }
-  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[i]}`;
-}
-
 /**
  * Local time, with the zone named — see `localStamp`. Re-exported here because
  * this is where the views already import their formatting from.

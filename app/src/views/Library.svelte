@@ -2,7 +2,8 @@
   import StatusBadge from '../components/StatusBadge.svelte';
   import Info from '../site/Info.svelte';
   import { buildCertificate1 } from '../lib/certificate1';
-  import { baseName, downloadBytes, formatBytes, formatDate } from '../lib/download';
+  import { baseName, downloadBytes, formatDate } from '../lib/download';
+  import { formatBytes } from '../site/size';
   import { fromHex, groupHex } from '../lib/hash';
   import {
     deleteCertificate,
