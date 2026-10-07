@@ -293,6 +293,22 @@ marks are diamonds (rotated squares) with a letter or two inside.
 - Where it appears: xSignature's Sign a document (step 4) and Check a PDF, and xNotary's Certify
   signers.
 
+### Support (one page, every service but xConvert)
+- `/support/` (`app/hub/Support.svelte`) is a thank-you and a voluntary payment. A thank-you
+  line, then one card: the serif question with its one highlighted word, method chips (Lightning
+  live; Card and Bank QR disabled, each with an ⓘ saying "Under development"), the Lightning
+  panel, and a share row (also under development). It fits one desktop screen.
+- The page never says a payment is required, secure or received: it cannot know. The Lightning
+  QR is drawn at build time in ink, and the page sends nothing.
+- `app/src/site/SupportLink.svelte` is the line under a finished task in xNotary and xSignature:
+  a light card with an ink heart on a wash circle, "If xNotary.digital saved you time, you can
+  support the project." It opens in a new tab, because the page it sits on may hold the only
+  copy of a result.
+- The site does not advertise itself as free of charge. "Free and open source" in a footer is the
+  licence (AGPL-3.0), not a price.
+- `/support/` is also in the front-page footer's family links and at the end of the "I want to…"
+  menu ("Support · Support the work with a payment").
+
 ### ⓘ Info mark
 - A 16px circled italic serif "i" with a 24px hit area. It opens a bubble on hover and pins it
   on click. A limit the product requires stays on screen as one sentence; the ⓘ holds only the

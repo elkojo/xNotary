@@ -15,6 +15,7 @@
    */
   import Info from '../../../../app/src/site/Info.svelte';
   import SignatureLevel from '../../../../app/src/site/SignatureLevel.svelte';
+  import SupportLink from '../../../../app/src/site/SupportLink.svelte';
   import { formatBytes } from '../../../../app/src/site/size';
   import { openPdf, UnreadablePdf, type OpenPdf } from '../lib/document/pdf/inspect';
   import { renderPage } from '../lib/document/pdf/render';
@@ -1996,6 +1997,7 @@
                   A copy; the original is untouched.
                 </div>
               {/if}
+              <SupportLink />
             {/if}
 
             <div class="action-group">

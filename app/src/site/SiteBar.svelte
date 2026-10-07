@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { SERVICES, TASKS, pageHref, service, type ServiceId } from './services';
+  import { SUPPORT_HREF } from './support';
 
   /**
    * The one top bar of xNotary.digital: brand (→ the front page), the service
@@ -127,6 +128,12 @@
                 </span>
               </a>
             {/each}
+            <!-- The site's own page, not a service's: marked with the site's x. -->
+            <a class="task-item" href={SUPPORT_HREF}>
+              <strong>Support</strong>
+              <span class="d">Support the work with a payment.</span>
+              <span class="tag"><span class="brand-mark"><span>x</span></span>xNotary.digital</span>
+            </a>
           </div>
           <div class="menu-foot"><a href="/">Browse services instead</a></div>
         </div>

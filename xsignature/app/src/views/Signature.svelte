@@ -13,6 +13,7 @@
    */
   import { untrack } from 'svelte';
   import Info from '../../../../app/src/site/Info.svelte';
+  import SupportLink from '../../../../app/src/site/SupportLink.svelte';
   import type SignaturePad from 'signature_pad';
 
   import { createPad, fitPad, inkFrom, padHasPressure, undoStroke } from '../lib/signature/draw/pad';
@@ -88,6 +89,8 @@
   let outputId = $state<OutputId>('2x');
   let opaque = $state(false);
   let copied = $state('');
+  /** A PNG or SVG was saved: the task is finished, and the support line may show. */
+  let exported = $state(false);
   let faceId = $state(stored.faceId);
   let sizeId = $state(stored.sizeId);
   let ink = $state(stored.ink);
@@ -324,7 +327,10 @@
     problem = null;
     try {
       const blob = await toPng(commands, pngOptions);
-      if (blob) downloadBlob(blob, fileNameFor(mode === 'draw' ? '' : trimmed, 'png'));
+      if (blob) {
+        downloadBlob(blob, fileNameFor(mode === 'draw' ? '' : trimmed, 'png'));
+        exported = true;
+      }
     } catch (e) {
       problem = { title: 'Could not make the PNG.', detail: e instanceof Error ? e.message : String(e) };
     } finally {
@@ -363,6 +369,7 @@
     if (!svg) return;
     problem = null;
     downloadText(svg, fileNameFor(mode === 'draw' ? '' : trimmed, 'svg'), 'image/svg+xml');
+    exported = true;
   }
 </script>
 
@@ -735,6 +742,8 @@
           {#if problem}
             <div class="notice bad"><strong>{problem.title}</strong> {problem.detail}</div>
           {/if}
+
+          {#if exported}<SupportLink />{/if}
         </div>
 
         <!--

@@ -134,6 +134,7 @@
   --selected-line: #111111;
   --selected-bg: #fff3c4;
   --file-icon-line: #8f8668;
+  --control-hover-line: #8f8668;
   --file-icon-shadow: #ede6cf;
   --privacy-fg: #57513f;
   --privacy-mark: #111111;
@@ -641,6 +642,39 @@ footer.site :focus-visible {
   font-size: 12px;
   font-weight: 750;
   text-decoration: underline;
+}
+
+/* Option buttons on every service: one of several, like a radio; a selected one looks like the
+   primary button. A disabled one is an option that exists but does not work yet. */
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice {
+  padding: 9px 16px;
+  border: 1px solid var(--line-dark);
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 650;
+  background: var(--card);
+  cursor: pointer;
+}
+
+.choice:hover:not(:disabled) {
+  border-color: var(--control-hover-line);
+}
+
+.choice.selected {
+  border-color: var(--dark-btn-line);
+  color: var(--dark-btn-fg);
+  background: var(--dark-btn-bg);
+}
+
+.choice:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 /* ---------------------------------------------------------------- landing -- */

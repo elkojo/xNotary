@@ -2,10 +2,12 @@ import { fontNoticeText } from './src/site/fonts/notice';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import QRCode from 'qrcode';
 import { defineConfig, type Plugin } from 'vite';
 
 import { revision } from './scripts/revision';
 import { SERVICES } from './src/site/services';
+import { LIGHTNING, lightningUri } from './src/site/support';
 
 /**
  * The xNotary.digital front page, served at `/`.
@@ -19,6 +21,23 @@ import { SERVICES } from './src/site/services';
  * two are released together from one tag.
  */
 const REVISION = revision();
+
+/**
+ * The Lightning QR on /support/, drawn here rather than in the browser so the page ships no QR
+ * library. An LNURL goes in upper case, which QR codes store more compactly (LUD-01); the
+ * modules are painted in `currentColor`, so the page's ink colours them and no colour is
+ * written outside app.css.
+ */
+const LIGHTNING_QR = (
+  await QRCode.toString(/^lnurl/i.test(LIGHTNING) ? LIGHTNING.toUpperCase() : lightningUri(LIGHTNING), {
+    type: 'svg',
+    margin: 0,
+    errorCorrectionLevel: 'M',
+    color: { dark: '#000000ff', light: '#00000000' },
+  })
+)
+  .replace(/<path fill="#00000000"[^>]*\/>/g, '')
+  .replace(/stroke="#000000"/g, 'stroke="currentColor"');
 
 /**
  * /THIRD-PARTY.txt: an index of every service's third-party notices, read from the
@@ -68,8 +87,16 @@ export default defineConfig({
   define: {
     __APP_REVISION__: JSON.stringify(REVISION.label),
     __APP_COMMIT__: JSON.stringify(REVISION.commit),
+    __LIGHTNING_QR__: JSON.stringify(LIGHTNING_QR),
   },
   build: {
+    // Two pages: the front page at /, and /support/.
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./hub/index.html', import.meta.url)),
+        support: fileURLToPath(new URL('./hub/support/index.html', import.meta.url)),
+      },
+    },
     outDir: fileURLToPath(new URL('./dist/', import.meta.url)),
     // Empties the whole site; the app builds into dist/xnotary/ afterwards.
     emptyOutDir: true,

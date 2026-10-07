@@ -391,3 +391,237 @@ footer.site .family-links a {
     grid-template-columns: 1fr;
   }
 }
+
+/* The line under a finished task that leads to /support/ (SupportLink.svelte): a light card, so
+   it is seen without competing with the result above it. */
+.support-link {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 14px 0 0;
+  padding: 12px 16px;
+  border: 1px solid var(--line-dark);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--card);
+  font-size: 14px;
+}
+
+.support-link-mark {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--selected-bg);
+}
+
+.support-link-mark svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.9;
+  stroke-linejoin: round;
+}
+
+.support-link a {
+  color: var(--ink);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+/* --------------------------------------------------------------- support -- */
+/* /support/ (app/hub/Support.svelte): a thank-you and a voluntary payment, on one screen. */
+
+.support-page {
+  padding: 30px 0 40px;
+}
+
+.support-wrap {
+  width: min(760px, calc(100% - 48px));
+  margin: 0 auto;
+}
+
+.support-done {
+  margin: 0 0 20px;
+  color: var(--ink-soft);
+  font-size: 16px;
+  text-align: center;
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.support-card {
+  padding: 38px 42px 32px;
+  border: 1px solid var(--line-dark);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: 0 12px 40px var(--card-shadow);
+  text-align: center;
+}
+
+.support-card h1 {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(32px, 5.4vw, 50px);
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.support-lede {
+  max-width: 34em;
+  margin: 14px auto 24px;
+  color: var(--ink-soft);
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+
+.support-methods {
+  justify-content: center;
+}
+
+.support-methods .choice {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.method-soon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.lightning {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 28px;
+  align-items: center;
+  margin-top: 20px;
+  padding: 22px;
+  border: 1px solid var(--line-dark);
+  border-radius: 12px;
+  background: var(--well);
+  text-align: left;
+}
+
+/* White behind the code, with a quiet zone wallets need to find it. */
+.lightning-qr {
+  padding: 14px;
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--card);
+}
+
+.lightning-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.lightning-text h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.lightning-text p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.lightning-text .action-group {
+  margin-top: 16px;
+}
+
+.lightning-code {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.lightning-code .input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.support-share {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 22px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.share-label {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 650;
+}
+
+.share-icons {
+  display: flex;
+  gap: 6px;
+}
+
+.share-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--line-dark);
+  border-radius: 50%;
+  color: var(--ink);
+  background: var(--card);
+}
+
+.share-icon:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@media (max-width: 720px) {
+  .support-page {
+    padding: 26px 0 40px;
+  }
+  .support-card {
+    padding: 28px 20px 24px;
+  }
+  .lightning {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    justify-items: center;
+    padding: 18px;
+    text-align: center;
+  }
+  .lightning-qr {
+    width: min(230px, 100%);
+  }
+  /* On a phone the QR cannot be scanned by the phone showing it: the button comes first. */
+  .lightning-text {
+    order: -1;
+  }
+  .lightning-text .action-group {
+    justify-content: center;
+  }
+}

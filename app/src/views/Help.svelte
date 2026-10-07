@@ -158,13 +158,13 @@
           <summary>What does xNotary cost? Do I need bitcoin?</summary>
           <div>
             <p>
-              Nothing. xNotary is free and open source, with no accounts, no charge per document and
-              no transaction fees — your fingerprint is aggregated with many others before it
-              reaches Bitcoin, which is why timestamping costs nothing.
+              You do not pay for this operation, and you do not need bitcoin. There are no accounts,
+              no charge per document and no transaction fees — your fingerprint is aggregated with
+              many others before it reaches Bitcoin, so there is no fee to cover.
             </p>
             <p>
-              You do not need to buy bitcoin or connect a wallet. Bitcoin supplies the public record
-              used for verification. A change in its market price does not itself change your file
+              You do not connect a wallet either. Bitcoin supplies the public record used for
+              verification. A change in its market price does not itself change your file
               or erase its proof.
             </p>
           </div>

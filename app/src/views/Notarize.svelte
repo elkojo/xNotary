@@ -13,6 +13,7 @@
   import StatusBadge from '../components/StatusBadge.svelte';
   import Info from '../site/Info.svelte';
   import Progress from '../site/Progress.svelte';
+  import SupportLink from '../site/SupportLink.svelte';
   import { buildCertificate1 } from '../lib/certificate1';
   import { baseName, downloadBytes } from '../lib/download';
   import { formatBytes } from '../site/size';
@@ -36,6 +37,8 @@
   let note = $state('');
   let phase = $state<Phase>('idle');
   let hashed = $state({ read: 0, total: 0 });
+  /** Certificate 1 was saved: the task is finished, and the support line may show. */
+  let saved = $state(false);
   let error = $state('');
   let calendarWarnings = $state<string[]>([]);
 
@@ -56,6 +59,7 @@
     note = '';
     phase = 'idle';
     hashed = { read: 0, total: 0 };
+    saved = false;
     error = '';
     calendarWarnings = [];
     result = null;
@@ -292,12 +296,14 @@
               <div class="success-actions">
                 <button
                   class="button dark"
-                  onclick={() =>
+                  onclick={() => {
                     downloadBytes(
                       result!.record.pdf,
                       `${baseName(result!.record.fileName)} — Certificate 1.pdf`,
                       'application/pdf',
-                    )}>Save Certificate 1 (PDF)</button
+                    );
+                    saved = true;
+                  }}>Save Certificate 1 (PDF)</button
                 >
                 <button
                   class="button ghost-dark"
@@ -330,6 +336,7 @@
                 file, which it cannot restore. My certificates lives only in this browser.</Info
               >
             </div>
+            {#if saved}<SupportLink />{/if}
 
             <details class="raw">
               <summary>OpenTimestamps proof tree</summary>

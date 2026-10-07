@@ -22,6 +22,7 @@
   import { utcStamp } from '../lib/time';
   import Info from '../site/Info.svelte';
   import SignatureLevel from '../site/SignatureLevel.svelte';
+  import SupportLink from '../site/SupportLink.svelte';
   import {
     AgreementError,
     DSS_SOURCE_URL,
@@ -437,6 +438,7 @@
                 >
               {/if}
             </div>
+            {#if saved}<SupportLink />{/if}
 
             <div class="flow-actions">
               <button class="button ghost-dark" onclick={() => (step = 2)}>
