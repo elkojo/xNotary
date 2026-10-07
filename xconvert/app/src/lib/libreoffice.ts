@@ -3,7 +3,7 @@
  *
  * pandoc keeps a document's structure and re-typesets it; LibreOffice lays the document out as a
  * word processor would print it — headers and footers, fonts, tables, numbering, page breaks. It
- * costs about 77 MB, downloaded once, and around 2 GB of memory while it converts, so it is offered
+ * costs about 73 MB, downloaded once, and around 2 GB of memory while it converts, so it is offered
  * on computers only and only when asked for. See docs/xconvert-spike.md, "LibreOffice route".
  *
  * The worker is the converter package's own (vendor/libreoffice/libreoffice.worker.js, patched by
@@ -19,8 +19,12 @@ export type LayoutInput = (typeof LAYOUT_INPUTS)[number];
 export const keepsLayout = (format: string | null): format is LayoutInput =>
   (LAYOUT_INPUTS as readonly string[]).includes(format ?? '');
 
-/** About what the first use downloads, for the screen to say before it starts. */
-export const DOWNLOAD_MB = 77;
+/**
+ * About what the first use downloads, for the screen to say before it starts. In the units the
+ * progress counts in (formatBytes: 1 MB = 1024² bytes), so the promise and the count agree;
+ * libreoffice.test.ts derives it from the shipped parts.
+ */
+export const DOWNLOAD_MB = 73;
 
 /**
  * Whether to offer it at all: threads need a cross-origin-isolated page, and the memory it needs
@@ -45,21 +49,85 @@ export const PDF_EXPORT_OPTIONS = JSON.stringify({
   SelectPdfVersion: { type: 'long', value: '2' },
 });
 
+/**
+ * Where LibreOffice is, for the screen. `loaded`/`total` are bytes, and only the download has
+ * them: it is the one stage whose progress is measured. LibreOffice's own stages come with a
+ * percentage too, but it marks the stage rather than measuring it — "Saving… 70%" stays at 70
+ * for as long as a long document takes to lay out — so it is not shown as one.
+ */
 export interface LayoutProgress {
-  readonly percent: number | null;
+  readonly label: string;
+  readonly loaded: number | null;
+  readonly total: number | null;
+}
+
+interface RawProgress {
+  readonly percent?: number;
   readonly message: string;
+  readonly loaded?: number;
+  readonly total?: number;
+}
+
+/** LibreOffice's stage messages, in the screen's words. Anything unknown is "Working". */
+const STAGES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/WebAssembly|WASM|LibreOfficeKit|^Initializing|^Setting up|^Ready/i, 'Starting LibreOffice'],
+  [/^Writing input|^Loading document/i, 'Opening the document'],
+  [/^Converting|^Saving/i, 'Laying out the PDF'],
+  [/^Reading output|^Complete/i, 'Finishing'],
+];
+
+export function layoutStage(raw: RawProgress): LayoutProgress {
+  if (typeof raw.loaded === 'number' && typeof raw.total === 'number' && raw.total > 0) {
+    return { label: 'Downloading the layout converter, once', loaded: raw.loaded, total: raw.total };
+  }
+  const label = STAGES.find(([pattern]) => pattern.test(raw.message))?.[1] ?? 'Working';
+  return { label, loaded: null, total: null };
 }
 
 type Message =
   | { type: 'loaded' }
-  | { type: 'progress'; progress?: { percent: number; message: string } }
+  | { type: 'progress'; progress?: RawProgress }
+  | { type: 'xconvert-threads-exhausted' }
   | { type: 'ready' | 'result' | 'error'; id: number; data?: Uint8Array; error?: string };
+
+/** Raised by cancelKeepingLayout, so the screen can tell a cancel from a failure. */
+export class LayoutCancelled extends Error {
+  constructor() {
+    super('Cancelled.');
+  }
+}
+
+/** LibreOffice ran out of threads; the conversion starts again with twice as many. */
+class OutOfThreads extends Error {}
+
+/**
+ * Threads LibreOffice is started with. Emscripten starts any beyond these on demand, which
+ * deadlocks in Brave while LibreOffice exports (docs/xconvert-spike.md). Documents of every size
+ * measured peak at four or five, so eight is the start; one that needs more is said so by the
+ * patched glue, and converted again with twice as many, up to MAX_THREADS.
+ */
+export const MAX_THREADS = 32;
+let threads: number | null = null;
+
+function initialThreads(): number {
+  // A seam for e2e, which starts with fewer threads to see a document run out and convert anyway.
+  try {
+    const n = Number(sessionStorage.getItem('xconvert:test-threads'));
+    if (Number.isInteger(n) && n >= 1) return n;
+  } catch {
+    // no storage: the default
+  }
+  return 8;
+}
 
 let worker: Worker | null = null;
 let ready: Promise<void> | null = null;
 let nextId = 1;
 const pending = new Map<number, { resolve: (m: Message) => void; reject: (e: Error) => void }>();
 let onProgress: ((p: LayoutProgress) => void) | undefined;
+/** Bumped by stop(), so a start that is still on its way gives up rather than carrying on. */
+let generation = 0;
+let abortStart: ((e: Error) => void) | null = null;
 
 function request(type: string, body: Record<string, unknown>, transfer: Transferable[] = []): Promise<Message> {
   const id = nextId++;
@@ -69,19 +137,45 @@ function request(type: string, body: Record<string, unknown>, transfer: Transfer
   });
 }
 
+/** Ends LibreOffice and everything waiting on it with `reason`; the next request starts afresh. */
+function stop(reason: Error): void {
+  generation += 1;
+  abortStart?.(reason);
+  abortStart = null;
+  for (const p of pending.values()) p.reject(reason);
+  pending.clear();
+  worker?.terminate();
+  worker = null;
+  ready = null;
+}
+
 function start(): Promise<void> {
   ready ??= (async () => {
+    const mine = generation;
+    threads ??= initialThreads();
     await controlled();
+    if (mine !== generation) throw new LayoutCancelled();
     const base = new URL(DIR, document.baseURI).pathname;
     worker = new Worker(base + 'libreoffice.worker.js');
     const loaded = new Promise<void>((resolve, reject) => {
-      worker!.addEventListener('error', (e) => reject(new Error(e.message || 'The layout converter did not start.')));
+      abortStart = reject;
+      worker!.addEventListener('error', (e) => {
+        const error = new Error(e.message || 'The layout converter stopped.');
+        reject(error);
+        stop(error);
+      });
       worker!.addEventListener('message', (e: MessageEvent<Message>) => {
         const m = e.data;
         if (m.type === 'loaded') return resolve();
         if (m.type === 'progress') {
-          if (m.progress) onProgress?.({ percent: m.progress.percent ?? null, message: m.progress.message });
+          if (m.progress) onProgress?.(layoutStage(m.progress));
           return;
+        }
+        if (m.type === 'xconvert-threads-exhausted') {
+          // At the ceiling, let it try on demand: some browsers cope, and Cancel is there.
+          if (threads! >= MAX_THREADS) return;
+          threads = Math.min(MAX_THREADS, threads! * 2);
+          return stop(new OutOfThreads());
         }
         const p = pending.get(m.id);
         if (!p) return;
@@ -91,6 +185,7 @@ function start(): Promise<void> {
       });
     });
     await loaded;
+    abortStart = null;
     await request('init', {
       sofficeJs: base + 'soffice.js',
       sofficeWasm: base + 'soffice.wasm',
@@ -98,12 +193,11 @@ function start(): Promise<void> {
       sofficeWorkerJs: base + 'soffice.worker.js',
       enableProgressTracking: false,
       verbose: false,
+      threads,
     });
   })().catch((e) => {
     // A failed start can be retried from scratch.
-    worker?.terminate();
-    worker = null;
-    ready = null;
+    if (!(e instanceof LayoutCancelled || e instanceof OutOfThreads)) stop(e);
     throw e;
   });
   return ready;
@@ -118,18 +212,30 @@ export async function convertKeepingLayout(
   onProgress = progress;
   stopPandoc();
   try {
-    await start();
-    const input = bytes.slice();
-    const reply = await request(
-      'convert',
-      { inputData: input, inputExt: format, outputFormat: 'pdf', filterOptions: PDF_EXPORT_OPTIONS },
-      [input.buffer],
-    );
-    if (!(reply.type === 'result' && reply.data instanceof Uint8Array)) throw new Error('LibreOffice returned no PDF.');
-    return reply.data;
+    for (;;) {
+      try {
+        await start();
+        const input = bytes.slice();
+        const reply = await request(
+          'convert',
+          { inputData: input, inputExt: format, outputFormat: 'pdf', filterOptions: PDF_EXPORT_OPTIONS },
+          [input.buffer],
+        );
+        if (!(reply.type === 'result' && reply.data instanceof Uint8Array)) throw new Error('LibreOffice returned no PDF.');
+        return reply.data;
+      } catch (e) {
+        if (!(e instanceof OutOfThreads)) throw e;
+        onProgress?.({ label: 'Starting again with more threads', loaded: null, total: null });
+      }
+    }
   } finally {
     onProgress = undefined;
   }
+}
+
+/** Stops a Keep-the-layout conversion. LibreOffice stays downloaded; the next one starts it again. */
+export function cancelKeepingLayout(): void {
+  stop(new LayoutCancelled());
 }
 
 // --- Does the document have comments? ---------------------------------------------------------

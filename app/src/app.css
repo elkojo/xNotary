@@ -1840,9 +1840,38 @@ details.raw pre {
 
 /* -------------------------------------------------------------- progress -- */
 
+/* One design on every service: app/src/site/Progress.svelte. */
+.progress-block {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line-dark);
+  border-radius: 12px;
+  background: var(--well);
+}
+
+.progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.progress-label {
+  font-weight: 650;
+}
+
+.progress-percent {
+  font-size: 28px;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
 .progress {
-  height: 5px;
-  margin-top: 14px;
+  height: 8px;
+  margin-top: 12px;
   overflow: hidden;
   border-radius: 999px;
   background: var(--progress-track);
@@ -1853,6 +1882,28 @@ details.raw pre {
   background: var(--green);
   transform-origin: left;
   transition: transform 0.15s linear;
+}
+
+/* No measure, only motion: a segment that travels, so the bar never looks stopped. */
+.progress.indeterminate > div {
+  width: 30%;
+  animation: progress-travel 1.4s ease-in-out infinite;
+}
+
+@keyframes progress-travel {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+.progress-detail {
+  margin-top: 8px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .spinner {
@@ -1989,6 +2040,12 @@ footer.site a {
   }
   .spinner {
     animation-duration: 2s !important;
+  }
+  /* Still visibly busy, without the travel. */
+  .progress.indeterminate > div {
+    width: 100%;
+    opacity: 0.45;
+    animation: none !important;
   }
 }
 

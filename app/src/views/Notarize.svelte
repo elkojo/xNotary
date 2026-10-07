@@ -12,6 +12,7 @@
   import FileDrop from '../components/FileDrop.svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import Info from '../site/Info.svelte';
+  import Progress from '../site/Progress.svelte';
   import { buildCertificate1 } from '../lib/certificate1';
   import { baseName, downloadBytes } from '../lib/download';
   import { formatBytes } from '../site/size';
@@ -34,7 +35,7 @@
   let digestHex = $state('');
   let note = $state('');
   let phase = $state<Phase>('idle');
-  let hashProgress = $state(0);
+  let hashed = $state({ read: 0, total: 0 });
   let error = $state('');
   let calendarWarnings = $state<string[]>([]);
 
@@ -54,7 +55,7 @@
     digestHex = '';
     note = '';
     phase = 'idle';
-    hashProgress = 0;
+    hashed = { read: 0, total: 0 };
     error = '';
     calendarWarnings = [];
     result = null;
@@ -67,7 +68,7 @@
     phase = 'hashing';
     try {
       const bytes = await sha256File(chosen, (read, total) => {
-        hashProgress = total === 0 ? 1 : read / total;
+        hashed = { read, total };
       });
       digest = bytes;
       digestHex = toHex(bytes);
@@ -167,8 +168,7 @@
             />
 
             {#if phase === 'hashing'}
-              <div class="progress"><div style="transform:scaleX({hashProgress})"></div></div>
-              <p class="field-help" role="status">Hashing… {Math.round(hashProgress * 100)}%</p>
+              <Progress label="Hashing on this device" loaded={hashed.read} total={hashed.total} />
             {/if}
 
             {#if error}

@@ -49,6 +49,12 @@ function headersFor(path) {
   return out;
 }
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.gz': 'application/gzip', '.svg': 'image/svg+xml', '.otf': 'font/otf', '.ttf': 'font/ttf' };
+// LibreOffice's parts are sent as a slow line would send them — in paced chunks, so progress can
+// be seen mid-part — and the first request for one of them is cut off partway, as a dropped
+// connection would be. The page has to resume it; on localhost everything else is instant.
+const PACED = /\/libreoffice\/soffice\.(wasm|data)\.gz\.\d\d$/;
+const DROP = '/xconvert/vendor/libreoffice/soffice.wasm.gz.01';
+let dropped = 0;
 const server = createServer((req, res) => {
   let path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname));
   let file = join(DIST, path);
@@ -56,7 +62,18 @@ const server = createServer((req, res) => {
   if (!existsSync(file)) return res.writeHead(404).end();
   const body = readFileSync(file);
   res.writeHead(200, { ...headersFor(path), 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'content-length': body.length });
-  res.end(body);
+  if (!PACED.test(path)) return res.end(body);
+  const cut = path === DROP && dropped++ === 0 ? 4 << 20 : Infinity;
+  let sent = 0;
+  const pump = () => {
+    if (sent >= cut) return res.destroy();
+    if (sent >= body.length) return res.end();
+    const end = Math.min(body.length, sent + (1 << 20), cut);
+    res.write(body.subarray(sent, end));
+    sent = end;
+    setTimeout(pump, 40);
+  };
+  pump();
 }).listen(0);
 await new Promise((r) => server.once('listening', r));
 const BASE = `http://localhost:${server.address().port}/xconvert/`;
@@ -294,6 +311,12 @@ try {
   check('the reader is told the comments are left out', await waitFor(`document.body.innerText.includes('Comments are not included')`, 5000));
   check('no paper choice: LibreOffice keeps the document’s own page', !(await ev(`!!document.querySelector('.field.paper')`)));
   await click('Convert to PDF/A');
+  // Polled only while it downloads: polling during LibreOffice's PDF export can stall it (the
+  // DevTools trap in docs/xconvert-spike.md), so the wait below is for the result alone.
+  check('the download shows a percentage and how many MB of how many', await waitFor(
+    `/\\d+%/.test(document.querySelector('.progress-percent')?.textContent ?? '') && / of \\d+ MB$/.test(document.querySelector('.progress-detail')?.textContent ?? '')`, 30000));
+  check('a part cut off mid-download is fetched again, not fatal', await waitFor(`document.body.innerText.includes('Converted') || !!document.querySelector('.notice.bad')`, 300000)
+    && !(await ev(`!!document.querySelector('.notice.bad')`)), `requested ${dropped} times; the first was cut off`);
   check('LibreOffice converts it to PDF', await waitFor(`document.body.innerText.includes('Converted')`, 300000),
     await ev(`(document.querySelector('details.raw pre')?.textContent ?? document.querySelector('.flow-panel')?.innerText ?? '').slice(0, 600)`));
   check('step 3 says LibreOffice laid it out', (await text()).includes('LibreOffice laid it out'));
@@ -316,6 +339,38 @@ try {
       check('veraPDF passes the LibreOffice PDF as PDF/A-2b', out.startsWith('PASS'), out.trim().split('\n')[0]);
     }
   }
+
+  // 5c. Cancel: LibreOffice can take minutes, so it can be stopped — quietly, and ready again after.
+  // Each run starts with a reload, so LibreOffice has to start again — seconds, from the cache —
+  // and Cancel lands mid-run.
+  const keepLayout = async (name) => {
+    await send('Page.reload', { ignoreCache: false });
+    await waitFor(`document.body.innerText.includes('Drop a document here')`, 15000);
+    await pick(name);
+    await waitFor(`document.body.innerText.includes('Convert to')`, 5000);
+    await ev(`[...document.querySelectorAll('.choice')].find((b) => b.textContent.includes('PDF/A')).click()`);
+    await waitFor(`!!document.querySelector('[aria-label=Layout]')`, 3000);
+    await ev(`[...document.querySelectorAll('.choice')].find((b) => b.textContent.trim() === 'Keep the layout').click()`);
+    // Every progress label shown, recorded by the page itself: read once afterwards, not polled.
+    await ev(`window.__labels = new Set(); new MutationObserver(() => document.querySelectorAll('.progress-label').forEach((l) => window.__labels.add(l.textContent))).observe(document.body, { subtree: true, childList: true, characterData: true })`);
+    await click('Convert to PDF/A');
+  };
+  await keepLayout('poznamka.docx');
+  check('Cancel is offered while LibreOffice runs', await waitFor(`[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Cancel')`, 5000));
+  await click('Cancel');
+  check('a cancel is not reported as a failure', await waitFor(`!document.querySelector('.notice.bad') && !document.querySelector('.progress-block') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim().startsWith('Convert to PDF') && !b.disabled)`, 5000));
+  await click('Convert to PDF/A');
+  check('after a cancel, it converts again', await waitFor(`document.body.innerText.includes('Converted')`, 120000));
+
+  // 5d. A document that runs LibreOffice's thread pool dry is converted again with twice the
+  //     threads, not left to deadlock. The test seam starts with one thread: how many run at once
+  //     depends on timing, and only one is sure to be outgrown by every document.
+  await ev(`sessionStorage.setItem('xconvert:test-threads', '1')`);
+  await keepLayout('poznamka.docx');
+  check('a document that outgrows the threads still converts', await waitFor(`document.body.innerText.includes('Converted')`, 180000));
+  check('…because LibreOffice started again with more', await ev(`window.__labels.has('Starting again with more threads…')`),
+    await ev(`[...window.__labels].join(' / ')`));
+  await ev(`sessionStorage.removeItem('xconvert:test-threads')`);
 
   // 6. Offline: after a conversion, everything needed is cached; cut the network, reload, convert
   check('a service worker controls the page', await waitFor(`navigator.serviceWorker.controller !== null`, 10000));

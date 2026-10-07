@@ -38,9 +38,15 @@ export async function controlled(): Promise<void> {
 let starting: Promise<Worker> | null = null;
 let nextId = 1;
 const pending = new Map<number, Pending>();
+/** Bumped by stopPandoc, so a start still waiting on the service worker does not go ahead. */
+let generation = 0;
 
 function start(): Promise<Worker> {
-  return (starting ??= controlled().then(create));
+  const mine = generation;
+  return (starting ??= controlled().then(() => {
+    if (mine !== generation) throw new ConverterError('The converter was stopped.', 'stopped for Keep the layout');
+    return create();
+  }));
 }
 
 function create(): Worker {
@@ -75,10 +81,12 @@ function ask(message: Without<ToWorker, 'id'>, onProgress?: (p: Progress) => voi
  * LibreOffice ("Keep the layout") converts, which needs about 2 GB on its own.
  */
 export function stopPandoc(): void {
-  if (!worker) return;
+  // Also before the worker exists: a warm-up still waiting on the service worker would
+  // otherwise start pandoc's 16 MiB download alongside LibreOffice's, over the same line.
+  generation += 1;
   for (const waiting of pending.values()) waiting.reject(new ConverterError('The converter was stopped.', 'stopped for Keep the layout'));
   pending.clear();
-  worker.terminate();
+  worker?.terminate();
   worker = null;
   starting = null;
 }
