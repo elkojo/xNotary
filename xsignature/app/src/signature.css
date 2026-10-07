@@ -172,32 +172,6 @@
   box-shadow: inset 0 0 0 1px var(--green);
 }
 
-.choice-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.choice {
-  padding: 9px 16px;
-  border: 1px solid var(--line-dark);
-  border-radius: 9px;
-  font-size: 13.5px;
-  font-weight: 650;
-  background: var(--card);
-  cursor: pointer;
-}
-
-.choice:hover {
-  border-color: var(--control-hover-line);
-}
-
-.choice.selected {
-  border-color: var(--dark-btn-line);
-  color: var(--dark-btn-fg);
-  background: var(--dark-btn-bg);
-}
-
 .swatches {
   display: flex;
   flex-wrap: wrap;
@@ -389,20 +363,6 @@
     flex-direction: column;
     align-items: flex-start;
   }
-}
-
-/*
- * The secondary actions, kept together.
- *
- * .flow-actions spreads its children apart, which reads correctly with two
- * buttons and wrongly with three — the middle one ends up floating. Grouping
- * keeps "go back / do something else" on the left and the action that finishes
- * the job on the right, which is the arrangement the rest of the app uses.
- */
-.action-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
 }
 
 @media (max-width: 560px) {

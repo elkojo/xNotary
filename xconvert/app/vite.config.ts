@@ -106,10 +106,10 @@ ${[fontNoticeText(rule), ...js].join('\n\n')}
  * sw.js: xConvert offline. Hand-rolled, as xNotary's is, so it can be read in one sitting.
  *
  * Two caches. The shell — page, scripts, styles, notices — is precached and versioned per
- * build. The converters (vendor/: 27 MiB) are cached the first time they are used, never
- * precached: a visitor who never converts should not download them. Their cache is named by
- * a digest of the files themselves, so a release that leaves them unchanged keeps them, and
- * one that changes them replaces them.
+ * build. The converters (vendor/: pandoc 16 MiB, LibreOffice 73 MiB, gzipped) are cached the
+ * first time they are used, never precached: a visitor who never converts should not download
+ * them. Their cache is named by a digest of the files themselves, so a release that leaves
+ * them unchanged keeps them, and one that changes them replaces them.
  *
  * Same origin and this scope only; xConvert makes no other request.
  */
@@ -157,13 +157,17 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin || !url.pathname.startsWith('${base}')) return;
 
   if (url.pathname.startsWith('${base}vendor/')) {
-    // The converters: from the cache once they are there; otherwise fetched, and kept.
+    // The converters: from the cache once they are there; otherwise fetched, and kept. The
+    // response goes to the page as it arrives and is kept alongside, not first: a 20 MiB part
+    // over a slow line held back until cached is minutes of a progress bar that does not move.
+    // And keeping is best effort — a cache that refuses (quota, a private window) must not
+    // turn a download that worked into a failed conversion.
     event.respondWith(
       caches.open(VENDOR).then(async (cache) => {
         const hit = await cache.match(request);
         if (hit) return hit;
         const response = await fetch(request);
-        if (response.ok) await cache.put(request, response.clone());
+        if (response.ok) event.waitUntil(cache.put(request, response.clone()).catch(() => {}));
         return response;
       }),
     );

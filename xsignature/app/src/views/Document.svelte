@@ -14,6 +14,9 @@
    * top, so the text in the document stays text.
    */
   import Info from '../../../../app/src/site/Info.svelte';
+  import SignatureLevel from '../../../../app/src/site/SignatureLevel.svelte';
+  import SupportLink from '../../../../app/src/site/SupportLink.svelte';
+  import { formatBytes } from '../../../../app/src/site/size';
   import { openPdf, UnreadablePdf, type OpenPdf } from '../lib/document/pdf/inspect';
   import { renderPage } from '../lib/document/pdf/render';
   import { fitInside, displayedSize } from '../lib/document/place/placement';
@@ -1071,13 +1074,6 @@
 
   /** In points, the size the block's details are set at on the page. */
   const BLOCK_FONT_SIZE = 7;
-
-
-  function readableSize(value: number): string {
-    if (value < 1024) return `${value} bytes`;
-    if (value < 1024 * 1024) return `${Math.round(value / 1024)} kB`;
-    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-  }
 </script>
 
 <!--
@@ -1106,8 +1102,8 @@
         <div class="flow-panel">
           <h2 class="panel-title">
             1 · Choose a document<Info
-              >Plain text and Markdown are laid out as a PDF on this device. For anything else, a
-              word processor's own Save As or Print to PDF will do a better job.</Info
+              >Plain text and Markdown are converted into a PDF on this device. For anything else,
+              save it as a PDF first.</Info
             >
           </h2>
 
@@ -1115,7 +1111,7 @@
             <div class="picked">
               <div class="picked-name">{fileName}</div>
               <div class="picked-facts">
-                {verdict.format} · {readableSize(sourceSize)}{#if opened} · {opened.pages
+                {verdict.format} · {formatBytes(sourceSize)}{#if opened} · {opened.pages
                     .length} page{opened.pages.length === 1 ? '' : 's'}{/if}{#if converted} · laid
                   out here as a PDF{/if}
               </div>
@@ -1475,7 +1471,7 @@
                 <input type="checkbox" bind:checked={wantCertificate} />
                 <span>
                   <strong>Use a certificate</strong>
-                  <span class="check-note">An advanced electronic signature — never a qualified one.</span>
+                  <span class="check-note">Never a qualified signature: a key file can be copied.</span>
                 </span>
               </label>
             </div>
@@ -1599,40 +1595,23 @@
 
                   {#if signerClaims}
                     <!--
-                      The certificate's own statements, kept carefully apart
-                      from anything this app decides. "This certificate declares
-                      itself qualified" is a fact about the file; "this
-                      signature is qualified" is a judgement, and not one this
-                      app is entitled to. Said here rather than only on the
-                      Check screen, so the signer learns what they are about to
-                      make before they make it instead of from somebody else's
-                      validator afterwards.
+                      The level this signature will be, before it is made. Read from the
+                      certificate's own statements, never judged (app/src/site/signature-level.ts).
+                      A key file is never on a certified device, whatever the certificate
+                      declares, so the top level cannot happen here.
                     -->
-                    <div class="notice">
-                      <strong>What this certificate says about itself.</strong>
-                      {#if signerClaims.qualified}
-                        It declares itself a <em>qualified certificate</em> under eIDAS{signerClaims.purpose ===
-                        'signature'
-                          ? ', issued to a person for signing'
-                          : signerClaims.purpose === 'seal'
-                            ? ', issued to an organisation for sealing'
-                            : ''} — but not that its key sits on a qualified signature creation
-                        device, which a file cannot. So this makes an advanced signature supported by
-                        a qualified certificate, not a qualified electronic signature.
-                      {:else}
-                        It makes no claim to being a qualified certificate under eIDAS, so this makes
-                        an advanced electronic signature.
-                        {#if signerClaims.purpose === 'website'}
-                          It declares itself a website certificate, which is not meant for signing
-                          documents at all.
-                        {/if}
+                    <SignatureLevel qualified={signerClaims.qualified} onQualifiedDevice={false}>
+                      Made with a key file, which can be copied, so it cannot be a qualified
+                      signature.
+                      {#if signerClaims.purpose === 'seal'}Issued to an organisation, as a seal.{/if}
+                      {#if signerClaims.purpose === 'website'}
+                        It is a website certificate, which is not meant for signing documents.
                       {/if}
                       {#if signerClaims.limit}
                         It declares a transaction limit of {signerClaims.limit.value.toLocaleString()}
                         {signerClaims.limit.currency}.
                       {/if}
-                      Nothing here checks these statements are true.
-                    </div>
+                    </SignatureLevel>
 
                     {#if signerClaims.keyUsage.stated && !signerClaims.keyUsage.digitalSignature && !signerClaims.keyUsage.nonRepudiation}
                       <div class="notice warn">
@@ -2018,6 +1997,7 @@
                   A copy; the original is untouched.
                 </div>
               {/if}
+              <SupportLink />
             {/if}
 
             <div class="action-group">
@@ -2048,22 +2028,12 @@
         -->
         {#if wantCertificate && identity}
           <div class="notice">
-            <strong>An advanced electronic signature — not a qualified one.</strong> It proves that
-            whoever held this key signed these exact bytes. It does not check who {identity.subject}
-            is, and carries no revocation data.<Info
-              >Qualified needs the key in certified hardware only you can use; a key file a browser
-              can read can be copied. Whose certificate it is, the reader's PDF software judges
-              against a list of trusted authorities this app does not ship. Whether
-              {identity.issuer} has since withdrawn the certificate
-            {#if signerClaims?.ocspUrl || signerClaims?.crlUrls.length}
-              is answered at
-              {[signerClaims.ocspUrl, ...signerClaims.crlUrls].filter(Boolean).join(', ')}, which
-              this app does not call: that would be a second network request.
-            {:else}
-              is a question a reader puts to the authority over the network; this app does not ask
-              it.
-            {/if} After {identity.validTo.toISOString().slice(0, 10)} it may not be answerable at
-              all — what Acrobat calls "not LTV enabled".</Info
+            <strong>Your certificate signs this exact file.</strong> If it is changed later, PDF
+            readers will show it. This page does not check who {identity.subject} is.<Info
+              >Whether to trust the certificate is for the reader's PDF software to decide, against
+              the trust list of the framework it was issued under. The signature also carries no
+              proof that {identity.issuer} had not withdrawn the certificate when you signed: a reader
+              can ask today, but after {identity.validTo.toISOString().slice(0, 10)} perhaps not.</Info
             >
           </div>
         {/if}

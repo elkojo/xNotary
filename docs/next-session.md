@@ -1,6 +1,51 @@
 # Where things stand — handoff
 
-## Pick up here (2026-10-06): deploy v0.8.0
+## Pick up here (2026-10-07): deploy v0.8.1
+
+**v0.8.1 is the release to deploy.** It supersedes 0.8.0, which was never deployed to
+production, so one deploy brings both. Tag `v0.8.1` builds it and attaches
+`xnotary-v0.8.1-dist.zip` to the release. Deploy that zip exactly as described for 0.8.0 below.
+Agents never touch the Cloudflare account.
+
+### What changed since 0.8.0
+
+**1. The same tool looks the same everywhere.** The rule is in `DESIGN.md`.
+- Drop zones follow xSignature's design: the file mark names the format, the hint reads "or click
+  to choose one — …", and there is no button.
+- A chosen file shows as the `.picked` summary card with a "Choose a different file" button.
+- `.choice` / `.choice-row` live once, in `app/src/app.css`.
+- One size formatter, `app/src/site/size.ts`.
+- One progress display, `app/src/site/Progress.svelte`.
+- One signature level, `app/src/site/SignatureLevel.svelte`: three levels read from the
+  certificate's own statements, never "verified". It replaced four separate wordings in xSignature
+  (Sign a document, Check a PDF) and xNotary (Certify signers).
+
+**2. xConvert, Keep the layout.** It failed on `beta.xnotary.digital` in Brave.
+- Brave deadlocked in LibreOffice's PDF export with 4 pthreads. The build now starts 8, and a
+  pool that runs dry restarts LibreOffice with twice as many, up to 32.
+- On slow lines, the service worker streams the parts and caches them alongside, and the
+  assembler resumes or retries a dropped part.
+- Download progress is shown by the byte. Keep the layout can be cancelled, and a worker that
+  dies fails the conversion instead of hanging it.
+- Checked in Chrome, Brave and Firefox. The full record is in `docs/xconvert-spike.md`.
+
+**3. Support.**
+- `/support/` is a second page of the front-page build. It holds a thank-you and a voluntary
+  Lightning payment. The QR is drawn at build time from `LIGHTNING` in `app/src/site/support.ts`
+  (it decodes to milan@cake.cash). Card, Bank QR and Share are marked "Under development".
+- `SupportLink` sits under finished tasks in xNotary and xSignature, never in xConvert.
+- Support is also in the front-page footer and the "I want to…" menu.
+- The site no longer calls itself free of charge. "Free and open source" in the footers is the
+  licence, not a price.
+
+### Check after the deploy
+- `/support/` returns 200. Scan its QR with a real Lightning wallet: that has not been done yet.
+- Keep the layout in Brave and Firefox with the owner's real 18-page Word document, which stays
+  outside the repository.
+- Safari still needs someone with a Mac.
+- The 0.8.0 checks below still apply: the headers, `/sw.js`, the parts manifest.
+
+## Earlier (2026-10-06): v0.8.0, superseded by v0.8.1
 
 **For the operator: deploy v0.8.0.** It is tagged and released
 ([release](https://github.com/elkojo/xNotary/releases/tag/v0.8.0)), with

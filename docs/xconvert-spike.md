@@ -157,10 +157,79 @@ apart from a real bug. The same page in a normal browser converts the same docum
 2 s. The e2e polls only while the small fixture converts, and that passes. Don't poll the page
 while a large document exports.
 
+The trap was a symptom. The export needs one more thread than the four the build starts up
+front. Emscripten starts any further thread on demand, and that needs the thread asking for it
+to return to its event loop. LibreOffice, blocked in `lok_documentSaveAs`, never does. See the
+next section.
+
+## Beta, slow lines and Brave (2026-10-06)
+
+A real 18-page Word document (1 MB, kept out of the repository) failed with Keep the layout on
+`beta.xnotary.digital` in Brave. There were two separate causes.
+
+**Brave deadlocked in the PDF export.** Everything was cached, the document was loaded by 8 s,
+and the export then sat at "Saving… 70%" for ten minutes at zero CPU. It did the same against a
+local server, so this was not the deploy. Raising the pthread pool fixed it: 4 hangs; 5 and 6
+convert, in 60 s. Chrome starts the extra thread on demand and gets away with 4. The patch now
+starts 8 (`scripts/patch-libreoffice.mjs`). LibreOffice's own thread pool is already capped by
+the upstream worker (`MAX_CONCURRENCY=1`), so the extra thread comes from elsewhere in the
+export, and capping harder is not the lever.
+
+Measured in Brave 1.96 (Flatpak) with a fresh profile and default Shields. Compared with Chrome
+it reports 13 cores instead of 14, `deviceMemory` 16 instead of 32, and a 2 GB storage quota
+instead of 10 GB. None of those turned out to matter.
+
+**Heavier documents do not need more threads, or more memory.** I generated four heavy documents
+with python-docx (400 pages of text; 150 large images, 9.5 MB; 100 tables of 30×8, 127 pages;
+60 sections with headers, footers and columns, 120 pages). An instrumented build logged peak
+running threads and every heap growth. Every document peaked at four or five threads. The fifth
+comes with some content and not with size: the image and section documents stayed at four. The
+heap never grew past its initial 1 GB, against a 4 GB ceiling. Firefox 156 converted all of them
+in 4–18 s.
+
+**What remains is a document that needs more than eight threads.** Unlikely, given the above,
+but it would hang silently. The patched glue now reports the moment the pool runs dry, the step
+before the deadlock (`Module.xconvertPoolExhausted`). The page then restarts LibreOffice with
+twice the threads, up to 32, and converts again: a few seconds, from the cache. A browser that
+would have coped on demand (Chrome, sometimes) loses those seconds; one that would not (Brave)
+is rescued. Checked in Brave with a pool of 4: the export ran dry at 5.3 s and the document was
+done at 9.1 s, where it used to hang for good. "Keep the layout" can also be cancelled now. A
+worker that dies mid-conversion fails the conversion instead of leaving it waiting forever.
+e2e covers both, using a test seam (`sessionStorage['xconvert:test-threads']`) that starts with
+one thread. One, because how many threads run at once depends on timing: a start of two let the
+small fixture through without running dry about half the time.
+
+**A slow line made every browser look stuck.** The line measured 0.6 MB/s, and Cloudflare served
+beta's parts at 0.3 MB/s, so 77 MB took over four minutes. Three things made that wait much
+worse:
+
+- The service worker awaited `cache.put` before answering. The worker received each 20 MiB part
+  only once it had been downloaded and cached in full: 98 s of nothing for the first part. A
+  cache that refused (quota, a private window) failed the part outright.
+- Progress was posted once per part, and restarted between the wasm and the data. For minutes
+  the screen read "Preparing to download WebAssembly… 50%".
+- One dropped part failed the conversion with "Failed to read from a ReadableStream". There was
+  no retry.
+
+The fixes: the service worker now streams each part through and caches it alongside, best
+effort (`event.waitUntil`). The assembler is now a file of its own,
+`scripts/libreoffice-assemble.js`, unit-tested. It reports progress in bytes across both files,
+resumes a dropped part with Range (or skips the bytes it already has), and retries three times.
+It does not retry a 4xx. And `stopPandoc` now also cancels a warm-up that is still waiting on
+the service worker. That warm-up used to start pandoc's 16 MiB download alongside LibreOffice's,
+over the same slow line.
+
+e2e now paces LibreOffice's parts and cuts one off partway, so resuming and mid-part progress
+are both exercised on localhost.
+
+**Another testing trap: Brave's Flatpak sandbox.** It shares `/tmp`, not the home directory, so
+documents and profiles for a driven Brave must live there. Measure CPU from the driven
+browser's own process tree. The user's own Brave is often open alongside it.
+
 ## Not yet checked
 
 - A real phone.
 - Inputs beyond the fixtures, for the pandoc route: Word's own DOCX (not LibreOffice's),
   tracked changes, right-to-left text, CJK (the bundled faces have none).
-- For Keep the layout: browsers other than Chrome (Firefox, Safari), tracked changes, and
+- For Keep the layout: Safari (Chrome, Brave and Firefox are checked), tracked changes, and
   documents whose fonts LibreOffice's bundled set lacks (CJK needs extra fonts).

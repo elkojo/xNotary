@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { PDF_EXPORT_OPTIONS, hasComments, keepsLayout } from './libreoffice';
+import { DOWNLOAD_MB, PDF_EXPORT_OPTIONS, hasComments, keepsLayout, layoutStage } from './libreoffice';
 
 const inflate = async (b: Uint8Array) => new Uint8Array(inflateRawSync(b));
 
@@ -91,5 +92,40 @@ describe('hasComments', () => {
 
   it('says no, rather than throwing, for bytes that are not a ZIP', async () => {
     expect(await hasComments(new TextEncoder().encode('not a zip at all, just text'), 'docx', inflate)).toBe(false);
+  });
+});
+
+describe('layoutStage', () => {
+  it('shows the download in bytes: the one stage that is measured', () => {
+    expect(layoutStage({ percent: 37, message: 'Downloading the layout converter, once', loaded: 28e6, total: 76e6 })).toEqual({
+      label: 'Downloading the layout converter, once',
+      loaded: 28e6,
+      total: 76e6,
+    });
+  });
+
+  it('names LibreOffice’s own stages in plain words, without their percentage', () => {
+    expect(layoutStage({ percent: 50, message: 'Preparing to download WebAssembly...' })).toEqual({
+      label: 'Starting LibreOffice',
+      loaded: null,
+      total: null,
+    });
+    expect(layoutStage({ percent: 70, message: 'Saving...' }).label).toBe('Laying out the PDF');
+    expect(layoutStage({ percent: 30, message: 'Loading document...' }).label).toBe('Opening the document');
+    expect(layoutStage({ percent: 95, message: 'Reading output...' }).label).toBe('Finishing');
+    expect(layoutStage({ percent: 70, message: 'Ready' }).label).toBe('Starting LibreOffice');
+  });
+
+  it('says "Working" for a message it does not know, never the raw text', () => {
+    expect(layoutStage({ percent: 10, message: 'Frobnicating the zorbs...' }).label).toBe('Working');
+  });
+});
+
+describe('DOWNLOAD_MB', () => {
+  it('is what the progress will count to, from the parts the build ships', () => {
+    const bytes = ['soffice.wasm', 'soffice.data']
+      .map((n) => JSON.parse(readFileSync(new URL(`../../public/vendor/libreoffice/${n}.parts.json`, import.meta.url), 'utf8')).bytes as number)
+      .reduce((a, b) => a + b);
+    expect(DOWNLOAD_MB).toBe(Math.round(bytes / 1024 / 1024));
   });
 });

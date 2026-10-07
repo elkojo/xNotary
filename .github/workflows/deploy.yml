@@ -193,6 +193,7 @@ jobs:
           grep -q 'frame-ancestors' dist/_headers || { echo '::error::dist/_headers carries no frame-ancestors directive'; exit 1; }
           grep -A1 '^/xnotary/\*' dist/_headers | grep -q '! Content-Security-Policy' || { echo '::error::the /xnotary/* rule does not detach the general CSP'; exit 1; }
           grep -q 'src="/assets/' dist/index.html || { echo '::error::dist/index.html is not the front page built for /'; exit 1; }
+          grep -q 'src="/assets/support-' dist/support/index.html || { echo '::error::dist/support/index.html is missing or not built for /support/ — every service links there'; exit 1; }
           grep -q 'src="/xnotary/assets/' dist/xnotary/index.html || { echo '::error::dist/xnotary/index.html does not reference /xnotary/assets/ — was BASE_PATH overridden?'; exit 1; }
           if grep -q '/xNotary/' dist/xnotary/index.html; then echo '::error::xNotary still carries the GitHub Pages base path'; exit 1; fi
           grep -q 'src="/xsignature/assets/' dist/xsignature/index.html || { echo '::error::dist/xsignature/index.html does not reference /xsignature/assets/'; exit 1; }

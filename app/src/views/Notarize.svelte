@@ -12,8 +12,11 @@
   import FileDrop from '../components/FileDrop.svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import Info from '../site/Info.svelte';
+  import Progress from '../site/Progress.svelte';
+  import SupportLink from '../site/SupportLink.svelte';
   import { buildCertificate1 } from '../lib/certificate1';
-  import { baseName, downloadBytes, formatBytes } from '../lib/download';
+  import { baseName, downloadBytes } from '../lib/download';
+  import { formatBytes } from '../site/size';
   import { groupHex, sha256File, toHex } from '../lib/hash';
   import { putCertificate, requestPersistence, type CertificateRecord } from '../lib/library';
   import { checkStatus, describeProof, parseOts, stamp, type OtsStatus } from '../lib/ots';
@@ -33,7 +36,9 @@
   let digestHex = $state('');
   let note = $state('');
   let phase = $state<Phase>('idle');
-  let hashProgress = $state(0);
+  let hashed = $state({ read: 0, total: 0 });
+  /** Certificate 1 was saved: the task is finished, and the support line may show. */
+  let saved = $state(false);
   let error = $state('');
   let calendarWarnings = $state<string[]>([]);
 
@@ -53,7 +58,8 @@
     digestHex = '';
     note = '';
     phase = 'idle';
-    hashProgress = 0;
+    hashed = { read: 0, total: 0 };
+    saved = false;
     error = '';
     calendarWarnings = [];
     result = null;
@@ -66,7 +72,7 @@
     phase = 'hashing';
     try {
       const bytes = await sha256File(chosen, (read, total) => {
-        hashProgress = total === 0 ? 1 : read / total;
+        hashed = { read, total };
       });
       digest = bytes;
       digestHex = toHex(bytes);
@@ -161,13 +167,12 @@
 
             <FileDrop
               label="Drop a file here"
-              hint="Any file type"
+              hint="any type"
               onselect={pick}
             />
 
             {#if phase === 'hashing'}
-              <div class="progress"><div style="transform:scaleX({hashProgress})"></div></div>
-              <p class="field-help" role="status">Hashing… {Math.round(hashProgress * 100)}%</p>
+              <Progress label="Hashing on this device" loaded={hashed.read} total={hashed.total} />
             {/if}
 
             {#if error}
@@ -291,12 +296,14 @@
               <div class="success-actions">
                 <button
                   class="button dark"
-                  onclick={() =>
+                  onclick={() => {
                     downloadBytes(
                       result!.record.pdf,
                       `${baseName(result!.record.fileName)} — Certificate 1.pdf`,
                       'application/pdf',
-                    )}>Save Certificate 1 (PDF)</button
+                    );
+                    saved = true;
+                  }}>Save Certificate 1 (PDF)</button
                 >
                 <button
                   class="button ghost-dark"
@@ -329,6 +336,7 @@
                 file, which it cannot restore. My certificates lives only in this browser.</Info
               >
             </div>
+            {#if saved}<SupportLink />{/if}
 
             <details class="raw">
               <summary>OpenTimestamps proof tree</summary>

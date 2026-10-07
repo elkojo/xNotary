@@ -15,17 +15,19 @@
    * already been signed.
    */
   import FileDrop from '../components/FileDrop.svelte';
-  import { downloadBytes, formatBytes } from '../lib/download';
+  import { downloadBytes } from '../lib/download';
+  import { formatBytes } from '../site/size';
   import { groupHex, toHex } from '../lib/hash';
   import { checkStatus, parseOts, type OtsStatus } from '../lib/ots';
   import { utcStamp } from '../lib/time';
   import Info from '../site/Info.svelte';
+  import SignatureLevel from '../site/SignatureLevel.svelte';
+  import SupportLink from '../site/SupportLink.svelte';
   import {
     AgreementError,
     DSS_SOURCE_URL,
     analyzeSignedDocuments,
     buildCertificate2,
-    claimsLine,
     type Certificate2Draft,
   } from '../lib/certificate2';
 
@@ -187,29 +189,24 @@
             </h2>
 
             <FileDrop
-              label="Signed PDFs"
-              hint="One file signed by everyone, or one copy per signer"
+              icon="PDF"
+              label="Drop the signed PDFs here"
+              hint="one file signed by everyone, or one copy per signer"
               accept=".pdf"
               multiple
+              {files}
               onselect={(f) => inspect([f])}
               onselectmany={(f) => inspect(f)}
             />
-            {#if files.length > 0}
-              <p class="field-help">
-                {files.length} file{files.length === 1 ? '' : 's'}: {files
-                  .map((f) => f.name)
-                  .join(', ')}
-              </p>
-            {/if}
 
             <div style="margin-top:14px">
               <FileDrop
                 compact
-                icon="◇"
-                label="Timestamp proof (optional)"
-hint="Its Certificate 1 or proof.ots"
+                icon="PDF"
+                label="Drop the timestamp proof here (optional)"
+                hint="its Certificate 1 or proof.ots"
                 accept=".pdf,.ots"
-                file={proofFile}
+                files={proofFile ? [proofFile] : []}
                 onselect={(f) => inspect(files, f)}
               />
             </div>
@@ -354,7 +351,7 @@ hint="Its Certificate 1 or proof.ots"
                         Certified by {s.qtsp}
                       {/if}
                     </span>
-                    <span class="meta">{claimsLine(s.qualifiedClaim)}</span>
+                    <SignatureLevel compact qualified={s.qualifiedClaim.qcCompliance} onQualifiedDevice={s.qualifiedClaim.qcSSCD} />
                     <span class="meta">{timeText(s)}</span>
                     <span class="meta" class:bad-text={!s.documentIntegrity}>
                       {#if s.documentIntegrity}
@@ -441,6 +438,7 @@ hint="Its Certificate 1 or proof.ots"
                 >
               {/if}
             </div>
+            {#if saved}<SupportLink />{/if}
 
             <div class="flow-actions">
               <button class="button ghost-dark" onclick={() => (step = 2)}>

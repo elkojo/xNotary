@@ -585,12 +585,12 @@ function timeLine(signer: Certificate2Signer, detail: Detail = 'full'): string {
 }
 
 /**
- * The claims line, worded so it can never be read as a verdict. Exported
- * because the Attest screen must show the same thing the certificate prints:
- * the issuing authority alone reads as an assurance, and this is the sentence
- * that says what was and was not established.
+ * The claims line, worded so it can never be read as a verdict: the issuing
+ * authority alone reads as an assurance, and this is the sentence that says
+ * what was and was not established. The certificate spells the statements out;
+ * the Attest screen shows the same claims as a level (site/SignatureLevel.svelte).
  */
-export function claimsLine(claim: QualifiedClaim): string {
+function claimsLine(claim: QualifiedClaim): string {
   const asserted: string[] = [];
   if (claim.qcCompliance) asserted.push('qualified certificate');
   if (claim.qcTypeEsign) asserted.push('for electronic signature');

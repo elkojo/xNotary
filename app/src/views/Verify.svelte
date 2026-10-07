@@ -11,7 +11,7 @@
   import StatusBadge from '../components/StatusBadge.svelte';
   import Info from '../site/Info.svelte';
   import { extractOtsAttachment } from '../lib/certificate1';
-  import { formatBytes } from '../lib/download';
+  import { formatBytes } from '../site/size';
   import { bytesEqual, groupHex, sha256File, toHex } from '../lib/hash';
   import { checkStatus, describeProof, digestOf, parseOts, type OtsStatus } from '../lib/ots';
   import { utcStamp } from '../lib/time';
@@ -119,9 +119,9 @@
             <div class="verify-uploader">
               <FileDrop
                 compact
-                label="Original document"
-hint="The file it was issued for"
-                file={documentFile}
+                label="Drop the original document here"
+                hint="the file it was issued for"
+                files={documentFile ? [documentFile] : []}
                 onselect={(f) => {
                   documentFile = f;
                   reset();
@@ -129,11 +129,11 @@ hint="The file it was issued for"
               />
               <FileDrop
                 compact
-                icon="◇"
-                label="Certificate 1, or the .ots proof"
-hint="The PDF is enough"
+                icon="PDF"
+                label="Drop Certificate 1 or the .ots proof here"
+                hint="the PDF is enough"
                 accept=".pdf,.ots"
-                file={proofFile}
+                files={proofFile ? [proofFile] : []}
                 onselect={(f) => {
                   proofFile = f;
                   reset();

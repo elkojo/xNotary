@@ -1,14 +1,18 @@
 <script lang="ts">
   import Stepper from '../../../../app/src/site/Stepper.svelte';
   import Info from '../../../../app/src/site/Info.svelte';
+  import Progress from '../../../../app/src/site/Progress.svelte';
+  import { formatBytes } from '../../../../app/src/site/size';
   import { defaultPaper, outputName, type ConvertResult, type Paper } from '../lib/convert';
   import { ConverterError, convertDocument, formats, preload } from '../lib/converter';
   import { COMMON_INPUTS, COMMON_OUTPUTS, detectInput } from '../lib/formats';
-  import type { Progress } from '../lib/protocol';
+  import type { Progress as Download } from '../lib/protocol';
   import { canRunPandoc } from '../lib/support';
   import {
     DOWNLOAD_MB,
+    LayoutCancelled,
     canKeepLayout,
+    cancelKeepingLayout,
     convertKeepingLayout,
     hasComments,
     keepsLayout,
@@ -36,8 +40,10 @@
 
   let all = $state<{ inputs: string[]; outputs: string[] } | null>(null);
   let showAll = $state(false);
-  let progress = $state<Progress | null>(null);
+  let progress = $state<Download | null>(null);
   let busy = $state(false);
+  /** LibreOffice is running: it can take minutes, so it can be cancelled. */
+  let laying = $state(false);
   let result = $state<ConvertResult | null>(null);
   let failure = $state<{ message: string; detail: string } | null>(null);
 
@@ -46,9 +52,6 @@
   const readable = COMMON_INPUTS.map((f) => f.extensions[0].toUpperCase()).join(', ');
   const labelFor = (id: string) => COMMON_OUTPUTS.find((f) => f.id === id)?.label ?? id;
   const inputLabel = (id: string) => COMMON_INPUTS.find((f) => f.id === id)?.label ?? id;
-  const size = (n: number) =>
-    n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`;
-  const percent = (p: Progress) => (p.total ? Math.min(100, Math.round((p.loaded / p.total) * 100)) : null);
 
   /** Starts pandoc's download as soon as there is a document: by then the intent is clear. */
   function warmUp() {
@@ -57,7 +60,7 @@
       () => (progress = null), // reported when it matters, by the conversion itself
     );
   }
-  const onProgress = (p: Progress) => (progress = p.loaded >= p.total && p.total > 0 ? null : p);
+  const onProgress = (p: Download) => (progress = p.loaded >= p.total && p.total > 0 ? null : p);
 
   function take(list: FileList | null | undefined) {
     const files = [...(list ?? [])];
@@ -91,6 +94,7 @@
     failure = null;
     try {
       if (keeping && keepsLayout(from)) {
+        laying = true;
         const bytes = await convertKeepingLayout(new Uint8Array(await main.arrayBuffer()), from, (p) => (layoutProgress = p));
         result = { bytes, fileName: outputName(main.name, 'pdf'), mime: 'application/pdf', warnings: [] };
         keptLayout = true;
@@ -109,12 +113,14 @@
         onProgress,
       );
     } catch (e) {
+      if (e instanceof LayoutCancelled) return;
       failure =
         e instanceof ConverterError
           ? { message: e.message, detail: e.detail }
           : { message: 'The converter could not run.', detail: String(e) };
     } finally {
       busy = false;
+      laying = false;
       progress = null;
       layoutProgress = null;
     }
@@ -238,7 +244,7 @@
             <div class="review-box">
               <div class="review-row">
                 <span>Document</span>
-                <strong>{main.name} · {inputLabel(from)} · {size(main.size)}</strong>
+                <strong>{main.name} · {inputLabel(from)} · {formatBytes(main.size)}</strong>
               </div>
               {#if resources.length}
                 <div class="review-row">
@@ -315,16 +321,13 @@
             {/if}
 
             {#if layoutProgress}
-              <p class="field-help">
-                {layoutProgress.message}{#if layoutProgress.percent !== null} — {layoutProgress.percent}%{/if}…
-              </p>
-            {/if}
-
-            {#if progress}
-              <p class="field-help">
-                Downloading the {progress.stage === 'pandoc' ? 'converter' : 'typesetter'}, once{#if percent(progress) !== null}
-                  — {percent(progress)}%{/if}…
-              </p>
+              <Progress label={layoutProgress.label} loaded={layoutProgress.loaded} total={layoutProgress.total} />
+            {:else if progress}
+              <Progress
+                label="Downloading the {progress.stage === 'pandoc' ? 'converter' : 'typesetter'}, once"
+                loaded={progress.loaded}
+                total={progress.total}
+              />
             {/if}
 
             {#if failure}
@@ -335,7 +338,11 @@
             {/if}
 
             <div class="flow-actions">
-              <button class="button ghost-dark" disabled={busy} onclick={reset}>← Choose another</button>
+              {#if laying}
+                <button class="button ghost-dark" onclick={cancelKeepingLayout}>Cancel</button>
+              {:else}
+                <button class="button ghost-dark" disabled={busy} onclick={reset}>← Choose another</button>
+              {/if}
               <button class="button dark" disabled={busy} onclick={run}>
                 {#if busy}<span class="spinner"></span>{/if}
                 {busy ? 'Converting…' : `Convert to ${labelFor(to)}`}
@@ -348,7 +355,7 @@
             <div class="success">
               <div class="success-mark" aria-hidden="true">✓</div>
               <h2>Converted</h2>
-              <p>{result.fileName} · {size(result.bytes.byteLength)}</p>
+              <p>{result.fileName} · {formatBytes(result.bytes.byteLength)}</p>
               <div class="success-actions">
                 <button class="button dark" onclick={() => result && save(result)}>Save {result.fileName}</button>
               </div>
