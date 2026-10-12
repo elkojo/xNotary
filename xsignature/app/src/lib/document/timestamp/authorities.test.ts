@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { AUTHORITIES, authorityById, checkAuthorityUrl, DEFAULT_AUTHORITY_ID } from './authorities';
+import {
+  AUTHORITIES,
+  AUTOMATIC,
+  automaticOrder,
+  checkAuthorityUrl,
+  DEFAULT_CHOICE,
+  STANDINGS,
+  summary,
+} from './authorities';
 
 describe('the authority list', () => {
   it('reaches every authority over https', () => {
@@ -11,10 +19,35 @@ describe('the authority list', () => {
     }
   });
 
-  it('has a default that Acrobat will recognise', () => {
-    const fallback = authorityById(DEFAULT_AUTHORITY_ID);
-    expect(fallback).toBeDefined();
-    expect(fallback!.adobeTrusted).toBe(true);
+  it('defaults to Automatic', () => {
+    expect(DEFAULT_CHOICE).toBe(AUTOMATIC);
+  });
+
+  it('has Automatic ask only qualified authorities, in list order', () => {
+    // Falling through to a lesser authority would deliver less than the option
+    // promised, without the reader having chosen it.
+    const order = automaticOrder();
+    expect(order.length).toBeGreaterThan(1);
+    expect(order.every((a) => a.qualified && a.adobeTrusted)).toBe(true);
+    const positions = order.map((a) => AUTHORITIES.indexOf(a));
+    expect(positions).toEqual([...positions].sort((x, y) => x - y));
+  });
+
+  it('places every authority in exactly one group', () => {
+    for (const authority of AUTHORITIES) {
+      expect(STANDINGS.filter((s) => s.has(authority))).toHaveLength(1);
+    }
+  });
+
+  it('marks as relayed exactly the authorities reached through ai.moda', () => {
+    for (const authority of AUTHORITIES) {
+      expect(authority.relayed).toBe(new URL(authority.url).host === 'rfc3161.ai.moda');
+    }
+  });
+
+  it('summarises from the facts, so the line cannot drift from them', () => {
+    const sigstore = AUTHORITIES.find((a) => a.id === 'sigstore')!;
+    expect(summary(sigstore)).toBe('Not qualified · Acrobat does not recognise it · reached directly');
   });
 
   it('offers a choice that does not go through a relay', () => {

@@ -14,6 +14,7 @@
   import { untrack } from 'svelte';
   import Info from '../../../../app/src/site/Info.svelte';
   import SupportLink from '../../../../app/src/site/SupportLink.svelte';
+  import { handoff } from '../handoff.svelte';
   import type SignaturePad from 'signature_pad';
 
   import { createPad, fitPad, inkFrom, padHasPressure, undoStroke } from '../lib/signature/draw/pad';
@@ -363,6 +364,18 @@
     const result = await copySvg(svg);
     if (result.ok) copied = 'SVG copied — paste as a picture, or as markup into an editor.';
     else problem = { title: 'Could not copy the SVG.', detail: result.reason };
+  }
+
+  /**
+   * Send the signature to the document waiting on the other screen, and go
+   * there. The same SVG "Save SVG" writes, so the document screen reads it the
+   * way it reads a dropped file — no second path to keep in step.
+   */
+  function useInDocument() {
+    if (!svg) return;
+    problem = null;
+    handoff.delivery = { svg, name: fileNameFor(mode === 'draw' ? '' : trimmed, 'svg') };
+    location.hash = '#/document';
   }
 
   function saveSvg() {
@@ -716,6 +729,18 @@
             pair SVG and PNG look identical, because here they are equal
             choices rather than a main one and an extra.
           -->
+          {#if handoff.waiting}
+            <!--
+              Only when a document is open on the other screen, which is the
+              one time this is the point of being here.
+            -->
+            <div class="action-group handoff-actions">
+              <button class="button primary" disabled={!svg} onclick={useInDocument}>
+                Use in “{handoff.waiting}”
+              </button>
+            </div>
+          {/if}
+
           <div class="flow-actions">
             <span class="action-group">
               <button class="button dark" disabled={!svg} onclick={saveSvg}>Save SVG</button>

@@ -52,6 +52,16 @@ export interface Authority {
    * while the bytes remain perfectly checkable by other tools.
    */
   readonly adobeTrusted: boolean;
+  /**
+   * Whether its tokens are qualified electronic timestamps: matched, by key,
+   * against a granted TSA/QTST service on its country's EU trust list. Checked
+   * the same way and on the same day as the comment at the top says — never
+   * read off a name or a relay's description.
+   */
+  readonly qualified: boolean;
+  /** Whether the request goes through the ai.moda relay rather than straight to the authority. */
+  readonly relayed: boolean;
+  /** The whole story, for the ⓘ. The screen shows `summary()` instead. */
   readonly note: string;
 }
 
@@ -62,6 +72,8 @@ export const AUTHORITIES: readonly Authority[] = [
     signedBy: 'Izenpe',
     url: 'https://rfc3161.ai.moda/izenpe',
     adobeTrusted: true,
+    qualified: true,
+    relayed: true,
     note: 'A qualified electronic timestamp under eIDAS, issued by Izenpe, the Basque Government’s certification authority. Reached through the ai.moda relay. Acrobat recognises the signer through the EU trust list.',
   },
   {
@@ -70,6 +82,8 @@ export const AUTHORITIES: readonly Authority[] = [
     signedBy: 'Cartão de Cidadão',
     url: 'https://rfc3161.ai.moda/instituto-dos-registos-e-do-notariado-i.p.',
     adobeTrusted: true,
+    qualified: true,
+    relayed: true,
     note: 'A qualified electronic timestamp under eIDAS, issued by the Instituto dos Registos e do Notariado. Fair use: at most 20 requests in 20 minutes. Reached through the ai.moda relay. Acrobat recognises the signer through the EU trust list.',
   },
   {
@@ -78,6 +92,8 @@ export const AUTHORITIES: readonly Authority[] = [
     signedBy: 'APED',
     url: 'https://rfc3161.ai.moda/aped',
     adobeTrusted: true,
+    qualified: true,
+    relayed: true,
     note: 'A qualified electronic timestamp under eIDAS, issued by the Hellenic Public Administration Certification Authority. Reached through the ai.moda relay. Acrobat recognises the signer through the EU trust list.',
   },
   {
@@ -86,6 +102,8 @@ export const AUTHORITIES: readonly Authority[] = [
     signedBy: 'DigiCert',
     url: 'https://rfc3161.ai.moda/digicert',
     adobeTrusted: true,
+    qualified: false,
+    relayed: true,
     note: 'Reached through the ai.moda relay. Acrobat recognises the signer.',
   },
   {
@@ -94,6 +112,8 @@ export const AUTHORITIES: readonly Authority[] = [
     signedBy: 'Sectigo',
     url: 'https://rfc3161.ai.moda/sectigo',
     adobeTrusted: true,
+    qualified: false,
+    relayed: true,
     note: 'Reached through the ai.moda relay. Acrobat recognises the signer.',
   },
   {
@@ -102,6 +122,8 @@ export const AUTHORITIES: readonly Authority[] = [
     signedBy: 'GlobalSign',
     url: 'https://rfc3161.ai.moda/globalsign',
     adobeTrusted: true,
+    qualified: false,
+    relayed: true,
     note: 'Reached through the ai.moda relay. Acrobat recognises the signer.',
   },
   {
@@ -110,11 +132,44 @@ export const AUTHORITIES: readonly Authority[] = [
     signedBy: 'sigstore.dev',
     url: 'https://timestamp.sigstore.dev/api/v1/timestamp',
     adobeTrusted: false,
+    qualified: false,
+    relayed: false,
     note: 'Reached directly, with no relay in between. Its root is its own, so Acrobat will not recognise the signer — the token is still verifiable with Sigstore’s published certificate.',
   },
 ];
 
-export const DEFAULT_AUTHORITY_ID = 'izenpe';
+/**
+ * What the picker can hold besides an authority's id.
+ *
+ * Automatic asks the qualified authorities in list order and stops at the first
+ * that answers. Only the qualified ones, so that what the option promises — a
+ * qualified timestamp — is what it delivers or it delivers nothing: falling
+ * through to DigiCert, or to Sigstore, would hand back a lesser timestamp than
+ * the one the reader was shown, without their having chosen it.
+ */
+export const AUTOMATIC = 'automatic';
+export const CUSTOM = 'custom';
+export const DEFAULT_CHOICE = AUTOMATIC;
+
+export function automaticOrder(): readonly Authority[] {
+  return AUTHORITIES.filter((authority) => authority.qualified);
+}
+
+/** How the picker groups them: by what the timestamp will be worth, not by vendor. */
+export const STANDINGS = [
+  { label: 'Qualified (eIDAS)', has: (a: Authority) => a.qualified },
+  { label: 'Recognised by Acrobat, not qualified', has: (a: Authority) => !a.qualified && a.adobeTrusted },
+  { label: 'Not recognised by Acrobat', has: (a: Authority) => !a.qualified && !a.adobeTrusted },
+] as const;
+
+/** One line for under the picker, built from the facts rather than written beside them. */
+export function summary(authority: Authority): string {
+  return [
+    authority.qualified ? 'Qualified (eIDAS)' : 'Not qualified',
+    authority.adobeTrusted ? 'Acrobat recognises it' : 'Acrobat does not recognise it',
+    authority.relayed ? 'through the ai.moda relay' : 'reached directly',
+  ].join(' · ');
+}
 
 export function authorityById(id: string): Authority | undefined {
   return AUTHORITIES.find((authority) => authority.id === id);

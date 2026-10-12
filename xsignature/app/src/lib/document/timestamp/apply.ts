@@ -7,7 +7,7 @@
  *  2. write the file out, and only then measure where that space landed
  *  3. name the two stretches either side of it in `/ByteRange`
  *  4. digest those two stretches
- *  5. ask an authority to sign the digest
+ *  5. ask an authority to sign the digest — the next in line, if one does not answer
  *  6. write the token into the space already reserved for it
  *
  * After step 4 the file cannot change by a single byte, which is why steps 3
@@ -26,31 +26,37 @@ import {
   writeByteRange,
 } from './byte-range';
 import { addDocTimeStampPlaceholder } from './doctimestamp';
-import { fetchTimestamp } from './fetch';
-import { buildTimestampRequest, sha256 } from './request';
-import { readTimestampResponse, type Timestamp } from './response';
+import { askInTurn, type Candidate, type Passed } from './in-turn';
+import { sha256 } from './request';
+import type { Timestamp } from './response';
 
 export interface TimestampedPdf {
   /** The whole file: the document as it arrived, with the timestamp appended. */
   readonly bytes: Uint8Array<ArrayBuffer>;
   readonly timestamp: Timestamp;
+  /** The authority that answered. */
+  readonly by: Candidate;
+  /** Those asked before it that did not. */
+  readonly passed: readonly Passed[];
 }
 
 /** What actually goes over the network, so the interface can show it. */
 export interface Outgoing {
   readonly url: string;
+  /** The name it goes under on screen. */
+  readonly authority: string;
   readonly digestHex: string;
   readonly requestBytes: number;
 }
 
 export interface ApplyOptions {
-  /** Called once the digest exists, before anything is sent. */
+  /** Called before each request is sent, once the digest exists. */
   readonly onOutgoing?: (outgoing: Outgoing) => void;
 }
 
 export async function applyDocTimeStamp(
   pdf: Uint8Array,
-  url: string,
+  candidates: readonly Candidate[],
   options: ApplyOptions = {},
 ): Promise<TimestampedPdf> {
   // Appending, not rewriting: the bytes that came in stay exactly as they were,
@@ -72,20 +78,9 @@ export async function applyDocTimeStamp(
   writeByteRange(withPlaceholder, range);
 
   const digest = await sha256(digestedBytes(withPlaceholder, range));
-  const { der, nonce } = buildTimestampRequest(digest);
-
-  options.onOutgoing?.({ url, digestHex: toHex(digest), requestBytes: der.length });
-
-  const reply = await fetchTimestamp(url, der);
-  const timestamp = readTimestampResponse(reply, digest, nonce);
+  const { timestamp, by, passed } = await askInTurn(candidates, digest, options);
 
   spliceToken(withPlaceholder, span, timestamp.token);
 
-  return { bytes: withPlaceholder, timestamp };
-}
-
-function toHex(bytes: Uint8Array): string {
-  let out = '';
-  for (const byte of bytes) out += byte.toString(16).padStart(2, '0');
-  return out;
+  return { bytes: withPlaceholder, timestamp, by, passed };
 }

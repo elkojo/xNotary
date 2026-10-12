@@ -425,3 +425,12 @@
 .flow-panel {
   scroll-margin-top: 92px;
 }
+
+/* Sending the signature to a waiting document: above the save and copy row, one gap's width apart. */
+.handoff-actions {
+  margin-top: 27px;
+}
+
+.handoff-actions + .flow-actions {
+  margin-top: 12px;
+}

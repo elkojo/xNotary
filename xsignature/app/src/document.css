@@ -381,6 +381,11 @@ kbd {
   margin: -2px 0 10px;
 }
 
+/* The button that finishes the job, clear of the notice that usually sits above it. */
+.save-actions {
+  margin-top: 22px;
+}
+
 /*
  * Touch.
  *

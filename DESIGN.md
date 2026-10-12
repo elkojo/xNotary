@@ -242,8 +242,10 @@ marks are diamonds (rotated squares) with a letter or two inside.
 - **Disabled:** 45% opacity and a not-allowed cursor.
 
 ### Chips
-- **Choices** (format, paper size, authority): white with a hairline border; when selected,
-  yellow with an ink outline. They behave as radio buttons.
+- **Choices** (format, paper size, appearance): white with a hairline border; when selected,
+  yellow with an ink outline. They behave as radio buttons. Past about five options they become
+  a `<select>` styled as a field, grouped with `<optgroup>`, with the chosen option's one-line
+  summary as help text under it — as the timestamp authority picker does.
 - **Pills:** 11px uppercase, full radius, coloured only by meaning.
 
 ### Cards / Containers
