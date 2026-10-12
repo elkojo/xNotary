@@ -303,7 +303,7 @@ marks are diamonds (rotated squares) with a letter or two inside.
 - The page never says a payment is required, secure or received: it cannot know. The Lightning
   QR is drawn at build time in ink, and the page sends nothing.
 - `app/src/site/SupportLink.svelte` is the line under a finished task in xNotary and xSignature:
-  a light card with an ink heart on a wash circle, "If xNotary.digital saved you time, you can
+  a light card with an ink heart on a wash circle, "Success! If xNotary.digital saved you time, you can
   support the project." It opens in a new tab, because the page it sits on may hold the only
   copy of a result.
 - The site does not advertise itself as free of charge. "Free and open source" in a footer is the
