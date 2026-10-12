@@ -1,5 +1,5 @@
 /**
- * The one request this app makes.
+ * The one kind of request this app makes.
  *
  * Everything else in xSignature runs without a network. This does not, and it
  * cannot: a timestamp is an assertion by somebody who is not you, so somebody

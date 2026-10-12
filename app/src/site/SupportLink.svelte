@@ -14,7 +14,7 @@
     >
   </span>
   <span>
-    If xNotary.digital saved you time, you can
+    <strong>Success!</strong> If xNotary.digital saved you time, you can
     <a href={SUPPORT_HREF} target="_blank" rel="noopener">support the project</a>.
   </span>
 </p>

@@ -113,6 +113,8 @@
   --vision-accent: #ffd84d;
   --footer-fg: #c9c3b0;
   --footer-link: #ffd84d;
+  /* The version line under the footer text */
+  --footer-version: #a8a08a;
 
   /* Text on solid fills (status icons) */
   --on-solid: #fff;
@@ -1970,6 +1972,19 @@ footer.site > div {
   width: min(1120px, calc(100% - 48px));
   margin: 0 auto;
   padding: 28px 0 40px;
+}
+
+/*
+ * The site's release, under the footer text, on every service.
+ *
+ * Quieter than the prose above it, because it is a fact for somebody checking
+ * which build reached the site rather than something a reader needs. Tabular
+ * figures so it does not shift about between releases.
+ */
+footer.site .site-version {
+  margin-top: 14px;
+  color: var(--footer-version);
+  font-variant-numeric: tabular-nums;
 }
 
 footer.site a {

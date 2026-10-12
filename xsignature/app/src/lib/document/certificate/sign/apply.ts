@@ -31,10 +31,9 @@ import {
   spliceToken,
   writeByteRange,
 } from '../../timestamp/byte-range';
-import { fetchTimestamp } from '../../timestamp/fetch';
-import { buildTimestampRequest, sha256 } from '../../timestamp/request';
-import { readTimestampResponse, type Timestamp } from '../../timestamp/response';
-import type { Outgoing } from '../../timestamp/apply';
+import { askInTurn, type Answered, type Candidate, type InTurnHooks } from '../../timestamp/in-turn';
+import { sha256 } from '../../timestamp/request';
+import type { Timestamp } from '../../timestamp/response';
 import { signDetached, type SigningMaterial } from './cms';
 import { signatureDictionary, type SignatureDetails } from './signature-dict';
 
@@ -68,7 +67,7 @@ export interface SignOptions extends SignatureDetails {
    *
    * A function rather than an address, so that this module has one way of
    * being given a timestamp and the tests can supply a real captured token
-   * without a network. `fromAuthority` below builds the one that fetches.
+   * without a network. `fromAuthorities` below builds the one that fetches.
    */
   readonly timestamp?: TimestampSource;
 }
@@ -77,25 +76,21 @@ export interface SignOptions extends SignatureDetails {
 export type TimestampSource = (signatureValue: Uint8Array) => Promise<Timestamp>;
 
 /**
- * A source that asks an authority, which is the one that goes over the network.
+ * A source that asks authorities in turn, which is the one that goes over the network.
  *
  * The same request the app already makes, to the same kind of authority,
  * carrying the same 32 bytes — what differs is only what those bytes are a
- * digest of, and where the answer is filed. It stays a single network request
- * and it stays opt-in.
+ * digest of, and where the answer is filed. It stays opt-in, and it stays one
+ * request at a time: the next authority is asked only if the last did not answer.
  */
-export function fromAuthority(
-  url: string,
-  onOutgoing?: (outgoing: Outgoing) => void,
+export function fromAuthorities(
+  candidates: readonly Candidate[],
+  hooks: InTurnHooks & { readonly onAnswered?: (answered: Answered) => void } = {},
 ): TimestampSource {
   return async (signatureValue) => {
-    const digest = await sha256(signatureValue);
-    const { der, nonce } = buildTimestampRequest(digest);
-
-    onOutgoing?.({ url, digestHex: toHex(digest), requestBytes: der.length });
-
-    const reply = await fetchTimestamp(url, der);
-    return readTimestampResponse(reply, digest, nonce);
+    const answered = await askInTurn(candidates, await sha256(signatureValue), hooks);
+    hooks.onAnswered?.(answered);
+    return answered.timestamp;
   };
 }
 
@@ -165,10 +160,4 @@ export async function applyCertificateSignature(
   spliceToken(withPlaceholder, span, token);
 
   return { bytes: withPlaceholder, token, covered: covered.length, timestamp: stamped };
-}
-
-function toHex(bytes: Uint8Array): string {
-  let out = '';
-  for (const byte of bytes) out += byte.toString(16).padStart(2, '0');
-  return out;
 }

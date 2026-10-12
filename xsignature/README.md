@@ -62,7 +62,7 @@ existed at a particular time, according to an authority that has never heard of
 whoever made it. Attached to a certificate signature it says more — that the
 *signature* existed then, so the time of signing stops resting on the signer's
 own computer clock. That is a PAdES-B-T signature — PAdES-B-B without it — and
-it is one network request, not two.
+it is the same request the timestamp always makes, not a second kind of one.
 
 ## Key files
 
@@ -240,6 +240,13 @@ authority, because that is the only way a timestamp can mean anything —
 somebody independent has to see it. The document itself does not go, and the
 digest cannot be turned back into it. The interface states this before it
 happens, and shows the exact digest afterwards.
+
+The default, *Automatic*, asks the qualified authorities in list order — Izenpe,
+then Cartão de Cidadão, then APED — and stops at the first that answers. So the
+same digest may go to up to three authorities, one at a time, and never to
+another once one has answered. Every address it could go to is listed on screen
+before anything is sent, and the result names the authority that actually
+answered. Choosing one authority by hand sends exactly one request.
 
 Addresses read out of a certificate — where its issuer is published, where its
 revocation could be checked — are shown to you and never fetched. Opening one is

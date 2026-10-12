@@ -6,6 +6,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig, type Plugin } from 'vite';
 
 import { revision } from './scripts/revision';
+import { siteVersion } from './scripts/site-version';
 
 // xNotary lives at /xnotary/ on xnotary.digital since 0.5.0; the front page
 // (hub/, built by vite.hub.config.ts) has `/`. BASE_PATH still overrides it,
@@ -361,6 +362,7 @@ export default defineConfig({
     serviceWorker(),
   ],
   define: {
+    __APP_VERSION__: JSON.stringify(siteVersion()),
     __APP_REVISION__: JSON.stringify(REVISION.label),
     __APP_COMMIT__: JSON.stringify(REVISION.commit),
   },

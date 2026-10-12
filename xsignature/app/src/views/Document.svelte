@@ -26,11 +26,17 @@
   import { textToPdf } from '../lib/document/convert/text-to-pdf';
   import {
     AUTHORITIES,
+    AUTOMATIC,
     authorityById,
+    automaticOrder,
     checkAuthorityUrl,
-    DEFAULT_AUTHORITY_ID,
+    CUSTOM,
+    DEFAULT_CHOICE,
+    STANDINGS,
+    summary,
   } from '../lib/document/timestamp/authorities';
   import { applyDocTimeStamp, type Outgoing } from '../lib/document/timestamp/apply';
+  import type { Candidate, Passed } from '../lib/document/timestamp/in-turn';
   import type { Timestamp } from '../lib/document/timestamp/response';
   import { applyImageStamp } from '../lib/document/stamp/stamp';
   import {
@@ -62,7 +68,7 @@
   } from '../lib/document/certificate/read/read';
   import {
     applyCertificateSignature,
-    fromAuthority,
+    fromAuthorities,
     SignatureTooLarge,
     type SignedPdf,
     type TimestampSource,
@@ -74,6 +80,15 @@
   import { occupantsOn, overlapping, type Occupant } from '../lib/document/pdf/annotations';
   import { unsupportedCharacters } from '../lib/signature/type/coverage';
   import type { Font } from 'opentype.js';
+  import { untrack } from 'svelte';
+  import { collect, handoff } from '../handoff.svelte';
+
+  /**
+   * False while another screen is showing. The screen is hidden rather than
+   * unmounted then, so that what is open here survives a trip to make a
+   * signature — see App.svelte.
+   */
+  let { active = true }: { active?: boolean } = $props();
 
   /** How wide the page preview is drawn, in CSS pixels. */
   const PREVIEW_WIDTH = 520;
@@ -225,6 +240,35 @@
           : 'That could not be read as a signature. A PNG or an SVG from the signature screen will work.';
     }
   }
+
+  // ---- across screens -------------------------------------------------------
+
+  /** Tell the signature screen there is a document to send a signature to. */
+  $effect(() => {
+    handoff.waiting = opened ? fileName : null;
+  });
+
+  /** And take one when it arrives, the same way a dropped SVG is taken. */
+  let signaturePanel = $state<HTMLElement | null>(null);
+  $effect(() => {
+    if (!active || !handoff.delivery) return;
+    const delivery = collect();
+    if (!delivery) return;
+    untrack(() => {
+      void takeSignature(new Blob([delivery.svg], { type: 'image/svg+xml' }), delivery.name).then(
+        () => signaturePanel?.scrollIntoView({ block: 'start' }),
+      );
+    });
+  });
+
+  /**
+   * The key goes when the screen is left. Everything else here waits for the
+   * reader to come back; key material is held no longer than it is needed,
+   * and someone off making a signature does not need it.
+   */
+  $effect(() => {
+    if (!active) untrack(forgetKey);
+  });
 
   /**
    * Take whatever the clipboard is offering.
@@ -747,21 +791,30 @@
    * never quiet.
    */
   let wantTimestamp = $state(false);
-  let authorityId = $state(DEFAULT_AUTHORITY_ID);
-  let useCustom = $state(false);
+  /** `AUTOMATIC`, `CUSTOM`, or an authority's id. */
+  let choice = $state(DEFAULT_CHOICE);
   let customUrl = $state('');
   let customError = $state('');
   let stamped = $state<Timestamp | null>(null);
+  /** The request in flight, then the one that was answered. */
   let sent = $state<Outgoing | null>(null);
+  let answeredBy = $state<Candidate | null>(null);
+  let passedOver = $state<readonly Passed[]>([]);
   let timestampError = $state('');
 
-  let authority = $derived(authorityById(authorityId) ?? AUTHORITIES[0]);
+  let useCustom = $derived(choice === CUSTOM);
+  let authority = $derived(authorityById(choice) ?? null);
 
-  /** The address the request will actually go to, or null if it is not valid. */
-  let endpoint = $derived.by(() => {
-    if (!useCustom) return authority.url;
+  /**
+   * Where the request will go, in the order it will be tried, or null if the
+   * typed address is not valid. Everything the request could reach is listed
+   * on screen from this before anything is sent.
+   */
+  let candidates = $derived.by((): readonly Candidate[] | null => {
+    if (choice === AUTOMATIC) return automaticOrder().map((a) => ({ name: a.signedBy, url: a.url }));
+    if (authority) return [{ name: authority.signedBy, url: authority.url }];
     const checked = checkAuthorityUrl(customUrl);
-    return 'url' in checked ? checked.url : null;
+    return 'url' in checked ? [{ name: new URL(checked.url).host, url: checked.url }] : null;
   });
 
   // ---- saving ---------------------------------------------------------------
@@ -769,6 +822,18 @@
   let saving = $state(false);
   let saved = $state(false);
   let saveError = $state('');
+
+  /**
+   * Once a timestamp is saved, the notice about what will be sent has done its
+   * job and the result says what was. Change where it would go, and the result
+   * no longer describes the next save — so it goes, and the notice comes back
+   * before anything else is sent.
+   */
+  let destination = $derived(wantTimestamp ? JSON.stringify(candidates) : '');
+  let savedFor = $state('');
+  $effect(() => {
+    if (saved && destination !== savedFor) saved = false;
+  });
 
   /**
    * Put the certificate signature on, building the visible block if asked.
@@ -847,8 +912,8 @@
   }
 
   async function save() {
-    if (!bytes || !rect || !box || !signature) return;
-    if (wantTimestamp && !endpoint) {
+    if (!bytes || (signature && !rect)) return;
+    if (wantTimestamp && !candidates) {
       customError = 'Enter a valid https address, or choose one of the authorities above.';
       return;
     }
@@ -857,14 +922,17 @@
     timestampError = '';
     stamped = null;
     sent = null;
+    answeredBy = null;
+    passedOver = [];
     customError = '';
     try {
       // Re-open from the original bytes so that saving twice does not stamp a
       // document that was already stamped.
       const fresh = await openPdf(bytes);
 
-      if (appendOnly) {
-        // Nothing is drawn on the page. For a visible certificate signature
+      if (appendOnly || !signature) {
+        // Nothing is drawn on the page. Without a picture there is nothing to
+        // draw: the timestamp or the certificate is the whole of what is added. For a visible certificate signature
         // that is because the ink belongs inside the block, where it is part
         // of what the signature covers. For an already-signed document it is
         // because drawing anything would mean rewriting the file, and the
@@ -872,7 +940,7 @@
       } else if (signature!.kind === 'vector') {
         applyStamp(fresh.doc, fresh.pages[page], {
           page,
-          rect,
+          rect: rect!,
           commands: signature!.commands,
           width: signature!.width,
           height: signature!.height,
@@ -885,7 +953,7 @@
             : await fresh.doc.embedJpg(signature!.bytes);
         applyImageStamp(fresh.doc, fresh.pages[page], {
           page,
-          rect,
+          rect: rect!,
           image,
           width: signature!.width,
           height: signature!.height,
@@ -898,14 +966,24 @@
       // `save()` reassembles the file. On a document that already carries
       // signatures that is not a modification but a demolition — they are gone
       // from the result entirely — so it is never reached in that case.
-      let out = appendOnly ? bytes : await fresh.doc.save();
+      // Nothing drawn means nothing to reassemble: the timestamp or signature is
+      // appended to the bytes exactly as they arrived.
+      let out = appendOnly || !signature ? bytes : await fresh.doc.save();
 
       if (wantCertificate && identity) {
         // With a certificate, a timestamp belongs *inside* the signature rather
         // than appended after it: the authority stamps the signature value, so
-        // what is dated is the act of signing. It is also the same single
-        // request, filed differently — not a second one.
-        const source = wantTimestamp ? fromAuthority(endpoint!, (o) => (sent = o)) : undefined;
+        // what is dated is the act of signing. It is also the same request,
+        // filed differently — not a second kind of one.
+        const source = wantTimestamp
+          ? fromAuthorities(candidates!, {
+              onOutgoing: (o) => (sent = o),
+              onAnswered: (a) => {
+                answeredBy = a.by;
+                passedOver = a.passed;
+              },
+            })
+          : undefined;
 
         try {
           const result = await signWithCertificate(out, source);
@@ -926,12 +1004,14 @@
 
         downloadBlob(new Blob([out], { type: 'application/pdf' }), signedName());
         saved = true;
+        savedFor = destination;
         return;
       }
 
       if (!wantTimestamp) {
         downloadBlob(new Blob([out], { type: 'application/pdf' }), signedName());
         saved = true;
+        savedFor = destination;
         return;
       }
 
@@ -939,12 +1019,15 @@
       // good — it simply has no timestamp on it. Saying so and offering it is
       // better than failing the whole save for the optional half of it.
       try {
-        const result = await applyDocTimeStamp(out, endpoint!, {
+        const result = await applyDocTimeStamp(out, candidates!, {
           onOutgoing: (outgoing) => (sent = outgoing),
         });
         stamped = result.timestamp;
+        answeredBy = result.by;
+        passedOver = result.passed;
         downloadBlob(new Blob([result.bytes], { type: 'application/pdf' }), signedName());
         saved = true;
+        savedFor = destination;
       } catch (cause) {
         timestampError =
           cause instanceof Error
@@ -952,6 +1035,7 @@
             : 'The timestamp could not be fetched, and the reason was not one the app recognises.';
         downloadBlob(new Blob([out], { type: 'application/pdf' }), signedName());
         saved = true;
+        savedFor = destination;
       }
     } catch (cause) {
       saveError =
@@ -972,14 +1056,31 @@
 
   function signedName(): string {
     const base = fileName.replace(/\.pdf$/i, '');
-    return `${base || 'document'}-signed.pdf`;
+    // Only a timestamp on it: calling it signed would claim what it is not.
+    const suffix = !signature && !(wantCertificate && identity) ? 'timestamped' : 'signed';
+    return `${base || 'document'}-${suffix}.pdf`;
   }
+
+  /**
+   * Whether anything would be added at all.
+   *
+   * The picture is optional: a timestamp, or an invisible certificate
+   * signature, is a complete thing to add to a document on its own. Saving
+   * with none of the three would only write out a copy.
+   */
+  let addsSomething = $derived(
+    Boolean(signature || wantTimestamp || (wantCertificate && identity)),
+  );
+
+  /** A visible certificate signature shows the picture, so it needs one. */
+  let blockWithoutPicture = $derived(placingBlock && !signature);
 
   let ready = $derived(
     Boolean(
       opened &&
-        rect &&
-        signature &&
+        addsSomething &&
+        (!signature || rect) &&
+        !blockWithoutPicture &&
         // Nothing can be added to a document whose first signer forbade it.
         !sealed &&
         // A certificate that was asked for but not opened is not a reason to
@@ -1081,7 +1182,8 @@
   who has just copied a signature will press Ctrl+V wherever they happen to be
   looking, not after clicking a particular box first.
 -->
-<svelte:window onpaste={(event) => void onPaste(event)} />
+<!-- Only while showing: hidden, a paste belongs to the screen that is. -->
+<svelte:window onpaste={(event) => active && void onPaste(event)} />
 
 <section class="product-view">
   <div class="workspace">
@@ -1167,8 +1269,10 @@
         </div>
 
         {#if opened}
-          <div class="flow-panel">
-            <h2 class="panel-title">2 · Bring in a signature</h2>
+          <div class="flow-panel" bind:this={signaturePanel}>
+            <h2 class="panel-title">
+              2 · Bring in a signature <span class="panel-optional">Optional</span>
+            </h2>
 
             {#if signature}
               <div class="picked">
@@ -1212,6 +1316,22 @@
                 </div>
               {/if}
 
+              <!--
+                The limit, next to the thing it is about, and only while it is
+                the whole story: with a certificate, the note at the foot of the
+                page says what proves what.
+              -->
+              {#if !(wantCertificate && identity)}
+                <div class="notice warn">
+                  <strong>A picture of a signature</strong>, not an electronic signature.<Info
+                    >It proves nothing about who put it there — anyone holding the image can do the
+                    same to any file. Use it for letterheads, forms and returning paperwork, not as
+                    evidence that you agreed to something. Signing with a certificate in step 4 is
+                    what proves who signed.</Info
+                  >
+                </div>
+              {/if}
+
               <div class="action-group">
                 <button class="button secondary small" type="button" onclick={clearSignature}>
                   Use a different signature
@@ -1237,8 +1357,8 @@
                 <div>
                   <strong>Paste, drop or choose a signature</strong>
 <div class="drop-hint">
-                    PNG or SVG — <a href="#/signature">make one</a>, then
-                    <kbd>Ctrl</kbd>+<kbd>V</kbd>
+                    PNG or SVG, or <kbd>Ctrl</kbd>+<kbd>V</kbd> — or
+                    <a href="#/signature">make one</a> and send it back here
                   </div>
                 </div>
                 <input
@@ -1860,65 +1980,41 @@
             </div>
 
             {#if wantTimestamp}
-              <!--
-                The one place in this app where something leaves the device. It
-                is stated before it happens, in full, rather than explained
-                afterwards in a changelog.
-              -->
-              <div class="notice warn">
-                <strong>This sends one request off your device</strong> — the only one the app
-                makes.<Info
-                  >A timestamp cannot work without it: somebody independent has to see the file's
-                  fingerprint and sign it. A digest cannot be turned back into the file, so the
-                  authority learns that something existed, not what.</Info
-                >
-                <span class="outgoing-list">
-                  <span>
-                    <strong>What goes:</strong>
-                    32 bytes — the SHA-256 of
-                    {wantCertificate && identity ? 'your signature' : 'the finished PDF'}
-                  </span>
-                  <span><strong>What does not:</strong> the document, your name, the signature</span>
-                  <span
-                    ><strong>Where:</strong>
-                    <code>{endpoint ?? 'nowhere — the address below is not valid'}</code></span
-                  >
-                </span>
-
-              </div>
-
               <div class="field">
-                <span class="field-label"
+                <span class="field-label" id="tsa-choice-label"
                   >Timestamp authority<Info
                     >Who independently dates it. Not the certificate you sign with, and it neither
                     issues nor checks that certificate.</Info
                   ></span
                 >
-                <div class="authority-list">
-                  {#each AUTHORITIES as option}
-                    <button
-                      type="button"
-                      class="face-option"
-                      class:selected={!useCustom && authorityId === option.id}
-                      onclick={() => {
-                        useCustom = false;
-                        authorityId = option.id;
-                      }}
-                    >
-                      <strong>{option.name}</strong>
-                      <span>{option.note}</span>
-                    </button>
+                <select
+                  id="tsa-choice"
+                  class="input"
+                  aria-labelledby="tsa-choice-label"
+                  bind:value={choice}
+                >
+                  <option value={AUTOMATIC}>Automatic — the first qualified one that answers</option>
+                  {#each STANDINGS as standing}
+                    <optgroup label={standing.label}>
+                      {#each AUTHORITIES.filter(standing.has) as option}
+                        <option value={option.id}>{option.name}</option>
+                      {/each}
+                    </optgroup>
                   {/each}
-                  <button
-                    type="button"
-                    class="face-option"
-                    class:selected={useCustom}
-                    onclick={() => (useCustom = true)}
-                  >
-                    <strong>Another one</strong>
-                    <span>Your own authority, if it allows requests from a browser</span>
-                  </button>
-                </div>
+                  <option value={CUSTOM}>Your own authority…</option>
+                </select>
+                <p class="field-note">
+                  {#if choice === AUTOMATIC}
+                    Asks {automaticOrder()
+                      .map((a) => a.signedBy)
+                      .join(', then ')} in turn, and stops at the first that answers. Each is qualified
+                    (eIDAS) and recognised by Acrobat.
+                  {:else if authority}
+                    {summary(authority)}<Info>{authority.note}</Info>
+                  {:else}
+                    Any RFC 3161 authority, if it allows requests from a web page.
+                  {/if}
+                </p>
               </div>
 
               {#if useCustom}
@@ -1938,10 +2034,50 @@
                     why.
                   </p>
                 </div>
-              {:else if !authority.adobeTrusted}
+              {:else if authority && !authority.adobeTrusted}
                 <div class="notice">
                   Acrobat will call this timestamp of unknown origin. It is still real, and checkable
                   with {authority.signedBy}'s published certificate.
+                </div>
+              {/if}
+
+              {#if !(saved && stamped)}
+                <!--
+                  The one place in this app where something leaves the device. It
+                  is stated before it happens, in full, rather than explained
+                  afterwards in a changelog — every address it could go to included.
+                -->
+                <div class="notice warn">
+                  <strong
+                    >{candidates && candidates.length > 1
+                      ? 'This sends one request at a time off your device'
+                      : 'This sends one request off your device'}</strong
+                  > — the only kind the app makes.<Info
+                    >A timestamp cannot work without it: somebody independent has to see the file's
+                    fingerprint and sign it. A digest cannot be turned back into the file, so the
+                    authority learns that something existed, not what.{#if candidates && candidates.length > 1}
+                      Each authority is sent the same 32 bytes, and none is asked once one has
+                      answered.{/if}</Info
+                  >
+                  <span class="outgoing-list">
+                    <span>
+                      <strong>What goes:</strong>
+                      32 bytes — the SHA-256 of
+                      {wantCertificate && identity ? 'your signature' : 'the finished PDF'}
+                    </span>
+                    <span><strong>What does not:</strong> the document, your name, the signature</span>
+                    <span
+                      ><strong>Where:</strong>
+                      {#if candidates}
+                        {#each candidates as candidate, index}{index ? ', then ' : ''}<code
+                            >{candidate.url}</code
+                          >{/each}{#if candidates.length > 1}{' '}— each only if the one before does
+                          not answer{/if}
+                      {:else}
+                        <code>nowhere — the address above is not valid</code>
+                      {/if}</span
+                    >
+                  </span>
                 </div>
               {/if}
 
@@ -1964,10 +2100,16 @@
               {:else if stamped && wantCertificate && identity}
                 <div class="notice ok">
                   <strong>Saved, signed and timestamped.</strong>
-                  {authority.signedBy} dates the signature to
+                  {answeredBy?.name} dates the signature to
                   <strong>{stamped.time.toISOString().replace('T', ' ').replace('.000Z', ' UTC')}</strong>.
                   {#if sent}
                     <span class="outgoing-list">
+                      {#if passedOver.length}
+                        <span
+                          ><strong>Passed over:</strong>
+                          {passedOver.map((p) => p.name).join(', ')} — did not answer</span
+                        >
+                      {/if}
                       <span><strong>Sent:</strong> <code>{groupHex(sent.digestHex)}</code></span>
                       <span><strong>To:</strong> <code>{sent.url}</code></span>
                     </span>
@@ -1981,11 +2123,17 @@
               {:else if stamped}
                 <div class="notice ok">
                   <strong>Saved, and timestamped.</strong>
-                  {authority.signedBy} states that this exact file existed at
+                  {answeredBy?.name} states that this exact file existed at
                   <strong>{stamped.time.toISOString().replace('T', ' ').replace('.000Z', ' UTC')}</strong>.
                   Nothing about who made it.
                   {#if sent}
                     <span class="outgoing-list">
+                      {#if passedOver.length}
+                        <span
+                          ><strong>Passed over:</strong>
+                          {passedOver.map((p) => p.name).join(', ')} — did not answer</span
+                        >
+                      {/if}
                       <span><strong>Sent:</strong> <code>{groupHex(sent.digestHex)}</code></span>
                       <span><strong>To:</strong> <code>{sent.url}</code></span>
                     </span>
@@ -2000,7 +2148,16 @@
               <SupportLink />
             {/if}
 
-            <div class="action-group">
+            {#if opened && !addsSomething && !sealed}
+              <p class="field-note">Add a signature image, a certificate or a timestamp to save.</p>
+            {:else if blockWithoutPicture}
+              <p class="field-note">
+                A visible certificate signature shows your signature image: bring one in at step 2,
+                or choose Invisible.
+              </p>
+            {/if}
+
+            <div class="action-group save-actions">
               <button
                 class="button dark small"
                 type="button"
@@ -2008,13 +2165,15 @@
                 onclick={() => void save()}
               >
                 {saving
-                  ? 'Writing…'
+                  ? sent && !stamped
+                    ? `Asking ${sent.authority}…`
+                    : 'Writing…'
                   : wantCertificate && wantTimestamp
                     ? 'Sign, timestamp and save'
                     : wantCertificate
                       ? 'Sign with the certificate and save'
                       : wantTimestamp
-                        ? 'Save, and timestamp'
+                        ? 'Timestamp and save'
                         : 'Save signed PDF'}
               </button>
             </div>
@@ -2022,9 +2181,8 @@
         {/if}
 
         <!--
-          The same limit as on the other screen, and it has to be said harder
-          here: a signature sitting on a contract looks far more like a signed
-          contract than a loose PNG ever does.
+          What a certificate signature does and does not establish. The
+          picture's own limit sits in step 2, beside the picture.
         -->
         {#if wantCertificate && identity}
           <div class="notice">
@@ -2037,17 +2195,6 @@
             >
           </div>
         {/if}
-
-        <div class="notice warn">
-          <strong>A signature image is not an electronic signature</strong>, and a timestamp does not
-          make it one.<Info
-            >A picture of your name proves nothing about who put it there — anyone holding the image
-            can do the same to any file. Use it for letterheads, forms and returning paperwork, not
-            as evidence that you agreed to something.{#if !wantCertificate}
-              Signing with a certificate above is what proves who signed.{/if} A timestamp establishes
-            only that this file existed at a particular time.</Info
-          >
-        </div>
       </div>
     </div>
   </div>

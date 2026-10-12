@@ -242,8 +242,10 @@ marks are diamonds (rotated squares) with a letter or two inside.
 - **Disabled:** 45% opacity and a not-allowed cursor.
 
 ### Chips
-- **Choices** (format, paper size, authority): white with a hairline border; when selected,
-  yellow with an ink outline. They behave as radio buttons.
+- **Choices** (format, paper size, appearance): white with a hairline border; when selected,
+  yellow with an ink outline. They behave as radio buttons. Past about five options they become
+  a `<select>` styled as a field, grouped with `<optgroup>`, with the chosen option's one-line
+  summary as help text under it — as the timestamp authority picker does.
 - **Pills:** 11px uppercase, full radius, coloured only by meaning.
 
 ### Cards / Containers
@@ -301,7 +303,7 @@ marks are diamonds (rotated squares) with a letter or two inside.
 - The page never says a payment is required, secure or received: it cannot know. The Lightning
   QR is drawn at build time in ink, and the page sends nothing.
 - `app/src/site/SupportLink.svelte` is the line under a finished task in xNotary and xSignature:
-  a light card with an ink heart on a wash circle, "If xNotary.digital saved you time, you can
+  a light card with an ink heart on a wash circle, "Success! If xNotary.digital saved you time, you can
   support the project." It opens in a new tab, because the page it sits on may hold the only
   copy of a result.
 - The site does not advertise itself as free of charge. "Free and open source" in a footer is the

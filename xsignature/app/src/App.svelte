@@ -33,6 +33,19 @@
 
   let view = $state<View>(viewFromHash());
 
+  /**
+   * The document screen, once opened, stays for as long as the tab does.
+   *
+   * Leaving it for the signature screen — usually to make the signature it is
+   * waiting for — used to unmount it, and the document went with it. Hidden
+   * instead, it keeps what is open in memory, exactly where it already was;
+   * nothing is written anywhere, and a reload still empties it.
+   */
+  let documentOpened = $state(false);
+  $effect(() => {
+    if (view === 'document') documentOpened = true;
+  });
+
   function go(next: View) {
     view = next;
     history.replaceState(null, '', `#/${next}`);
@@ -80,16 +93,19 @@
     {:catch}
       {@render unavailable()}
     {/await}
-  {:else if view === 'document'}
-    {#await loadDocument()}
-      {@render loading()}
-    {:then DocumentView}
-      <DocumentView />
-    {:catch}
-      {@render unavailable()}
-    {/await}
-  {:else}
+  {:else if view === 'signature'}
     <Signature />
+  {/if}
+  {#if documentOpened}
+    <div hidden={view !== 'document'}>
+      {#await loadDocument()}
+        {@render loading()}
+      {:then DocumentView}
+        <DocumentView active={view === 'document'} />
+      {:catch}
+        {@render unavailable()}
+      {/await}
+    </div>
   {/if}
 </main>
 

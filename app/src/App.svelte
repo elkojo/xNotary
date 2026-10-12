@@ -114,5 +114,6 @@ import Verify from './views/Verify.svelte';
     <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">
       AGPL-3.0</a
     >. Not legal advice.
+    <div class="site-version">Version {__APP_VERSION__}</div>
   </div>
 </footer>
