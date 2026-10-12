@@ -7,9 +7,10 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig, type Plugin } from 'vite';
 
 import { revision } from '../../app/scripts/revision';
+import { siteVersion } from '../../app/scripts/site-version';
 
-/** The version, read from package.json at build time, so a deployed build can say which it is. */
-const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+/** The site's release, so a deployed build can say which it is — see app/scripts/site-version.ts. */
+const version = siteVersion();
 /** The commit this build came from: the AGPL's source offer points at exactly this. */
 const REVISION = revision();
 

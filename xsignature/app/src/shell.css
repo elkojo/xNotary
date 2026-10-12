@@ -30,19 +30,4 @@
   --taken-bg: rgba(17, 17, 17, 0.045);
   --taken-hit-bg: rgba(168, 57, 47, 0.1);
   --taken-label-bg: rgba(17, 17, 17, 0.62);
-  /* The version line, on the footer */
-  --site-version: #a8a08a;
-}
-
-/*
- * The version, under the footer text.
- *
- * Quieter than the prose above it, because it is a fact for somebody checking
- * which build reached the site rather than something a reader needs. Tabular
- * figures so it does not shift about between releases.
- */
-.site-version {
-  margin-top: 14px;
-  color: var(--site-version);
-  font-variant-numeric: tabular-nums;
 }

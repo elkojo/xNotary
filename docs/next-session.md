@@ -132,9 +132,9 @@ What is left before a real release is not code: two reviews, and documents only 
 **Deploying** is two halves now, and only one of them is automatic.
 
 Bump `version` in `app/package.json` to match → commit → push → tag `v*`. The tag fires
-`deploy.yml`; a plain push does not. Nothing in the app reads that version field, so keeping it in
-step is a discipline rather than a mechanism — it drifted from `0.1.0` to `v0.3.0` before anyone
-noticed. The `github-pages` environment has a `v*` tag policy so tags are allowed to deploy — do
+`deploy.yml`; a plain push does not. That field is also what every service's footer shows
+("Version 0.8.1", via `app/scripts/site-version.ts`), so a missed bump is visible on the live site.
+The services' own `package.json` versions are not shown anywhere and need no bump. The `github-pages` environment has a `v*` tag policy so tags are allowed to deploy — do
 not remove it.
 
 **Write the tag message properly, because it is the release.** `deploy.yml` publishes the GitHub
