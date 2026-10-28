@@ -62,7 +62,7 @@
   const t = $derived(pick(TEXT));
   /** Text this layer translated: in its language, and left alone by a browser translator. */
   const ours = $derived(site.lang === 'en' ? {} : { lang: site.lang, translate: 'no' as const });
-  const langs = $derived((void site.lang, offeredLangs()));
+  const langs = offeredLangs();
 
   function toggle(which: 'services' | 'tasks') {
     menu = menu === which ? null : which;
@@ -182,7 +182,7 @@
     </div>
 
     {#if langs.length > 1}
-      <!-- Offered only once there is a choice: see LANGUAGES in lang.svelte.ts. -->
+      <!-- Every language, to everyone; which one a visit starts in is lang.svelte.ts's call. -->
       <div class="lang-switch" role="group" aria-label="Language" translate="no">
         {#each langs as l}
           <button type="button" lang={l} aria-pressed={site.lang === l} class:on={site.lang === l} onclick={() => setLang(l)}

@@ -8,9 +8,9 @@
  * translated by the browser, which is why everything this layer translates is also marked
  * translate="no" with its own lang — so a browser translator leaves it alone.
  *
- * A language ships unreviewed only behind its URL parameter: until a native speaker (a lawyer
- * for the legal parts) has approved it, `reviewed` is false, it is never chosen automatically and
- * the switcher offers it only to someone who arrived with `?lang=`.
+ * The switcher offers every language to everyone (owner's decision, 2026-10-28). Until a native
+ * speaker — a lawyer for the legal parts — has approved a language, `reviewed` is false and it is
+ * never chosen automatically: a Czech browser still starts in English, and the reader chooses.
  */
 export type Lang = 'en' | 'cs';
 
@@ -20,8 +20,6 @@ export const LANGUAGES: Readonly<Record<Lang, { readonly name: string; readonly 
 };
 
 const KEY = 'site.lang';
-/** Every language this browser has chosen, so the switcher keeps offering an unreviewed one. */
-const CHOSEN_KEY = 'site.lang.chosen';
 const isLang = (value: unknown): value is Lang => typeof value === 'string' && value in LANGUAGES;
 
 function stored(): Lang | null {
@@ -33,18 +31,9 @@ function stored(): Lang | null {
   }
 }
 
-function chosenBefore(): Lang[] {
-  try {
-    return (localStorage.getItem(CHOSEN_KEY) ?? '').split(',').filter(isLang);
-  } catch {
-    return [];
-  }
-}
-
 function remember(lang: Lang): void {
   try {
     localStorage.setItem(KEY, lang);
-    localStorage.setItem(CHOSEN_KEY, [...new Set([...chosenBefore(), lang])].join(','));
   } catch {
     // A browser that cannot remember asks again next time; that is all.
   }
@@ -75,19 +64,13 @@ if (start.fromUrl) remember(start.lang);
 
 export const site = $state({ lang: start.lang });
 
-/** A language this browser has chosen before, reviewed or not: the switcher keeps offering it. */
-const chosen = new Set<Lang>([start.lang, ...chosenBefore()]);
-
 export function setLang(lang: Lang): void {
   site.lang = lang;
-  chosen.add(lang);
   remember(lang);
 }
 
-/** What the switcher offers: every reviewed language, and the current one even if it is not. */
-export function offeredLangs(): Lang[] {
-  return (Object.keys(LANGUAGES) as Lang[]).filter((l) => LANGUAGES[l].reviewed || chosen.has(l));
-}
+/** What the switcher offers: every language, to everyone. */
+export const offeredLangs = (): Lang[] => Object.keys(LANGUAGES) as Lang[];
 
 /** Pick this language's version of a text, falling back to English. */
 export const pick = <T>(texts: { en: T } & Partial<Record<Lang, T>>): T => texts[site.lang] ?? texts.en;
