@@ -9,8 +9,10 @@
     "CZ": 34,
     "DE": 428,
     "DK": 4,
+    "EE": 20,
     "EL": 116,
     "ES": 270,
+    "FI": 19,
     "FR": 151,
     "HR": 11,
     "HU": 68,
@@ -31,8 +33,9 @@
     "SI": 51,
     "SK": 22
   },
-  "missing": [
+  "fromCommissionCopy": [
     "EE",
     "FI"
-  ]
+  ],
+  "missing": []
 }
