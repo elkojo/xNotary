@@ -112,11 +112,12 @@ export default defineConfig({
     __LIGHTNING_QR__: JSON.stringify(LIGHTNING_QR),
   },
   build: {
-    // Two pages: the front page at /, and /support/.
+    // Three pages: the front page at /, /support/ and /situations/.
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./hub/index.html', import.meta.url)),
         support: fileURLToPath(new URL('./hub/support/index.html', import.meta.url)),
+        situations: fileURLToPath(new URL('./hub/situations/index.html', import.meta.url)),
       },
     },
     outDir: fileURLToPath(new URL('./dist/', import.meta.url)),

@@ -71,6 +71,9 @@ export const SERVICES: readonly Service[] = [
   },
 ];
 
+/** "Start from your situation": the questions that lead to a task (hub/Situations.svelte). */
+export const SITUATIONS_HREF = '/situations/';
+
 /** What people come to do, each pointing at the screen that does it. */
 export const TASKS: ReadonlyArray<{
   readonly service: ServiceId;

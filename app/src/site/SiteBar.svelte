@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { SERVICES, TASKS, pageHref, service, type ServiceId } from './services';
+  import { SERVICES, SITUATIONS_HREF, TASKS, pageHref, service, type ServiceId } from './services';
   import { SUPPORT_HREF } from './support';
   import UpdateNotice from './UpdateNotice.svelte';
 
@@ -119,6 +119,12 @@
         <div class="menu right task-menu">
           <h4>What do you need to do?</h4>
           <div class="task-grid">
+            <!-- First, and set apart: for when the task itself is not yet clear. -->
+            <a class="task-item lead" href={SITUATIONS_HREF}>
+              <strong>Start from your situation</strong>
+              <span class="d">A few questions, then the right tool — or what to ask first.</span>
+              <span class="tag"><span class="brand-mark"><span>x</span></span>xNotary.digital</span>
+            </a>
             {#each TASKS as task}
               {@const s = service(task.service)}
               <a class="task-item" href={pageHref(task.service, task.page)} onclick={(e) => within(e, task.service, task.page)}>
