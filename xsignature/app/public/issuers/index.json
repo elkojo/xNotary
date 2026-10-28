@@ -1,6 +1,10 @@
 {
   "asOf": "2026-10-28",
   "source": "https://ec.europa.eu/tools/lotl/eu-lotl.xml",
+  "outsideEu": {
+    "CH": "https://trustedlist.tsl-switzerland.ch/tsl-ch.xml",
+    "UA": "https://eidas.ec.europa.eu/efda/api/v2/browse/ades/download/UA"
+  },
   "lists": {
     "AT": 53,
     "BE": 87,
@@ -31,7 +35,9 @@
     "RO": 75,
     "SE": 6,
     "SI": 51,
-    "SK": 22
+    "SK": 22,
+    "CH": 14,
+    "UA": 2
   },
   "fromCommissionCopy": [
     "EE",
