@@ -23,6 +23,7 @@
   import Info from '../site/Info.svelte';
   import SignatureLevel from '../site/SignatureLevel.svelte';
   import SupportLink from '../site/SupportLink.svelte';
+  import { holdRefresh } from '../site/update-check';
   import {
     AgreementError,
     DSS_SOURCE_URL,
@@ -42,6 +43,9 @@
   let built = $state<Uint8Array | null>(null);
   /** Flips once the user has actually downloaded, so the warning can stand down. */
   let saved = $state(false);
+  $effect(() => {
+    if (files.length > 0 && !saved) return holdRefresh();
+  });
   let step = $state(1);
 
   const chosen = $derived(consented.filter(Boolean).length);

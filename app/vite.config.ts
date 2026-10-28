@@ -6,6 +6,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig, type Plugin } from 'vite';
 
 import { revision } from './scripts/revision';
+import { buildId } from './scripts/build-id';
 import { siteVersion } from './scripts/site-version';
 
 // xNotary lives at /xnotary/ on xnotary.digital since 0.5.0; the front page
@@ -293,13 +294,22 @@ self.addEventListener('fetch', (event) => {
   // could make a pending timestamp look confirmed.
   if (url.origin !== self.location.origin) return;
 
+  // Content-hashed files: a cached one is the right one, whichever release asks.
+  if (url.pathname.startsWith('${base}assets/')) {
+    event.respondWith(caches.match(request).then((hit) => hit ?? fetch(request)));
+    return;
+  }
+
+  // The page and the unhashed files (the linked library, the manifest) from the network
+  // first, so a reload gets the release that is out; the cached copy only when offline.
+  // Serving the page from the cache first kept every visitor one release behind: the new
+  // worker installed in the background while the old page ran.
   event.respondWith(
-    caches.match(request).then((hit) => {
-      if (hit) return hit;
-      return fetch(request).catch(() =>
-        request.mode === 'navigate' ? caches.match(${JSON.stringify(precache[0])}) : Promise.reject(),
-      );
-    }),
+    fetch(request).catch(() =>
+      caches.match(request).then((hit) =>
+        hit ?? (request.mode === 'navigate' ? caches.match(${JSON.stringify(precache[0])}) : Promise.reject()),
+      ),
+    ),
   );
 });
 `;
@@ -365,6 +375,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(siteVersion()),
     __APP_REVISION__: JSON.stringify(REVISION.label),
     __APP_COMMIT__: JSON.stringify(REVISION.commit),
+    __BUILD_ID__: JSON.stringify(buildId()),
   },
   build: {
     // dist/ is the whole site: the front page at its root (vite.hub.config.ts)

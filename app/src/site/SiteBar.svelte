@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import { SERVICES, TASKS, pageHref, service, type ServiceId } from './services';
   import { SUPPORT_HREF } from './support';
+  import UpdateNotice from './UpdateNotice.svelte';
 
   /**
    * The one top bar of xNotary.digital: brand (→ the front page), the service
@@ -142,4 +143,5 @@
 
     {@render children?.()}
   </div>
+  <UpdateNotice />
 </header>

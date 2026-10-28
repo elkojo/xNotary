@@ -1,6 +1,7 @@
 <script lang="ts">
   import Stepper from '../../../../app/src/site/Stepper.svelte';
   import Info from '../../../../app/src/site/Info.svelte';
+  import { holdRefresh } from '../../../../app/src/site/update-check';
   import Progress from '../../../../app/src/site/Progress.svelte';
   import { formatBytes } from '../../../../app/src/site/size';
   import { defaultPaper, outputName, type ConvertResult, type Paper } from '../lib/convert';
@@ -42,6 +43,10 @@
   let showAll = $state(false);
   let progress = $state<Download | null>(null);
   let busy = $state(false);
+  /** An open document, and above all a conversion under way, would be lost to a refresh. */
+  $effect(() => {
+    if (main) return holdRefresh();
+  });
   /** LibreOffice is running: it can take minutes, so it can be cancelled. */
   let laying = $state(false);
   let result = $state<ConvertResult | null>(null);

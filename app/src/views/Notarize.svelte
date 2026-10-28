@@ -14,6 +14,7 @@
   import Info from '../site/Info.svelte';
   import Progress from '../site/Progress.svelte';
   import SupportLink from '../site/SupportLink.svelte';
+  import { holdRefresh } from '../site/update-check';
   import { buildCertificate1 } from '../lib/certificate1';
   import { baseName, downloadBytes } from '../lib/download';
   import { formatBytes } from '../site/size';
@@ -39,6 +40,10 @@
   let hashed = $state({ read: 0, total: 0 });
   /** Certificate 1 was saved: the task is finished, and the support line may show. */
   let saved = $state(false);
+  /** A proof not yet saved exists only in this page; a refresh would drop it. */
+  $effect(() => {
+    if (file && !saved) return holdRefresh();
+  });
   let error = $state('');
   let calendarWarnings = $state<string[]>([]);
 

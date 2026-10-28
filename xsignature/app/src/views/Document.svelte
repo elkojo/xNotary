@@ -16,6 +16,7 @@
   import Info from '../../../../app/src/site/Info.svelte';
   import SignatureLevel from '../../../../app/src/site/SignatureLevel.svelte';
   import SupportLink from '../../../../app/src/site/SupportLink.svelte';
+  import { holdRefresh } from '../../../../app/src/site/update-check';
   import { formatBytes } from '../../../../app/src/site/size';
   import { openPdf, UnreadablePdf, type OpenPdf } from '../lib/document/pdf/inspect';
   import { renderPage } from '../lib/document/pdf/render';
@@ -833,6 +834,11 @@
   let savedFor = $state('');
   $effect(() => {
     if (saved && destination !== savedFor) saved = false;
+  });
+
+  /** Until it is saved, the document and any key exist only in this page. */
+  $effect(() => {
+    if (opened && !saved) return holdRefresh();
   });
 
   /**

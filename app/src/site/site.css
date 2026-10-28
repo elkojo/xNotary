@@ -625,3 +625,28 @@ footer.site .family-links a {
     justify-content: center;
   }
 }
+
+/* ------------------------------------------------------- a newer version -- */
+/* Under the bar, inside it, so it stays in view while the page scrolls (UpdateNotice.svelte).
+   Paper, not bar: it is a message to read, highlighted the way a selection is. */
+
+.update-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line-dark);
+  color: var(--ink);
+  background: var(--selected-bg);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.update-strip :focus-visible {
+  outline-color: var(--focus);
+}
+.update-actions {
+  display: flex;
+  gap: 8px;
+}

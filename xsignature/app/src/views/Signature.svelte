@@ -14,6 +14,7 @@
   import { untrack } from 'svelte';
   import Info from '../../../../app/src/site/Info.svelte';
   import SupportLink from '../../../../app/src/site/SupportLink.svelte';
+  import { holdRefresh } from '../../../../app/src/site/update-check';
   import { handoff } from '../handoff.svelte';
   import type SignaturePad from 'signature_pad';
 
@@ -92,6 +93,10 @@
   let copied = $state('');
   /** A PNG or SVG was saved: the task is finished, and the support line may show. */
   let exported = $state(false);
+  /** The name and strokes are never stored: until exported, they exist only in this page. */
+  $effect(() => {
+    if ((name.trim() !== '' || hasStrokes) && !exported) return holdRefresh();
+  });
   let faceId = $state(stored.faceId);
   let sizeId = $state(stored.sizeId);
   let ink = $state(stored.ink);

@@ -11,3 +11,6 @@ declare const __APP_VERSION__: string;
 declare const __APP_COMMIT__: string;
 /** The Lightning QR for /support/, an SVG drawn at build time (vite.hub.config.ts). */
 declare const __LIGHTNING_QR__: string;
+
+/** Which build this is; /version.json names the one the site serves now (src/site/update-check.ts). */
+declare const __BUILD_ID__: string;

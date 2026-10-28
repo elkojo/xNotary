@@ -6,6 +6,7 @@
    */
   import Signature from './views/Signature.svelte';
   import SiteBar from '../../../app/src/site/SiteBar.svelte';
+  import { versionLabel } from '../../../app/src/site/update-check';
   import { ROUTES, titleFor, type View } from './nav';
 
   /**
@@ -122,6 +123,6 @@
       release reached the site meant grepping the bundle for a sentence that
       had changed, which works and is a poor substitute for the build saying so.
     -->
-    <div class="site-version">Version {__APP_VERSION__}</div>
+    <div class="site-version">{versionLabel(__APP_VERSION__, __BUILD_ID__)}</div>
   </div>
 </footer>
