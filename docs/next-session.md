@@ -1,10 +1,11 @@
 # Where things stand — handoff
 
-## Pick up here (2026-10-28): v0.9.0 to beta
+## Pick up here (2026-10-28): v0.9.1 to beta
 
-**v0.9.0 goes to beta only** (`beta.xnotary.digital`); production stays on v0.8.1 until the
-owner says otherwise. Beta served v0.8.2 before it. Tag `v0.9.0` builds the release and attaches
-`xnotary-v0.9.0-dist.zip`; the operator deploys that zip. Agents never touch the Cloudflare
+**v0.9.1 goes to beta only** (`beta.xnotary.digital`); production stays on v0.8.1 until the
+owner says otherwise. Beta served v0.8.2 before it. Tag `v0.9.1` builds the release and attaches
+`xnotary-v0.9.1-dist.zip`; the operator deploys that zip. (`v0.9.0` was tagged but its release
+build failed on a workflow-ordering bug, fixed in #22; nothing was published from it.) Agents never touch the Cloudflare
 account.
 
 ### What changed since 0.8.2
