@@ -7,6 +7,7 @@
 import Verify from './views/Verify.svelte';
   import { ALIASES, ROUTES, type View } from './nav';
   import SiteBar from './site/SiteBar.svelte';
+  import { versionLabel } from './site/update-check';
 
   /** `#/help/pending` is the Help page, opened at one question. */
   function routeFromHash(): { view: View; topic: string } {
@@ -114,6 +115,6 @@ import Verify from './views/Verify.svelte';
     <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">
       AGPL-3.0</a
     >. Not legal advice.
-    <div class="site-version">Version {__APP_VERSION__}</div>
+    <div class="site-version">{versionLabel(__APP_VERSION__, __BUILD_ID__)}</div>
   </div>
 </footer>

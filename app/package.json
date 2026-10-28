@@ -1,6 +1,6 @@
 {
   "name": "xnotary",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
@@ -20,6 +20,7 @@
     "spike:pades": "vitest run --config vitest.spike.config.ts src/spikes/pades.spike.test.ts",
     "spike:cors": "node scripts/cdp-probe.mjs http://localhost:5173/src/spikes/cors-probe.html",
     "e2e": "node scripts/e2e-flow-a.mjs",
+    "i18n:review": "vite-node scripts/i18n-review.ts",
     "fixtures:pades": "bash scripts/make-pades-fixture.sh && node scripts/make-pades-fixtures.mjs",
     "fonts:subset": "node scripts/make-font-subsets.mjs",
     "fonts:inter": "node scripts/make-inter-subset.mjs"

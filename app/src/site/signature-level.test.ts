@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LEVELS, NOT_CHECKED, signatureLevel } from './signature-level';
+import { LEVELS, NOT_CHECKED, NO_CERTIFICATE, signatureLevel } from './signature-level';
 
 describe('signatureLevel', () => {
   it('needs both statements for the top level', () => {
@@ -33,5 +33,17 @@ describe('the wording', () => {
 
   it('ranks the levels 3, 2, 1', () => {
     expect([LEVELS.qualified.rank, LEVELS['qualified-certificate'].rank, LEVELS.certificate.rank]).toEqual([3, 2, 1]);
+  });
+});
+
+describe('no certificate', () => {
+  it('sits below the three, as the absence of a signature rather than a kind of one', () => {
+    expect(NO_CERTIFICATE.rank).toBe(0);
+    expect(NO_CERTIFICATE.title).not.toMatch(/^Signature/);
+  });
+
+  it('claims nothing about anybody, and nothing was verified', () => {
+    expect(NO_CERTIFICATE.line).toMatch(/nothing in it says who/);
+    expect(`${NO_CERTIFICATE.title} ${NO_CERTIFICATE.line}`).not.toMatch(/verif|valid|confirm|qualified|electronic signature/i);
   });
 });

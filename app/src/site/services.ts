@@ -26,6 +26,8 @@ export interface Service {
   readonly tabs: ReadonlyArray<{ readonly id: string; readonly label: string }>;
   /** Its third-party notices, relative to `href`. The front page's index lists them all. */
   readonly notices: string;
+  /** The same in Czech (lang.svelte.ts). */
+  readonly cs: { readonly tagline: string; readonly description: string };
 }
 
 export const SERVICES: readonly Service[] = [
@@ -40,6 +42,10 @@ export const SERVICES: readonly Service[] = [
     description: 'Prove an exact file existed by a given Bitcoin block, and record who signed it.',
     tabs: NAV,
     notices: 'THIRD-PARTY.txt',
+    cs: {
+      tagline: 'Časové razítko dokumentu v Bitcoinu a doklad o tom, kdo ho podepsal.',
+      description: 'Doložte, že přesný soubor existoval k danému bloku Bitcoinu, a zaznamenejte, kdo ho podepsal.',
+    },
   },
   {
     id: 'xsignature',
@@ -54,6 +60,12 @@ export const SERVICES: readonly Service[] = [
       'electronic signature with an independent timestamp.',
     tabs: XSIGNATURE_NAV,
     notices: 'THIRD-PARTY.md',
+    cs: {
+      tagline: 'Obrázek podpisu a podpis PDF vlastním certifikátem s nezávislým časovým razítkem.',
+      description:
+        'Vytvořte podpis a dejte ho na PDF. Podepište vlastním certifikátem — vznikne zaručený ' +
+        'elektronický podpis s nezávislým časovým razítkem.',
+    },
   },
   {
     id: 'xconvert',
@@ -68,8 +80,17 @@ export const SERVICES: readonly Service[] = [
       'ready to sign or timestamp.',
     tabs: XCONVERT_NAV,
     notices: 'THIRD-PARTY.txt',
+    cs: {
+      tagline: 'Převod dokumentu do PDF/A, DOCX, ODT a dalších formátů.',
+      description:
+        'Převádějte dokumenty mezi DOCX, ODT, HTML, Markdownem a dalšími formáty — nebo do ' +
+        'archivního PDF/A, připraveného k podpisu či časovému razítku.',
+    },
   },
 ];
+
+/** "Start from your situation": the questions that lead to a task (hub/Situations.svelte). */
+export const SITUATIONS_HREF = '/situations/';
 
 /** What people come to do, each pointing at the screen that does it. */
 export const TASKS: ReadonlyArray<{
@@ -77,15 +98,50 @@ export const TASKS: ReadonlyArray<{
   readonly page: string;
   readonly title: string;
   readonly description: string;
+  readonly cs: { readonly title: string; readonly description: string };
 }> = [
-  { service: 'xconvert', page: 'convert', title: 'Convert a document', description: 'To an archival PDF/A, DOCX, ODT and more.' },
-  { service: 'xnotary', page: 'notarize', title: 'Prove a file existed', description: 'A Bitcoin-anchored timestamp of the exact file.' },
-  { service: 'xsignature', page: 'document', title: 'Sign a PDF', description: 'Place your signature, sign with your certificate and an independent timestamp.' },
-  { service: 'xnotary', page: 'attest', title: 'Record who signed', description: 'Certify the signers of a file that was signed elsewhere.' },
-  { service: 'xsignature', page: 'signature', title: 'Make a signature image', description: 'Type or draw it; export PNG or SVG.' },
-  { service: 'xnotary', page: 'verify', title: 'Verify an xNotary proof', description: 'Match a document to its xNotary certificate.' },
-  { service: 'xsignature', page: 'check', title: 'Check a signed PDF', description: 'See what a signed or timestamped PDF claims.' },
+  {
+    service: 'xconvert', page: 'convert', title: 'Convert a document', description: 'To an archival PDF/A, DOCX, ODT and more.',
+    cs: { title: 'Převést dokument', description: 'Do archivního PDF/A, DOCX, ODT a dalších formátů.' },
+  },
+  {
+    service: 'xnotary', page: 'notarize', title: 'Prove a file existed', description: 'A Bitcoin-anchored timestamp of the exact file.',
+    cs: { title: 'Doložit, že soubor existoval', description: 'Časové razítko přesného souboru ukotvené v Bitcoinu.' },
+  },
+  {
+    service: 'xsignature', page: 'document', title: 'Sign a PDF', description: 'Place your signature, sign with your certificate and an independent timestamp.',
+    cs: { title: 'Podepsat PDF', description: 'Umístěte podpis, podepište certifikátem a nezávislým časovým razítkem.' },
+  },
+  {
+    service: 'xnotary', page: 'attest', title: 'Record who signed', description: 'Certify the signers of a file that was signed elsewhere.',
+    cs: { title: 'Zaznamenat, kdo podepsal', description: 'Doložte podepisující u souboru podepsaného jinde.' },
+  },
+  {
+    service: 'xsignature', page: 'signature', title: 'Make a signature image', description: 'Type or draw it; export PNG or SVG.',
+    cs: { title: 'Vytvořit obrázek podpisu', description: 'Napište nebo nakreslete; uložte jako PNG nebo SVG.' },
+  },
+  {
+    service: 'xnotary', page: 'verify', title: 'Verify an xNotary proof', description: 'Match a document to its xNotary certificate.',
+    cs: { title: 'Ověřit důkaz xNotary', description: 'Porovnejte dokument s jeho certifikátem xNotary.' },
+  },
+  {
+    service: 'xsignature', page: 'check', title: 'Check a signed PDF', description: 'See what a signed or timestamped PDF claims.',
+    cs: { title: 'Zkontrolovat podepsané PDF', description: 'Co tvrdí podepsané PDF, nebo PDF s časovým razítkem.' },
+  },
 ];
+
+/** Czech for the services' tab labels, where the site's own pages show them (the front page). */
+export const TABS_CS: Readonly<Record<string, string>> = {
+  Timestamp: 'Časové razítko',
+  'Certify signers': 'Doložit podepisující',
+  'Verify proof': 'Ověřit důkaz',
+  'My certificates': 'Moje certifikáty',
+  Help: 'Nápověda',
+  'Signature image': 'Obrázek podpisu',
+  'Sign a document': 'Podepsat dokument',
+  'Check a PDF': 'Zkontrolovat PDF',
+  Convert: 'Převést',
+};
 
 export const service = (id: ServiceId): Service => SERVICES.find((s) => s.id === id)!;
 

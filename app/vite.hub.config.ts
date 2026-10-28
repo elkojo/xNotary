@@ -5,7 +5,9 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import QRCode from 'qrcode';
 import { defineConfig, type Plugin } from 'vite';
 
+import { buildId } from './scripts/build-id';
 import { revision } from './scripts/revision';
+import { siteVersion } from './scripts/site-version';
 import { SERVICES } from './src/site/services';
 import { LIGHTNING, lightningUri } from './src/site/support';
 
@@ -80,21 +82,42 @@ function noticesIndex(): Plugin {
   };
 }
 
+/**
+ * /version.json: which build the site serves now. Every service's bundle carries the same id
+ * (scripts/build-id.ts), and an open page that finds a different one here offers a refresh
+ * (src/site/update-check.ts). Static, same-origin, and served `no-store` (hub/public/_headers).
+ */
+function versionFile(): Plugin {
+  return {
+    name: 'hub-version-file',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: JSON.stringify({ version: siteVersion(), build: buildId() }) + '\n',
+      });
+    },
+  };
+}
+
 export default defineConfig({
   root: fileURLToPath(new URL('./hub/', import.meta.url)),
   base: '/',
-  plugins: [svelte(), noticesIndex()],
+  plugins: [svelte(), noticesIndex(), versionFile()],
   define: {
     __APP_REVISION__: JSON.stringify(REVISION.label),
     __APP_COMMIT__: JSON.stringify(REVISION.commit),
+    __BUILD_ID__: JSON.stringify(buildId()),
     __LIGHTNING_QR__: JSON.stringify(LIGHTNING_QR),
   },
   build: {
-    // Two pages: the front page at /, and /support/.
+    // Three pages: the front page at /, /support/ and /situations/.
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./hub/index.html', import.meta.url)),
         support: fileURLToPath(new URL('./hub/support/index.html', import.meta.url)),
+        situations: fileURLToPath(new URL('./hub/situations/index.html', import.meta.url)),
       },
     },
     outDir: fileURLToPath(new URL('./dist/', import.meta.url)),

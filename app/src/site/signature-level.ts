@@ -58,5 +58,17 @@ export const LEVELS: Readonly<Record<SignatureLevel, LevelText>> = {
   },
 };
 
+/**
+ * Below the three: what a document carries when no certificate signed it — a picture of a
+ * signature, a timestamp, or both. Not a level of signature but the absence of one, shown in
+ * the same marks so the scale reads the same from nothing to the top. Nothing is read from a
+ * certificate here, so there is nothing to say was not checked.
+ */
+export const NO_CERTIFICATE = {
+  rank: 0,
+  title: 'No certificate signature',
+  line: 'No certificate signed this document, so nothing in it says who made it.',
+} as const;
+
 /** The limit that stays on screen wherever a level is shown. */
 export const NOT_CHECKED = 'Read from the certificate itself, not checked against an official trust list.';

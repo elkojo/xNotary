@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig, type Plugin } from 'vite';
 
+import { buildId } from '../../app/scripts/build-id';
 import { revision } from '../../app/scripts/revision';
 import { siteVersion } from '../../app/scripts/site-version';
 
@@ -175,9 +176,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Content-hashed files: a cached one is the right one, whichever release asks.
+  if (url.pathname.startsWith('${base}assets/')) {
+    event.respondWith(caches.match(request).then((hit) => hit ?? fetch(request)));
+    return;
+  }
+
+  // The page and the unhashed files from the network first, so a reload gets the release
+  // that is out; the cached copy only when offline.
   event.respondWith(
-    caches.match(request).then((hit) =>
-      hit ?? fetch(request).catch(() => (request.mode === 'navigate' ? caches.match('${base}') : Promise.reject())),
+    fetch(request).catch(() =>
+      caches.match(request).then((hit) => hit ?? (request.mode === 'navigate' ? caches.match('${base}') : Promise.reject())),
     ),
   );
 });
@@ -201,6 +210,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(version),
     __APP_REVISION__: JSON.stringify(REVISION.label),
     __APP_COMMIT__: JSON.stringify(REVISION.commit),
+    __BUILD_ID__: JSON.stringify(buildId()),
   },
   plugins: [svelte(), notices.page, serviceWorker()],
   // The converter runs as a module worker (src/worker.ts).

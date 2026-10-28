@@ -13,7 +13,9 @@
    */
   import { untrack } from 'svelte';
   import Info from '../../../../app/src/site/Info.svelte';
+  import Fresh from '../../../../app/src/site/Fresh.svelte';
   import SupportLink from '../../../../app/src/site/SupportLink.svelte';
+  import { holdRefresh } from '../../../../app/src/site/update-check';
   import { handoff } from '../handoff.svelte';
   import type SignaturePad from 'signature_pad';
 
@@ -92,6 +94,10 @@
   let copied = $state('');
   /** A PNG or SVG was saved: the task is finished, and the support line may show. */
   let exported = $state(false);
+  /** The name and strokes are never stored: until exported, they exist only in this page. */
+  $effect(() => {
+    if ((name.trim() !== '' || hasStrokes) && !exported) return holdRefresh();
+  });
   let faceId = $state(stored.faceId);
   let sizeId = $state(stored.sizeId);
   let ink = $state(stored.ink);
@@ -518,7 +524,7 @@
               aria-pressed={darkStage}
               onclick={() => (darkStage = !darkStage)}
             >
-              {darkStage ? 'On light' : 'On dark'}
+              <Fresh text={darkStage ? 'On light' : 'On dark'} />
             </button>
           </div>
 
@@ -736,7 +742,7 @@
             -->
             <div class="action-group handoff-actions">
               <button class="button primary" disabled={!svg} onclick={useInDocument}>
-                Use in “{handoff.waiting}”
+                Use in “<span translate="no">{handoff.waiting}</span>”
               </button>
             </div>
           {/if}
@@ -745,7 +751,7 @@
             <span class="action-group">
               <button class="button dark" disabled={!svg} onclick={saveSvg}>Save SVG</button>
               <button class="button dark" disabled={!bounds || saving} onclick={savePng}>
-                {saving ? 'Rendering…' : 'Save PNG'}
+                <Fresh text={saving ? 'Rendering…' : 'Save PNG'} />
               </button>
             </span>
             {#if canCopy}

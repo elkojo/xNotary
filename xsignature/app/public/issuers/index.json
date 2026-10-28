@@ -1,0 +1,47 @@
+{
+  "asOf": "2026-10-28",
+  "source": "https://ec.europa.eu/tools/lotl/eu-lotl.xml",
+  "outsideEu": {
+    "CH": "https://trustedlist.tsl-switzerland.ch/tsl-ch.xml",
+    "UA": "https://eidas.ec.europa.eu/efda/api/v2/browse/ades/download/UA"
+  },
+  "lists": {
+    "AT": 53,
+    "BE": 87,
+    "BG": 30,
+    "CY": 8,
+    "CZ": 34,
+    "DE": 428,
+    "DK": 4,
+    "EE": 20,
+    "EL": 116,
+    "ES": 270,
+    "FI": 19,
+    "FR": 151,
+    "HR": 11,
+    "HU": 68,
+    "IE": 7,
+    "IS": 3,
+    "IT": 204,
+    "LI": 6,
+    "LT": 31,
+    "LU": 11,
+    "LV": 14,
+    "MT": 9,
+    "NL": 82,
+    "NO": 44,
+    "PL": 41,
+    "PT": 52,
+    "RO": 75,
+    "SE": 6,
+    "SI": 51,
+    "SK": 22,
+    "CH": 14,
+    "UA": 2
+  },
+  "fromCommissionCopy": [
+    "EE",
+    "FI"
+  ],
+  "missing": []
+}

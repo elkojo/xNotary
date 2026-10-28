@@ -1,6 +1,7 @@
 <script lang="ts">
   /** The shell: the xNotary.digital bar, the screen, the footer. */
   import SiteBar from '../../../app/src/site/SiteBar.svelte';
+  import { versionLabel } from '../../../app/src/site/update-check';
   import Convert from './views/Convert.svelte';
   import Licences from './views/Licences.svelte';
   import { ROUTES, titleFor, type View } from './nav';
@@ -47,6 +48,6 @@
     >, built on <a href="https://pandoc.org" target="_blank" rel="noopener noreferrer">pandoc</a> and
     <a href="https://typst.app" target="_blank" rel="noopener noreferrer">Typst</a>.
     <a href="#/licences">Licences and source</a>.
-    <div class="site-version">Version {__APP_VERSION__}</div>
+    <div class="site-version">{versionLabel(__APP_VERSION__, __BUILD_ID__)}</div>
   </div>
 </footer>

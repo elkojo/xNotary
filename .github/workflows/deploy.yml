@@ -193,6 +193,7 @@ jobs:
           grep -q 'frame-ancestors' dist/_headers || { echo '::error::dist/_headers carries no frame-ancestors directive'; exit 1; }
           grep -A1 '^/xnotary/\*' dist/_headers | grep -q '! Content-Security-Policy' || { echo '::error::the /xnotary/* rule does not detach the general CSP'; exit 1; }
           grep -q 'src="/assets/' dist/index.html || { echo '::error::dist/index.html is not the front page built for /'; exit 1; }
+          grep -q 'src="/assets/situations-' dist/situations/index.html || { echo '::error::dist/situations/index.html is missing — every "I want to…" menu leads with it'; exit 1; }
           grep -q 'src="/assets/support-' dist/support/index.html || { echo '::error::dist/support/index.html is missing or not built for /support/ — every service links there'; exit 1; }
           grep -q 'src="/xnotary/assets/' dist/xnotary/index.html || { echo '::error::dist/xnotary/index.html does not reference /xnotary/assets/ — was BASE_PATH overridden?'; exit 1; }
           if grep -q '/xNotary/' dist/xnotary/index.html; then echo '::error::xNotary still carries the GitHub Pages base path'; exit 1; fi
@@ -206,6 +207,10 @@ jobs:
           done
           test -s dist/xconvert/THIRD-PARTY.txt || { echo '::error::dist/xconvert/THIRD-PARTY.txt is missing'; exit 1; }
           test -s dist/xconvert/licences/pandoc-wasm-loader-MIT.txt || { echo "::error::the pandoc loader's MIT notice is missing"; exit 1; }
+          test -s dist/xsignature/issuers/index.json || { echo '::error::the issuer directory is missing from dist/xsignature/issuers/'; exit 1; }
+          test "$(ls dist/xsignature/issuers/ | wc -l)" -gt 200 || { echo '::error::the issuer directory has too few shards'; exit 1; }
+          grep -q '"build":' dist/version.json || { echo '::error::dist/version.json is missing — open pages could never learn of a new release'; exit 1; }
+          grep -A1 '^/version.json' dist/_headers | grep -q 'no-store' || { echo '::error::/version.json is not served no-store'; exit 1; }
           grep -q 'registration.unregister' dist/sw.js || { echo '::error::dist/sw.js, which retires the pre-0.5.0 worker, is missing'; exit 1; }
 
       - uses: actions/upload-artifact@v4

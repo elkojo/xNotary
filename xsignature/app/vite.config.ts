@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig, type Plugin } from 'vite';
 
+import { buildId } from '../../app/scripts/build-id';
 import { siteVersion } from '../../app/scripts/site-version';
 
 /**
@@ -50,6 +51,7 @@ export default defineConfig({
   define: {
     // A literal, so it is in the bundle rather than fetched from anywhere.
     __APP_VERSION__: JSON.stringify(version),
+    __BUILD_ID__: JSON.stringify(buildId()),
   },
   plugins: [svelte(), publishNotices()],
   build: {

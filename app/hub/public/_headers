@@ -51,6 +51,12 @@
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 
+# Which build the site serves now (vite.hub.config.ts). An open page asks it whether it has been
+# superseded (src/site/update-check.ts), so it must never come from a cache: a cached answer
+# says "no" for as long as it is kept.
+/version.json
+  Cache-Control: no-store
+
 /xnotary/*
   ! Content-Security-Policy
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://alice.btc.calendar.opentimestamps.org https://bob.btc.calendar.opentimestamps.org https://finney.calendar.eternitywall.com https://blockstream.info https://blockchain.info https://*.blockstream.info; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'

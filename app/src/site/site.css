@@ -242,21 +242,6 @@ mark.hlm {
 .hub .hero h1 {
   font-size: clamp(36px, 6.4vw, 62px);
 }
-.hint {
-  margin: 26px 0 0;
-  color: var(--hub-fg);
-  font-size: 14px;
-}
-.hint button {
-  padding: 0;
-  border: 0;
-  color: var(--lime);
-  background: none;
-  cursor: pointer;
-  font-weight: 720;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
 .product-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -624,4 +609,207 @@ footer.site .family-links a {
   .lightning-text .action-group {
     justify-content: center;
   }
+}
+
+/* ------------------------------------------------------- a newer version -- */
+/* Under the bar, inside it, so it stays in view while the page scrolls (UpdateNotice.svelte).
+   Paper, not bar: it is a message to read, highlighted the way a selection is. */
+
+.update-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line-dark);
+  color: var(--ink);
+  background: var(--selected-bg);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.update-strip :focus-visible {
+  outline-color: var(--focus);
+}
+.update-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ------------------------------------------------------ /situations/ -- */
+/* Start from your situation (hub/Situations.svelte). The cards and answers borrow the task
+   menu's look — a title over a line of description — because they are the same kind of thing. */
+
+.situation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+}
+.situation-card,
+.answer {
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 1px solid var(--line-dark);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--card);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+a.situation-card {
+  text-decoration: none;
+}
+.situation-card:hover,
+.answer:hover {
+  border-color: var(--control-hover-line);
+}
+.situation-card strong,
+.answer strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+.situation-card span,
+.answer span {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+/* The first is the one the menu leads with: set apart the way a selection is. */
+.situation-card.lead {
+  border-color: var(--selected-line);
+  background: var(--selected-bg);
+}
+.situation-card.lead strong {
+  font-weight: 800;
+}
+.answer-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+.situations-other {
+  margin: 36px 0 10px;
+  font-size: 15px;
+}
+.situation-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 14px;
+}
+.situation-journey {
+  margin-bottom: 10px;
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.outcome-steps {
+  margin: 14px 0 0;
+  padding-left: 20px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.outcome-steps li + li {
+  margin-top: 6px;
+}
+.situation-light {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+.situation-sources {
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-dark);
+  color: var(--faint);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.situation-sources ul {
+  margin: 6px 0 8px;
+  padding-left: 18px;
+}
+.outcome-steps + .action-group {
+  margin-top: 20px;
+}
+/* .product-view underlines its links; these are buttons. */
+.situations a.button {
+  text-decoration: none;
+}
+.situation-nav {
+  display: flex;
+  gap: 18px;
+  margin-top: 22px;
+  font-size: 13px;
+}
+.situations-foot {
+  max-width: 640px;
+  margin: 40px 0 0;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+/* The task menu's first entry, "Start from your situation": bold, and highlighted. */
+.task-item.lead {
+  background: var(--selected-bg);
+}
+.task-item.lead strong {
+  font-weight: 800;
+}
+
+/* The front page leads with the situations; the service directory follows. */
+.hub-situations {
+  max-width: 1120px;
+  margin: 44px auto 0;
+}
+.hub-tools-head {
+  margin: 64px 0 0;
+  font-size: 15px;
+  font-weight: 760;
+  text-align: center;
+}
+.hub-tools-head + .product-grid {
+  margin-top: 18px;
+}
+
+/* ------------------------------------------------------------ language -- */
+/* The switcher, in the bar beside "I want to…"; and, on a service screen shown in another
+   language than its own, one line saying so (SiteBar.svelte, lang.svelte.ts). */
+
+.lang-switch {
+  display: inline-flex;
+  margin-left: 10px;
+  border: 1px solid var(--bar-line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.lang-switch button {
+  padding: 6px 9px;
+  border: 0;
+  color: var(--bar-fg);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+.lang-switch button.on {
+  color: var(--primary-fg);
+  background: var(--primary-bg);
+}
+.lang-note {
+  padding: 6px 16px;
+  border-top: 1px solid var(--line-dark);
+  color: var(--ink-soft);
+  background: var(--well);
+  font-size: 12.5px;
+  text-align: center;
 }

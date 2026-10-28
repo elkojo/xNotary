@@ -16,6 +16,9 @@
   import Info from '../../../../app/src/site/Info.svelte';
   import SignatureLevel from '../../../../app/src/site/SignatureLevel.svelte';
   import SupportLink from '../../../../app/src/site/SupportLink.svelte';
+  import type { Certificate } from 'pkijs';
+  import FindIssuers from './FindIssuers.svelte';
+  import { holdRefresh } from '../../../../app/src/site/update-check';
   import { formatBytes } from '../../../../app/src/site/size';
   import { openPdf, UnreadablePdf, type OpenPdf } from '../lib/document/pdf/inspect';
   import { renderPage } from '../lib/document/pdf/render';
@@ -24,6 +27,7 @@
   import { accept, HEAD_BYTES, type Accepted } from '../lib/document/accept';
   import { markdownToPdf } from '../lib/document/convert/markdown-to-pdf';
   import { textToPdf } from '../lib/document/convert/text-to-pdf';
+  import Fresh from '../../../../app/src/site/Fresh.svelte';
   import {
     AUTHORITIES,
     AUTOMATIC,
@@ -52,6 +56,7 @@
     pixelsNeededFor,
     resolutionFor,
   } from '../lib/document/signature/resolution';
+  import { clipboardCanBeRead, readSignatureFromClipboard } from '../lib/signature/clipboard';
   import { downloadBlob } from '../lib/signature/download';
   import { toPathData } from '../lib/signature/path';
   import { PDFDocument } from '@cantoo/pdf-lib';
@@ -297,6 +302,22 @@
       event.preventDefault();
       await takeSignature(new Blob([text]), 'pasted SVG');
     }
+  }
+
+  /**
+   * The same, from a tap: a phone has no Ctrl+V, so its paste event never comes.
+   * Offered wherever the browser can read the clipboard. The keyboard hint goes
+   * only where touch is the main pointer — asking for a fine one instead would
+   * hide it wherever the browser cannot say what the pointer is.
+   */
+  const canPaste = clipboardCanBeRead();
+  const hasKeyboard = !(typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
+
+  async function pasteSignature(): Promise<void> {
+    signatureError = '';
+    const result = await readSignatureFromClipboard();
+    if (result.ok) await takeSignature(result.blob, result.name);
+    else signatureError = result.reason;
   }
 
   /**
@@ -584,17 +605,29 @@
    * exist.
    */
   let issuerName = $state('');
+  /** Where the directory found them, said once they are added. */
+  let issuerFrom = $state('');
   let issuerError = $state('');
-  let issuerInput = $state<HTMLInputElement | null>(null);
   let supplied = $state<Awaited<ReturnType<typeof readKeyFile>>[number]['chain']>([]);
   let links = $state<ChainLink[]>([]);
 
   /** The chain that will actually be embedded: the file's own, or what was added. */
   let chain = $derived(identity ? (identity.chain.length > 0 ? identity.chain : supplied) : []);
 
+  /** From the issuer directory, already walked and verified (FindIssuers). */
+  async function takeFoundIssuers(found: Certificate[], from: string) {
+    if (!identity) return;
+    issuerError = '';
+    supplied = found;
+    issuerName = 'The issuer directory';
+    issuerFrom = from;
+    links = await checkLinks(identity.certificate, found);
+  }
+
   async function takeIssuers(file: File | undefined) {
     if (!file || !identity) return;
     issuerError = '';
+    issuerFrom = '';
     const found = readCertificates(new Uint8Array(await file.arrayBuffer()));
 
     if (found.length === 0) {
@@ -621,8 +654,8 @@
     supplied = [];
     links = [];
     issuerName = '';
+    issuerFrom = '';
     issuerError = '';
-    if (issuerInput) issuerInput.value = '';
   }
 
   // A different key means a different chain; keeping the old one would embed
@@ -824,6 +857,33 @@
   let saveError = $state('');
 
   /**
+   * What the saved file turned out to carry, read back from the bytes that were downloaded by
+   * the Check screen's own reader — the level shown after saving is evidence, not intent.
+   */
+  let produced = $state<
+    | { readonly kind: 'signed'; readonly qualified: boolean }
+    | { readonly kind: 'none' }
+    | { readonly kind: 'unreadable'; readonly detail: string }
+    | null
+  >(null);
+
+  async function finish(out: Uint8Array<ArrayBuffer>) {
+    downloadBlob(new Blob([out], { type: 'application/pdf' }), signedName());
+    saved = true;
+    savedFor = destination;
+    if (!(wantCertificate && identity)) {
+      produced = { kind: 'none' };
+      return;
+    }
+    // Appended last, so the last signature of identity is the one just made.
+    const ours = (await checkSignatures(out)).filter((c) => c.kind === 'signature').at(-1);
+    produced =
+      ours?.verdict === 'intact' && ours.claims
+        ? { kind: 'signed', qualified: ours.claims.qualified }
+        : { kind: 'unreadable', detail: ours?.detail ?? 'No signature was found in it.' };
+  }
+
+  /**
    * Once a timestamp is saved, the notice about what will be sent has done its
    * job and the result says what was. Change where it would go, and the result
    * no longer describes the next save — so it goes, and the notice comes back
@@ -833,6 +893,11 @@
   let savedFor = $state('');
   $effect(() => {
     if (saved && destination !== savedFor) saved = false;
+  });
+
+  /** Until it is saved, the document and any key exist only in this page. */
+  $effect(() => {
+    if (opened && !saved) return holdRefresh();
   });
 
   /**
@@ -925,6 +990,7 @@
     answeredBy = null;
     passedOver = [];
     customError = '';
+    produced = null;
     try {
       // Re-open from the original bytes so that saving twice does not stamp a
       // document that was already stamped.
@@ -1002,16 +1068,12 @@
           out = (await signWithCertificate(out)).bytes;
         }
 
-        downloadBlob(new Blob([out], { type: 'application/pdf' }), signedName());
-        saved = true;
-        savedFor = destination;
+        await finish(out);
         return;
       }
 
       if (!wantTimestamp) {
-        downloadBlob(new Blob([out], { type: 'application/pdf' }), signedName());
-        saved = true;
-        savedFor = destination;
+        await finish(out);
         return;
       }
 
@@ -1025,17 +1087,13 @@
         stamped = result.timestamp;
         answeredBy = result.by;
         passedOver = result.passed;
-        downloadBlob(new Blob([result.bytes], { type: 'application/pdf' }), signedName());
-        saved = true;
-        savedFor = destination;
+        await finish(result.bytes);
       } catch (cause) {
         timestampError =
           cause instanceof Error
             ? cause.message
             : 'The timestamp could not be fetched, and the reason was not one the app recognises.';
-        downloadBlob(new Blob([out], { type: 'application/pdf' }), signedName());
-        saved = true;
-        savedFor = destination;
+        await finish(out);
       }
     } catch (cause) {
       saveError =
@@ -1211,7 +1269,7 @@
 
           {#if verdict}
             <div class="picked">
-              <div class="picked-name">{fileName}</div>
+              <div class="picked-name" translate="no">{fileName}</div>
               <div class="picked-facts">
                 {verdict.format} · {formatBytes(sourceSize)}{#if opened} · {opened.pages
                     .length} page{opened.pages.length === 1 ? '' : 's'}{/if}{#if converted} · laid
@@ -1276,7 +1334,7 @@
 
             {#if signature}
               <div class="picked">
-                <div class="picked-name">{signatureName}</div>
+                <div class="picked-name" translate="no">{signatureName}</div>
                 <div class="picked-facts">
                   {#if signature.kind === 'vector'}
                     SVG · outlines · sharp at any size
@@ -1356,8 +1414,8 @@
               >
                 <div>
                   <strong>Paste, drop or choose a signature</strong>
-<div class="drop-hint">
-                    PNG or SVG, or <kbd>Ctrl</kbd>+<kbd>V</kbd> — or
+                  <div class="drop-hint">
+                    PNG or SVG{#if hasKeyboard}, or <kbd>Ctrl</kbd>+<kbd>V</kbd>{/if} — or
                     <a href="#/signature">make one</a> and send it back here
                   </div>
                 </div>
@@ -1371,6 +1429,13 @@
                   }}
                 />
               </label>
+              {#if canPaste}
+                <div class="action-group">
+                  <button class="button secondary small" type="button" onclick={() => void pasteSignature()}>
+                    Paste
+                  </button>
+                </div>
+              {/if}
             {/if}
 
             {#if signatureError}
@@ -1594,6 +1659,15 @@
                   <span class="check-note">Never a qualified signature: a key file can be copied.</span>
                 </span>
               </label>
+              {#if !identities}
+                <!--
+                  The dead end the beta testers hit: no certificate, and nothing saying how to get
+                  one. The site's own guide, not another service (CLAUDE.md, the second exception).
+                -->
+                <p class="field-note">
+                  No certificate? <a href="/situations/#sign-nocert">How to get one</a>
+                </p>
+              {/if}
             </div>
 
             {#if wantCertificate}
@@ -1614,7 +1688,7 @@
                     onchange={(event) => void takeKeyFile(event.currentTarget.files?.[0])}
                   />
                   <p class="field-note">
-                    A <code>.p12</code>, <code>.pfx</code> or <code>.pem</code>. Read here, never sent;
+                    A <code translate="no">.p12</code>, <code translate="no">.pfx</code> or <code translate="no">.pem</code>. Read here, never sent;
                     the password is then forgotten.
                   </p>
                 </div>
@@ -1622,7 +1696,7 @@
 
               {#if keyKind && !keyKind.reason && !identities}
                 <div class="facts">
-                  <div><span>File</span><strong>{keyName}</strong></div>
+                  <div><span>File</span><strong translate="no">{keyName}</strong></div>
                   <div><span>Format</span><strong>{keyKind.format}</strong></div>
                 </div>
               {/if}
@@ -1650,7 +1724,7 @@
                     disabled={opening}
                     onclick={() => void openKey()}
                   >
-                    {opening ? 'Opening…' : 'Open the key file'}
+                    <Fresh text={opening ? 'Opening…' : 'Open the key file'} />
                   </button>
                 </div>
               {/if}
@@ -1684,14 +1758,14 @@
 
                 {#if identity}
                   <div class="facts">
-                    <div><span>Key file</span><strong>{keyName}</strong></div>
+                    <div><span>Key file</span><strong translate="no">{keyName}</strong></div>
                     <!--
                       Kept after the chooser goes: "older encryption" is how a
                       reader learns the fallback was fetched to open it.
                     -->
                     <div><span>Format</span><strong>{keyKind?.format}</strong></div>
-                    <div><span>Certificate</span><strong>{identity.subject}</strong></div>
-                    <div><span>Issued by</span><strong>{identity.issuer}</strong></div>
+                    <div><span>Certificate</span><strong translate="no">{identity.subject}</strong></div>
+                    <div><span>Issued by</span><strong translate="no">{identity.issuer}</strong></div>
                     <div>
                       <span>Valid</span>
                       <strong>
@@ -1754,48 +1828,24 @@
                   {:else if supplied.length === 0}
                     <div class="notice">
                       <strong>This file holds no issuer certificates.</strong>
-                      Without them, a reader that lacks <strong>{identity.issuer}</strong> shows your
-                      name with no way to check it.
-                      {#if signerClaims?.issuerUrl}
-                        Your certificate says where that one is published:
-                        <span class="outgoing-list">
-                          <span>
-                            <strong>Published at:</strong>
-                            <!-- A link the reader follows, never a request this app makes. -->
-                            <a href={signerClaims.issuerUrl} target="_blank" rel="noopener noreferrer">
-                              {signerClaims.issuerUrl}
-                            </a>
-                          </span>
-                        </span>
-                        Fetch it and add it below, or re-export the key file with its full
-                        certification path.<Info
-                          >Online readers often follow that address themselves — but a signature that
-                          encloses its chain does not depend on them being online, and this app will
-                          not fetch it for you.</Info
-                        >
-                      {:else}
-                        Add them below, or re-export the key file with its full certification path
-                        — your authority publishes both.
-                      {/if}
+                      Without them, a reader that lacks <strong translate="no">{identity.issuer}</strong> shows your
+                      name with no way to check it.<Info
+                        >A signature that encloses its chain does not depend on the reader being
+                        online, or already holding the authority. Re-exporting the key file with its
+                        full certification path does the same.</Info
+                      >
                     </div>
+                    {#key identity}
+                      <FindIssuers
+                        leaf={identity.certificate}
+                        issuerUrl={signerClaims?.issuerUrl ?? null}
+                        onfound={(chain, from) => void takeFoundIssuers(chain, from)}
+                        onfile={(file) => void takeIssuers(file)}
+                      />
+                    {/key}
                   {/if}
 
                   {#if identity.chain.length === 0}
-                    <div class="field">
-                      <span class="field-label">Issuer certificates</span>
-                      <input
-                        bind:this={issuerInput}
-                        class="input"
-                        type="file"
-                        accept=".pem,.crt,.cer,.p7b,.p7c,application/x-pkcs7-certificates"
-                        onchange={(event) => void takeIssuers(event.currentTarget.files?.[0])}
-                      />
-                      <p class="field-note">
-                        A <code>.pem</code>, <code>.crt</code> or <code>.p7b</code>. Public, embedded
-                        in the signature; nothing is sent.
-                      </p>
-                    </div>
-
                     {#if issuerError}
                       <div class="notice bad">{issuerError}</div>
                     {/if}
@@ -1803,12 +1853,13 @@
                     {#if supplied.length > 0}
                       <div class="notice ok">
                         <strong>{issuerName} continues this chain.</strong>
+                        {issuerFrom}
                         <span class="outgoing-list">
                           {#each links as link}
                             <span>
                               {link.holds ? '✓' : '✗'}
-                              <strong>{link.subject}</strong> signed by
-                              <strong>{link.issuer}</strong>
+                              <strong translate="no">{link.subject}</strong> signed by
+                              <strong translate="no">{link.issuer}</strong>
                               {link.holds ? '' : ' — but that signature does not hold'}
                             </span>
                           {/each}
@@ -1944,7 +1995,7 @@
                     {#if blockUnsupported.length > 0}
                       <div class="notice warn">
                         <strong>Some characters cannot be drawn in the block.</strong>
-                        <code>{blockUnsupported.join(' ')}</code> come out as empty boxes. They still go
+                        <code translate="no">{blockUnsupported.join(' ')}</code> come out as empty boxes. They still go
                         into the signature as typed.
                       </div>
                     {/if}
@@ -1972,28 +2023,18 @@
             <div class="field timestamp-field">
               <label class="check">
                 <input type="checkbox" bind:checked={wantTimestamp} />
-                <span>
-                  <strong>Add a timestamp</strong>
-                  <span class="check-note">Sends a 32-byte digest — shown below before it goes.</span>
-                </span>
+                <span><strong>Add a timestamp</strong></span>
               </label>
             </div>
 
             {#if wantTimestamp}
-              <div class="field">
-                <span class="field-label" id="tsa-choice-label"
-                  >Timestamp authority<Info
-                    >Who independently dates it. Not the certificate you sign with, and it neither
-                    issues nor checks that certificate.</Info
-                  ></span
-                >
-                <select
-                  id="tsa-choice"
-                  class="input"
-                  aria-labelledby="tsa-choice-label"
-                  bind:value={choice}
-                >
-                  <option value={AUTOMATIC}>Automatic — the first qualified one that answers</option>
+              <!--
+                One choice on screen; what it means, in the ⓘ beside it. The default answers for
+                almost everyone, so the explanation is there for those who change it.
+              -->
+              <div class="field select-row">
+                <select id="tsa-choice" class="input" aria-label="Timestamp authority" bind:value={choice}>
+                  <option value={AUTOMATIC}>Automatic (recommended)</option>
                   {#each STANDINGS as standing}
                     <optgroup label={standing.label}>
                       {#each AUTHORITIES.filter(standing.has) as option}
@@ -2003,18 +2044,20 @@
                   {/each}
                   <option value={CUSTOM}>Your own authority…</option>
                 </select>
-                <p class="field-note">
-                  {#if choice === AUTOMATIC}
+                <Info label="About the timestamp authority"
+                  >{#if choice === AUTOMATIC}
                     Asks {automaticOrder()
                       .map((a) => a.signedBy)
                       .join(', then ')} in turn, and stops at the first that answers. Each is qualified
                     (eIDAS) and recognised by Acrobat.
                   {:else if authority}
-                    {summary(authority)}<Info>{authority.note}</Info>
+                    {summary(authority)} {authority.note}
                   {:else}
                     Any RFC 3161 authority, if it allows requests from a web page.
                   {/if}
-                </p>
+                  The authority only dates the file: it neither issues nor checks the certificate you
+                  sign with.</Info
+                >
               </div>
 
               {#if useCustom}
@@ -2043,42 +2086,42 @@
 
               {#if !(saved && stamped)}
                 <!--
-                  The one place in this app where something leaves the device. It
-                  is stated before it happens, in full, rather than explained
-                  afterwards in a changelog — every address it could go to included.
+                  The one request that leaves for another site. The limit stays on screen as one
+                  sentence; every address it could go to is a click away, before anything is sent.
                 -->
-                <div class="notice warn">
-                  <strong
-                    >{candidates && candidates.length > 1
-                      ? 'This sends one request at a time off your device'
-                      : 'This sends one request off your device'}</strong
-                  > — the only kind the app makes.<Info
-                    >A timestamp cannot work without it: somebody independent has to see the file's
-                    fingerprint and sign it. A digest cannot be turned back into the file, so the
-                    authority learns that something existed, not what.{#if candidates && candidates.length > 1}
-                      Each authority is sent the same 32 bytes, and none is asked once one has
-                      answered.{/if}</Info
-                  >
-                  <span class="outgoing-list">
-                    <span>
-                      <strong>What goes:</strong>
-                      32 bytes — the SHA-256 of
-                      {wantCertificate && identity ? 'your signature' : 'the finished PDF'}
+                <p class="field-note">
+                  Sends a 32-byte digest to {candidates && candidates.length > 1
+                    ? 'one timestamp authority at a time'
+                    : 'the timestamp authority'} — never the document.
+                </p>
+                <details class="explain">
+                  <summary>What is sent, and where</summary>
+                  <div>
+                    <span class="outgoing-list">
+                      <span>
+                        <strong>What goes:</strong>
+                        32 bytes — the SHA-256 of
+                        {wantCertificate && identity ? 'your signature' : 'the finished PDF'}
+                      </span>
+                      <span><strong>What does not:</strong> the document, your name, the signature</span>
+                      <span
+                        ><strong>Where:</strong>
+                        {#if candidates}
+                          {#each candidates as candidate, index}{index ? ', then ' : ''}<code
+                              >{candidate.url}</code
+                            >{/each}{#if candidates.length > 1}{' '}— each only if the one before does
+                            not answer{/if}
+                        {:else}
+                          <code translate="no">nowhere — the address above is not valid</code>
+                        {/if}</span
+                      >
                     </span>
-                    <span><strong>What does not:</strong> the document, your name, the signature</span>
-                    <span
-                      ><strong>Where:</strong>
-                      {#if candidates}
-                        {#each candidates as candidate, index}{index ? ', then ' : ''}<code
-                            >{candidate.url}</code
-                          >{/each}{#if candidates.length > 1}{' '}— each only if the one before does
-                          not answer{/if}
-                      {:else}
-                        <code>nowhere — the address above is not valid</code>
-                      {/if}</span
-                    >
-                  </span>
-                </div>
+                    A timestamp cannot work without it: somebody independent has to see the file's
+                    fingerprint and sign it. A digest cannot be turned back into the file, so the
+                    authority learns that something existed, not what.{#if candidates && candidates.length > 1}{' '}Each
+                      authority is sent the same 32 bytes, and none is asked once one has answered.{/if}
+                  </div>
+                </details>
               {/if}
 
               {#if customError}
@@ -2110,8 +2153,8 @@
                           {passedOver.map((p) => p.name).join(', ')} — did not answer</span
                         >
                       {/if}
-                      <span><strong>Sent:</strong> <code>{groupHex(sent.digestHex)}</code></span>
-                      <span><strong>To:</strong> <code>{sent.url}</code></span>
+                      <span><strong>Sent:</strong> <code translate="no">{groupHex(sent.digestHex)}</code></span>
+                      <span><strong>To:</strong> <code translate="no">{sent.url}</code></span>
                     </span>
                   {/if}
                 </div>
@@ -2134,8 +2177,8 @@
                           {passedOver.map((p) => p.name).join(', ')} — did not answer</span
                         >
                       {/if}
-                      <span><strong>Sent:</strong> <code>{groupHex(sent.digestHex)}</code></span>
-                      <span><strong>To:</strong> <code>{sent.url}</code></span>
+                      <span><strong>Sent:</strong> <code translate="no">{groupHex(sent.digestHex)}</code></span>
+                      <span><strong>To:</strong> <code translate="no">{sent.url}</code></span>
                     </span>
                   {/if}
                 </div>
@@ -2143,6 +2186,23 @@
                 <div class="notice ok">
                   <strong>Saved.</strong>
                   A copy; the original is untouched.
+                </div>
+              {/if}
+
+              <!-- The level of what was saved, read back from the saved bytes (`finish`). -->
+              {#if produced?.kind === 'signed'}
+                <SignatureLevel qualified={produced.qualified} onQualifiedDevice={false}>
+                  Read back from the saved file. Made with a key file, so it cannot be a qualified
+                  signature.
+                </SignatureLevel>
+              {:else if produced?.kind === 'none'}
+                <SignatureLevel certificate={false}>
+                  {#if signature}The picture on it proves nothing about who put it there.{/if}
+                </SignatureLevel>
+              {:else if produced?.kind === 'unreadable'}
+                <div class="notice bad">
+                  <strong>The saved file does not read back as signed.</strong>
+                  {produced.detail} Do not rely on it; sign again.
                 </div>
               {/if}
               <SupportLink />
@@ -2164,7 +2224,7 @@
                 disabled={!ready || saving}
                 onclick={() => void save()}
               >
-                {saving
+                <Fresh text={saving
                   ? sent && !stamped
                     ? `Asking ${sent.authority}…`
                     : 'Writing…'
@@ -2174,7 +2234,7 @@
                       ? 'Sign with the certificate and save'
                       : wantTimestamp
                         ? 'Timestamp and save'
-                        : 'Save signed PDF'}
+                        : 'Save signed PDF'} />
               </button>
             </div>
           </div>
@@ -2187,10 +2247,10 @@
         {#if wantCertificate && identity}
           <div class="notice">
             <strong>Your certificate signs this exact file.</strong> If it is changed later, PDF
-            readers will show it. This page does not check who {identity.subject} is.<Info
+            readers will show it. This page does not check who <span translate="no">{identity.subject}</span> is.<Info
               >Whether to trust the certificate is for the reader's PDF software to decide, against
               the trust list of the framework it was issued under. The signature also carries no
-              proof that {identity.issuer} had not withdrawn the certificate when you signed: a reader
+              proof that <span translate="no">{identity.issuer}</span> had not withdrawn the certificate when you signed: a reader
               can ask today, but after {identity.validTo.toISOString().slice(0, 10)} perhaps not.</Info
             >
           </div>

@@ -23,6 +23,7 @@
   import Info from '../site/Info.svelte';
   import SignatureLevel from '../site/SignatureLevel.svelte';
   import SupportLink from '../site/SupportLink.svelte';
+  import { holdRefresh } from '../site/update-check';
   import {
     AgreementError,
     DSS_SOURCE_URL,
@@ -42,6 +43,9 @@
   let built = $state<Uint8Array | null>(null);
   /** Flips once the user has actually downloaded, so the warning can stand down. */
   let saved = $state(false);
+  $effect(() => {
+    if (files.length > 0 && !saved) return holdRefresh();
+  });
   let step = $state(1);
 
   const chosen = $derived(consented.filter(Boolean).length);
@@ -343,12 +347,12 @@
                 <label class="signer" class:on={consented[i]}>
                   <input type="checkbox" bind:checked={consented[i]} />
                   <div class="who">
-                    <strong>{s.name}</strong>
+                    <strong translate="no">{s.name}</strong>
                     <span class="meta" class:warn-text={s.selfSigned}>
                       {#if s.selfSigned}
                         Self-signed — no authority vouched for this name
                       {:else}
-                        Certified by {s.qtsp}
+                        Certified by <span translate="no">{s.qtsp}</span>
                       {/if}
                     </span>
                     <SignatureLevel compact qualified={s.qualifiedClaim.qcCompliance} onQualifiedDevice={s.qualifiedClaim.qcSSCD} />

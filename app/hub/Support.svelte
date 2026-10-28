@@ -9,6 +9,7 @@
   import SiteBar from '../src/site/SiteBar.svelte';
   import { LIGHTNING, lightningUri } from '../src/site/support';
   import HubFooter from './HubFooter.svelte';
+  import Fresh from '../src/site/Fresh.svelte';
 
   let menu = $state<'services' | 'tasks' | null>(null);
   let copy = $state<'idle' | 'copied' | 'failed'>('idle');
@@ -98,7 +99,7 @@
           <div class="action-group">
             <a class="button dark" href={lightningUri(LIGHTNING)}>Open in wallet</a>
             <button type="button" class="button secondary" onclick={() => void copyCode()}>
-              {copy === 'copied' ? 'Copied' : 'Copy code'}
+              <Fresh text={copy === 'copied' ? 'Copied' : 'Copy code'} />
             </button>
           </div>
           {#if copy === 'failed'}

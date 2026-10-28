@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { clipboardCanTakeImages, copyImage, copySvg } from './clipboard';
+import { clipboardCanBeRead, clipboardCanTakeImages, copyImage, copySvg, readSignatureFromClipboard } from './clipboard';
 
 const original = {
   navigator: Object.getOwnPropertyDescriptor(globalThis, 'navigator'),
@@ -124,5 +124,52 @@ describe('copySvg', () => {
   it('says so where there is no clipboard at all', async () => {
     withClipboard(null);
     await expect(copySvg(markup)).resolves.toMatchObject({ ok: false });
+  });
+});
+
+/** A clipboard holding these flavours, readable the way the asynchronous API reads them. */
+function holding(...entries: Record<string, Blob>[]) {
+  const read = async () =>
+    entries.map((e) => ({ types: Object.keys(e), getType: async (t: string) => e[t] }));
+  Object.defineProperty(globalThis, 'navigator', { value: { clipboard: { read } }, configurable: true, writable: true });
+}
+
+const svg = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>';
+
+describe('readSignatureFromClipboard', () => {
+  it('is offered only where the browser can read the clipboard', () => {
+    withClipboard(null);
+    expect(clipboardCanBeRead()).toBe(false);
+    holding();
+    expect(clipboardCanBeRead()).toBe(true);
+  });
+
+  it('prefers a picture over text, as the paste event does', async () => {
+    holding({ 'text/plain': new Blob(['signature.png']) }, { 'image/png': png });
+    const result = await readSignatureFromClipboard();
+    expect(result).toEqual({ ok: true, blob: png, name: 'pasted image' });
+  });
+
+  it('takes SVG markup carried as text — how the signature screen copies', async () => {
+    holding({ 'text/plain': new Blob([`  ${svg}\n`]) });
+    const result = await readSignatureFromClipboard();
+    expect(result.ok && result.name).toBe('pasted SVG');
+    expect(result.ok && (await result.blob.text())).toBe(svg);
+  });
+
+  it('says so when the clipboard holds no signature', async () => {
+    holding({ 'text/plain': new Blob(['just words']) });
+    const result = await readSignatureFromClipboard();
+    expect(result.ok).toBe(false);
+  });
+
+  it('turns a refusal into a sentence', async () => {
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { clipboard: { read: async () => Promise.reject(new DOMException('no', 'NotAllowedError')) } },
+      configurable: true,
+      writable: true,
+    });
+    const result = await readSignatureFromClipboard();
+    expect(result.ok === false && result.reason).toMatch(/did not allow/);
   });
 });

@@ -13,6 +13,8 @@
   import Info from '../../../../app/src/site/Info.svelte';
   import SignatureLevel from '../../../../app/src/site/SignatureLevel.svelte';
   import { checkSignatures, type CheckedSignature } from '../lib/document/verify/verify';
+  import type { Certificate } from 'pkijs';
+  import FindIssuers from './FindIssuers.svelte';
   import {
     checkLinks,
     orderChain,
@@ -77,7 +79,13 @@
    * offline, exactly as it does on the signing screen. Keyed by signature
    * because a document may carry several, each wanting a different issuer.
    */
-  let supplied = $state<Record<number, { name: string; links: ChainLink[]; error: string }>>({});
+  let supplied = $state<Record<number, { name: string; from?: string; links: ChainLink[]; error: string }>>({});
+
+  /** From the issuer directory, already walked and verified (FindIssuers). */
+  async function takeFound(index: number, result: CheckedSignature, chain: Certificate[], from: string) {
+    if (!result.certificate) return;
+    supplied[index] = { name: 'The issuer directory', from, links: await checkLinks(result.certificate, chain), error: '' };
+  }
 
   async function takeIssuers(index: number, result: CheckedSignature, file: File | undefined) {
     if (!file) return;
@@ -152,7 +160,7 @@
 
           {#if fileName && !error}
             <div class="picked">
-              <div class="picked-name">{fileName}</div>
+              <div class="picked-name" translate="no">{fileName}</div>
               <div class="picked-facts">
                 {#if checking}
                   Checking…
@@ -264,10 +272,10 @@
                 <div><span>Location</span><strong>{result.location}</strong></div>
               {/if}
               {#if result.signedBy}
-                <div><span>Signed by</span><strong>{result.signedBy}</strong></div>
+                <div><span>Signed by</span><strong translate="no">{result.signedBy}</strong></div>
               {/if}
               {#if result.policy}
-                <div><span>Policy</span><code>{result.policy}</code></div>
+                <div><span>Policy</span><code translate="no">{result.policy}</code></div>
               {/if}
               {#if result.timestamp}
                 <div>
@@ -313,7 +321,7 @@
                     {#each result.chain as link}
                       <span>
                         {link.holds ? '✓' : '✗'}
-                        <strong>{link.subject}</strong> signed by <strong>{link.issuer}</strong>
+                        <strong translate="no">{link.subject}</strong> signed by <strong translate="no">{link.issuer}</strong>
                         {link.holds ? '' : ' — but that signature does not hold'}
                       </span>
                     {/each}
@@ -329,73 +337,34 @@
                 -->
                 <div class="notice" class:warn={!supplied[index]?.links.length}>
                   <strong>This signature carries no issuer certificates.</strong>
-                  Only the signer's own. The certificate names its issuer —
-                  <strong>{result.issuedBy ?? 'not by any name it gives'}</strong> —
-                  {#if result.claims?.issuerUrl}
-                    and says where that one is published:
-                    <span class="outgoing-list">
-                      <span>
-                        <strong>Published at:</strong>
-                        <!--
-                          A link, not a fetch. Following it is the reader
-                          navigating their own browser; the app makes no request
-                          either way, and could not if it wanted to — these
-                          addresses are plain http, which a page served over
-                          https may not load, and they answer no CORS preflight.
-                        -->
-                        <a href={result.claims.issuerUrl} target="_blank" rel="noopener noreferrer">
-                          {result.claims.issuerUrl}
-                        </a>
-                      </span>
-                    </span>
-                    Most readers hold a well-known authority already, and an online one fetches it
-                    from that address by itself — which is why this often validates elsewhere
-                    without complaint. This app does not fetch it.
-                    {#if supplied[index]?.links.length}
-                      <strong>Continued below.</strong>
-                    {:else}
-                      Open it yourself and drop it in below.
-                    {/if}
-                  {:else}
-                    and gives no address to fetch it from, so a reader that does not already hold
-                    it has nowhere to look but its own store.
-                    {#if supplied[index]?.links.length}
-                      <strong>Continued below.</strong>
-                    {/if}
-                  {/if}
+                  Only the signer's own, which names its issuer:
+                  <strong translate="no">{result.issuedBy ?? 'not by any name it gives'}</strong>.<Info
+                    >Most readers hold a well-known authority already, and an online one fetches it
+                    by itself — which is why this often validates elsewhere without complaint. A
+                    reader that does neither has a name and no way to trace it.</Info
+                  >
                 </div>
 
-                <!--
-                  The same upload the signing screen offers, on the screen where
-                  somebody is reading a document rather than making one. It
-                  answers the question the notice above raises and otherwise
-                  leaves hanging: fine, so is this chain sound or not?
-                -->
-                <div class="field">
-                  <span class="field-label">Continue the chain yourself</span>
-                  <p class="field-note">
-                    Fetch the certificate above and drop it in. Checked offline; nothing is sent or
-                    written back.
-                  </p>
-                  <input
-                    class="input"
-                    type="file"
-                    accept=".pem,.crt,.cer,.der,.p7b,.p7c,application/x-x509-ca-cert,application/x-pkcs7-certificates"
-                    onchange={(event) =>
-                      void takeIssuers(index, result, event.currentTarget.files?.[0] ?? undefined)}
+                {#if !supplied[index]?.links.length && result.certificate}
+                  <FindIssuers
+                    leaf={result.certificate}
+                    issuerUrl={result.claims?.issuerUrl ?? null}
+                    onfound={(chain, from) => void takeFound(index, result, chain, from)}
+                    onfile={(file) => void takeIssuers(index, result, file)}
                   />
-                </div>
+                {/if}
 
                 {#if supplied[index]?.error}
                   <div class="notice bad">{supplied[index].error}</div>
                 {:else if supplied[index]?.links.length}
                   <div class="notice ok">
                     <strong>{supplied[index].name} continues this chain.</strong>
+                    {supplied[index].from}
                     <span class="outgoing-list">
                       {#each supplied[index].links as link}
                         <span>
                           {link.holds ? '✓' : '✗'}
-                          <strong>{link.subject}</strong> signed by <strong>{link.issuer}</strong>
+                          <strong translate="no">{link.subject}</strong> signed by <strong translate="no">{link.issuer}</strong>
                           {link.holds ? '' : ' — but that signature does not hold'}
                         </span>
                       {/each}
@@ -497,7 +466,7 @@
               Saying "verified" without this would be the dishonest version.
             -->
             <div class="notice">
-              <strong>Not checked:</strong> whether <em>{result.signedBy ?? 'that signer'}</em> is who
+              <strong>Not checked:</strong> whether <em translate="no">{result.signedBy ?? 'that signer'}</em> is who
               they say they are — open the file in a PDF reader for that.<Info
                 >That takes a list of trusted authorities, which this app chooses not to ship, and a
                 revocation check, which needs a network it does not use. The name above is read out
@@ -511,10 +480,10 @@
                   Where that check would go, uncalled:
                   <span class="outgoing-list">
                     {#if result.claims.ocspUrl}
-                      <span><strong>Asked at:</strong> <code>{result.claims.ocspUrl}</code></span>
+                      <span><strong>Asked at:</strong> <code translate="no">{result.claims.ocspUrl}</code></span>
                     {/if}
                     {#each result.claims.crlUrls as url}
-                      <span><strong>Listed at:</strong> <code>{url}</code></span>
+                      <span><strong>Listed at:</strong> <code translate="no">{url}</code></span>
                     {/each}
                   </span>
                 {/if}</Info

@@ -1,5 +1,6 @@
 <script lang="ts">
   import Stepper from '../site/Stepper.svelte';
+  import Fresh from '../site/Fresh.svelte';
   /**
    * "Timestamp" — Certificate 1, in three steps: choose the file, look at what
    * is about to be published, create the proof.
@@ -14,6 +15,7 @@
   import Info from '../site/Info.svelte';
   import Progress from '../site/Progress.svelte';
   import SupportLink from '../site/SupportLink.svelte';
+  import { holdRefresh } from '../site/update-check';
   import { buildCertificate1 } from '../lib/certificate1';
   import { baseName, downloadBytes } from '../lib/download';
   import { formatBytes } from '../site/size';
@@ -39,6 +41,10 @@
   let hashed = $state({ read: 0, total: 0 });
   /** Certificate 1 was saved: the task is finished, and the support line may show. */
   let saved = $state(false);
+  /** A proof not yet saved exists only in this page; a refresh would drop it. */
+  $effect(() => {
+    if (file && !saved) return holdRefresh();
+  });
   let error = $state('');
   let calendarWarnings = $state<string[]>([]);
 
@@ -217,11 +223,13 @@
               </button>
               <button class="button dark" disabled={busy} onclick={notarize}>
                 {#if busy}<span class="spinner"></span>{/if}
-                {phase === 'stamping'
-                  ? 'Submitting to calendars…'
-                  : phase === 'building'
-                    ? 'Building certificate…'
-                    : 'Create Certificate 1'}
+                <Fresh
+                  text={phase === 'stamping'
+                    ? 'Submitting to calendars…'
+                    : phase === 'building'
+                      ? 'Building certificate…'
+                      : 'Create Certificate 1'}
+                />
               </button>
               <span class="visually-hidden" role="status"
                 >{phase === 'stamping' ? 'Submitting to calendars…' : phase === 'building' ? 'Building certificate…' : ''}</span
