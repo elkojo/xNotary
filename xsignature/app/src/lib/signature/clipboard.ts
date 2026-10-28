@@ -84,3 +84,47 @@ export async function copySvg(markup: string): Promise<CopyResult> {
 
   return write({ 'text/plain': new Blob([markup], { type: 'text/plain' }) });
 }
+
+/**
+ * Read a signature off the clipboard, for a Paste button.
+ *
+ * On a phone there is no Ctrl+V and no field to long-press, so the paste event a
+ * keyboard fires never comes; the asynchronous Clipboard API, called from a tap, is
+ * the only way in. The same preference as the paste event: a PNG or JPEG first,
+ * then SVG — as an image flavour, or as markup in plain text, which is how the
+ * signature screen's own copy usually arrives.
+ */
+export type PasteResult = { ok: true; blob: Blob; name: string } | { ok: false; reason: string };
+
+export function clipboardCanBeRead(): boolean {
+  return typeof navigator !== 'undefined' && typeof navigator.clipboard?.read === 'function';
+}
+
+export async function readSignatureFromClipboard(): Promise<PasteResult> {
+  let items: ClipboardItems;
+  try {
+    items = await navigator.clipboard.read();
+  } catch {
+    return {
+      ok: false,
+      reason: 'The browser did not allow reading the clipboard. Allow it when asked, or choose the file instead.',
+    };
+  }
+
+  for (const type of ['image/png', 'image/jpeg']) {
+    const item = items.find((i) => i.types.includes(type));
+    if (item) return { ok: true, blob: await item.getType(type), name: 'pasted image' };
+  }
+  for (const type of ['image/svg+xml', 'text/plain']) {
+    for (const item of items.filter((i) => i.types.includes(type))) {
+      const text = (await (await item.getType(type)).text()).trim();
+      if (text.startsWith('<svg') || text.startsWith('<?xml')) {
+        return { ok: true, blob: new Blob([text], { type: 'image/svg+xml' }), name: 'pasted SVG' };
+      }
+    }
+  }
+  return {
+    ok: false,
+    reason: 'The clipboard holds no signature. Copy it as a picture on the signature screen first.',
+  };
+}

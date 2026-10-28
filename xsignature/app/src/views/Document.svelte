@@ -53,6 +53,7 @@
     pixelsNeededFor,
     resolutionFor,
   } from '../lib/document/signature/resolution';
+  import { clipboardCanBeRead, readSignatureFromClipboard } from '../lib/signature/clipboard';
   import { downloadBlob } from '../lib/signature/download';
   import { toPathData } from '../lib/signature/path';
   import { PDFDocument } from '@cantoo/pdf-lib';
@@ -298,6 +299,22 @@
       event.preventDefault();
       await takeSignature(new Blob([text]), 'pasted SVG');
     }
+  }
+
+  /**
+   * The same, from a tap: a phone has no Ctrl+V, so its paste event never comes.
+   * Offered wherever the browser can read the clipboard. The keyboard hint goes
+   * only where touch is the main pointer — asking for a fine one instead would
+   * hide it wherever the browser cannot say what the pointer is.
+   */
+  const canPaste = clipboardCanBeRead();
+  const hasKeyboard = !(typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
+
+  async function pasteSignature(): Promise<void> {
+    signatureError = '';
+    const result = await readSignatureFromClipboard();
+    if (result.ok) await takeSignature(result.blob, result.name);
+    else signatureError = result.reason;
   }
 
   /**
@@ -1382,8 +1399,8 @@
               >
                 <div>
                   <strong>Paste, drop or choose a signature</strong>
-<div class="drop-hint">
-                    PNG or SVG, or <kbd>Ctrl</kbd>+<kbd>V</kbd> — or
+                  <div class="drop-hint">
+                    PNG or SVG{#if hasKeyboard}, or <kbd>Ctrl</kbd>+<kbd>V</kbd>{/if} — or
                     <a href="#/signature">make one</a> and send it back here
                   </div>
                 </div>
@@ -1397,6 +1414,13 @@
                   }}
                 />
               </label>
+              {#if canPaste}
+                <div class="action-group">
+                  <button class="button secondary small" type="button" onclick={() => void pasteSignature()}>
+                    Paste
+                  </button>
+                </div>
+              {/if}
             {/if}
 
             {#if signatureError}
