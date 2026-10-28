@@ -1,5 +1,6 @@
 <script lang="ts">
   import { formatBytes } from '../site/size';
+  import Fresh from '../site/Fresh.svelte';
 
   interface Props {
     /** "Drop … here": the family's wording, shared with xSignature and xConvert. */
@@ -66,14 +67,14 @@
 
   {#if files.length > 0}
     <div class="picked">
-      <div class="picked-name">{files.map((f) => f.name).join(', ')}</div>
+      <div class="picked-name" translate="no">{files.map((f) => f.name).join(', ')}</div>
       <div class="picked-facts">
         {#if files.length > 1}{files.length} files · {/if}{formatBytes(totalSize)}
       </div>
     </div>
     <div class="action-group">
       <button class="button secondary small" type="button" onclick={() => input.click()}>
-        {files.length > 1 ? 'Choose different files' : 'Choose a different file'}
+        <Fresh text={files.length > 1 ? 'Choose different files' : 'Choose a different file'} />
       </button>
     </div>
   {:else}

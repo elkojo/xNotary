@@ -38,7 +38,7 @@
           <a class="product-card" href={s.href}>
             <div class="top">
               <span class="brand-mark"><span>{s.mark}</span></span>
-              <h2>{s.name}</h2>
+              <h2 translate="no">{s.name}</h2>
               <span class="kicker" aria-hidden="true">↗</span>
             </div>
             <p>{s.description}</p>

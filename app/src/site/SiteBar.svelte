@@ -60,7 +60,7 @@
 
 <header class="topbar">
   <div class="nav">
-    <a class="brand small" href="/" aria-label="xNotary.digital — all services">
+    <a class="brand small" href="/" aria-label="xNotary.digital — all services" translate="no">
       <span class="brand-mark"><span>x</span></span>
       <span class="brand-text">xNotary<span class="brand-domain">.digital</span></span>
     </a>
@@ -69,7 +69,7 @@
     <div class="drop">
       <button class="switcher" aria-expanded={menu === 'services'} onclick={() => toggle('services')}>
         {#if here}
-          <span class="brand-mark"><span>{here.mark}</span></span>{here.name}
+          <span class="brand-mark"><span>{here.mark}</span></span><span translate="no">{here.name}</span>
         {:else}
           Services
         {/if}
@@ -86,7 +86,7 @@
             >
               <span class="brand-mark"><span>{s.mark}</span></span>
               <span>
-                <strong>{s.name}{#if s.external}<span class="external" aria-label="(opens its current address)"> ↗</span>{/if}</strong>
+                <strong translate="no">{s.name}{#if s.external}<span class="external" aria-label="(opens its current address)"> ↗</span>{/if}</strong>
                 <small>{s.tagline}</small>
               </span>
             </a>
@@ -123,7 +123,7 @@
             <a class="task-item lead" href={SITUATIONS_HREF}>
               <strong>Start from your situation</strong>
               <span class="d">A few questions, then the right tool — or what to ask first.</span>
-              <span class="tag"><span class="brand-mark"><span>x</span></span>xNotary.digital</span>
+              <span class="tag"><span class="brand-mark"><span>x</span></span><span translate="no">xNotary.digital</span></span>
             </a>
             {#each TASKS as task}
               {@const s = service(task.service)}
@@ -131,7 +131,7 @@
                 <strong>{task.title}</strong>
                 <span class="d">{task.description}</span>
                 <span class="tag">
-                  <span class="brand-mark"><span>{s.mark}</span></span>{s.name}{#if s.external} ↗{/if}
+                  <span class="brand-mark"><span>{s.mark}</span></span><span translate="no">{s.name}</span>{#if s.external} ↗{/if}
                 </span>
               </a>
             {/each}
@@ -139,7 +139,7 @@
             <a class="task-item" href={SUPPORT_HREF}>
               <strong>Support</strong>
               <span class="d">Support the work with a payment.</span>
-              <span class="tag"><span class="brand-mark"><span>x</span></span>xNotary.digital</span>
+              <span class="tag"><span class="brand-mark"><span>x</span></span><span translate="no">xNotary.digital</span></span>
             </a>
           </div>
           <div class="menu-foot"><a href="/">Browse services instead</a></div>

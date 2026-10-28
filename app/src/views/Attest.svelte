@@ -347,12 +347,12 @@
                 <label class="signer" class:on={consented[i]}>
                   <input type="checkbox" bind:checked={consented[i]} />
                   <div class="who">
-                    <strong>{s.name}</strong>
+                    <strong translate="no">{s.name}</strong>
                     <span class="meta" class:warn-text={s.selfSigned}>
                       {#if s.selfSigned}
                         Self-signed — no authority vouched for this name
                       {:else}
-                        Certified by {s.qtsp}
+                        Certified by <span translate="no">{s.qtsp}</span>
                       {/if}
                     </span>
                     <SignatureLevel compact qualified={s.qualifiedClaim.qcCompliance} onQualifiedDevice={s.qualifiedClaim.qcSSCD} />

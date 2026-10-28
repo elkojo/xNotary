@@ -524,13 +524,13 @@
               here is a proprietary format.
             </p>
             <ol>
-              <li>Install the reference client: <code>pip install opentimestamps-client</code></li>
+              <li>Install the reference client: <code translate="no">pip install opentimestamps-client</code></li>
               <li>
-                Detach <code>proof.ots</code> from the Certificate 1 PDF — or from a Certificate 2,
+                Detach <code translate="no">proof.ots</code> from the Certificate 1 PDF — or from a Certificate 2,
                 which carries it too when the document itself was signed — using any reader with an
-                attachments panel. Or use the <code>.ots</code> file you saved.
+                attachments panel. Or use the <code translate="no">.ots</code> file you saved.
               </li>
-              <li>Run <code>ots verify -f your-document.pdf proof.ots</code></li>
+              <li>Run <code translate="no">ots verify -f your-document.pdf proof.ots</code></li>
             </ol>
             <p>
               The client recomputes the digest itself and queries Bitcoin directly. It will print

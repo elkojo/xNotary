@@ -9,6 +9,7 @@
   import { COMMON_INPUTS, COMMON_OUTPUTS, detectInput } from '../lib/formats';
   import type { Progress as Download } from '../lib/protocol';
   import { canRunPandoc } from '../lib/support';
+  import Fresh from '../../../../app/src/site/Fresh.svelte';
   import {
     DOWNLOAD_MB,
     LayoutCancelled,
@@ -215,7 +216,7 @@
                 <strong>{main.name} is not a format xConvert recognises.</strong>
                 {#if main.name.toLowerCase().endsWith('.txt')}Rename it to .md if it is Markdown.<Info
                     >pandoc reads no plain-text format, and reading text as Markdown would turn its
-                    <code>*</code> and <code>#</code> into formatting.</Info
+                    <code translate="no">*</code> and <code translate="no">#</code> into formatting.</Info
                   >{/if}
                 {#if !showAll}
                   <button class="link-button" onclick={revealAll}>Read it as…</button>
@@ -350,7 +351,7 @@
               {/if}
               <button class="button dark" disabled={busy} onclick={run}>
                 {#if busy}<span class="spinner"></span>{/if}
-                {busy ? 'Converting…' : `Convert to ${labelFor(to)}`}
+                <Fresh text={busy ? 'Converting…' : `Convert to ${labelFor(to)}`} />
               </button>
               <span class="visually-hidden" role="status">{busy ? 'Converting…' : ''}</span>
             </div>
@@ -360,9 +361,9 @@
             <div class="success">
               <div class="success-mark" aria-hidden="true">✓</div>
               <h2>Converted</h2>
-              <p>{result.fileName} · {formatBytes(result.bytes.byteLength)}</p>
+              <p><span translate="no">{result.fileName}</span> · {formatBytes(result.bytes.byteLength)}</p>
               <div class="success-actions">
-                <button class="button dark" onclick={() => result && save(result)}>Save {result.fileName}</button>
+                <button class="button dark" onclick={() => result && save(result)}>Save <span translate="no">{result.fileName}</span></button>
               </div>
             </div>
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import Stepper from '../site/Stepper.svelte';
+  import Fresh from '../site/Fresh.svelte';
   /**
    * "Verify" — the screen a signer uses after receiving a document and a
    * Certificate 1 out of band. It answers two separate questions:
@@ -152,7 +153,7 @@
                 onclick={check}
               >
                 {#if checking}<span class="spinner"></span>{/if}
-                {checking ? 'Checking…' : 'Verify'}
+                <Fresh text={checking ? 'Checking…' : 'Verify'} />
               </button>
               <span class="visually-hidden" role="status">{checking ? 'Checking…' : ''}</span>
             </div>
@@ -236,8 +237,8 @@
             <details class="raw">
               <summary>Verify without xNotary</summary>
               <p class="field-help">
-                Install the reference client (<code>pip install opentimestamps-client</code>) and run
-                <code>ots verify -f "{documentFile?.name}" proof.ots</code>. The certificate prints
+                Install the reference client (<code translate="no">pip install opentimestamps-client</code>) and run
+                <code translate="no">ots verify -f "{documentFile?.name}" proof.ots</code>. The certificate prints
                 the same instructions.
               </p>
             </details>

@@ -27,6 +27,7 @@
   import { accept, HEAD_BYTES, type Accepted } from '../lib/document/accept';
   import { markdownToPdf } from '../lib/document/convert/markdown-to-pdf';
   import { textToPdf } from '../lib/document/convert/text-to-pdf';
+  import Fresh from '../../../../app/src/site/Fresh.svelte';
   import {
     AUTHORITIES,
     AUTOMATIC,
@@ -1268,7 +1269,7 @@
 
           {#if verdict}
             <div class="picked">
-              <div class="picked-name">{fileName}</div>
+              <div class="picked-name" translate="no">{fileName}</div>
               <div class="picked-facts">
                 {verdict.format} · {formatBytes(sourceSize)}{#if opened} · {opened.pages
                     .length} page{opened.pages.length === 1 ? '' : 's'}{/if}{#if converted} · laid
@@ -1333,7 +1334,7 @@
 
             {#if signature}
               <div class="picked">
-                <div class="picked-name">{signatureName}</div>
+                <div class="picked-name" translate="no">{signatureName}</div>
                 <div class="picked-facts">
                   {#if signature.kind === 'vector'}
                     SVG · outlines · sharp at any size
@@ -1687,7 +1688,7 @@
                     onchange={(event) => void takeKeyFile(event.currentTarget.files?.[0])}
                   />
                   <p class="field-note">
-                    A <code>.p12</code>, <code>.pfx</code> or <code>.pem</code>. Read here, never sent;
+                    A <code translate="no">.p12</code>, <code translate="no">.pfx</code> or <code translate="no">.pem</code>. Read here, never sent;
                     the password is then forgotten.
                   </p>
                 </div>
@@ -1695,7 +1696,7 @@
 
               {#if keyKind && !keyKind.reason && !identities}
                 <div class="facts">
-                  <div><span>File</span><strong>{keyName}</strong></div>
+                  <div><span>File</span><strong translate="no">{keyName}</strong></div>
                   <div><span>Format</span><strong>{keyKind.format}</strong></div>
                 </div>
               {/if}
@@ -1723,7 +1724,7 @@
                     disabled={opening}
                     onclick={() => void openKey()}
                   >
-                    {opening ? 'Opening…' : 'Open the key file'}
+                    <Fresh text={opening ? 'Opening…' : 'Open the key file'} />
                   </button>
                 </div>
               {/if}
@@ -1757,14 +1758,14 @@
 
                 {#if identity}
                   <div class="facts">
-                    <div><span>Key file</span><strong>{keyName}</strong></div>
+                    <div><span>Key file</span><strong translate="no">{keyName}</strong></div>
                     <!--
                       Kept after the chooser goes: "older encryption" is how a
                       reader learns the fallback was fetched to open it.
                     -->
                     <div><span>Format</span><strong>{keyKind?.format}</strong></div>
-                    <div><span>Certificate</span><strong>{identity.subject}</strong></div>
-                    <div><span>Issued by</span><strong>{identity.issuer}</strong></div>
+                    <div><span>Certificate</span><strong translate="no">{identity.subject}</strong></div>
+                    <div><span>Issued by</span><strong translate="no">{identity.issuer}</strong></div>
                     <div>
                       <span>Valid</span>
                       <strong>
@@ -1827,7 +1828,7 @@
                   {:else if supplied.length === 0}
                     <div class="notice">
                       <strong>This file holds no issuer certificates.</strong>
-                      Without them, a reader that lacks <strong>{identity.issuer}</strong> shows your
+                      Without them, a reader that lacks <strong translate="no">{identity.issuer}</strong> shows your
                       name with no way to check it.<Info
                         >A signature that encloses its chain does not depend on the reader being
                         online, or already holding the authority. Re-exporting the key file with its
@@ -1857,8 +1858,8 @@
                           {#each links as link}
                             <span>
                               {link.holds ? '✓' : '✗'}
-                              <strong>{link.subject}</strong> signed by
-                              <strong>{link.issuer}</strong>
+                              <strong translate="no">{link.subject}</strong> signed by
+                              <strong translate="no">{link.issuer}</strong>
                               {link.holds ? '' : ' — but that signature does not hold'}
                             </span>
                           {/each}
@@ -1994,7 +1995,7 @@
                     {#if blockUnsupported.length > 0}
                       <div class="notice warn">
                         <strong>Some characters cannot be drawn in the block.</strong>
-                        <code>{blockUnsupported.join(' ')}</code> come out as empty boxes. They still go
+                        <code translate="no">{blockUnsupported.join(' ')}</code> come out as empty boxes. They still go
                         into the signature as typed.
                       </div>
                     {/if}
@@ -2111,7 +2112,7 @@
                             >{/each}{#if candidates.length > 1}{' '}— each only if the one before does
                             not answer{/if}
                         {:else}
-                          <code>nowhere — the address above is not valid</code>
+                          <code translate="no">nowhere — the address above is not valid</code>
                         {/if}</span
                       >
                     </span>
@@ -2152,8 +2153,8 @@
                           {passedOver.map((p) => p.name).join(', ')} — did not answer</span
                         >
                       {/if}
-                      <span><strong>Sent:</strong> <code>{groupHex(sent.digestHex)}</code></span>
-                      <span><strong>To:</strong> <code>{sent.url}</code></span>
+                      <span><strong>Sent:</strong> <code translate="no">{groupHex(sent.digestHex)}</code></span>
+                      <span><strong>To:</strong> <code translate="no">{sent.url}</code></span>
                     </span>
                   {/if}
                 </div>
@@ -2176,8 +2177,8 @@
                           {passedOver.map((p) => p.name).join(', ')} — did not answer</span
                         >
                       {/if}
-                      <span><strong>Sent:</strong> <code>{groupHex(sent.digestHex)}</code></span>
-                      <span><strong>To:</strong> <code>{sent.url}</code></span>
+                      <span><strong>Sent:</strong> <code translate="no">{groupHex(sent.digestHex)}</code></span>
+                      <span><strong>To:</strong> <code translate="no">{sent.url}</code></span>
                     </span>
                   {/if}
                 </div>
@@ -2223,7 +2224,7 @@
                 disabled={!ready || saving}
                 onclick={() => void save()}
               >
-                {saving
+                <Fresh text={saving
                   ? sent && !stamped
                     ? `Asking ${sent.authority}…`
                     : 'Writing…'
@@ -2233,7 +2234,7 @@
                       ? 'Sign with the certificate and save'
                       : wantTimestamp
                         ? 'Timestamp and save'
-                        : 'Save signed PDF'}
+                        : 'Save signed PDF'} />
               </button>
             </div>
           </div>
@@ -2246,10 +2247,10 @@
         {#if wantCertificate && identity}
           <div class="notice">
             <strong>Your certificate signs this exact file.</strong> If it is changed later, PDF
-            readers will show it. This page does not check who {identity.subject} is.<Info
+            readers will show it. This page does not check who <span translate="no">{identity.subject}</span> is.<Info
               >Whether to trust the certificate is for the reader's PDF software to decide, against
               the trust list of the framework it was issued under. The signature also carries no
-              proof that {identity.issuer} had not withdrawn the certificate when you signed: a reader
+              proof that <span translate="no">{identity.issuer}</span> had not withdrawn the certificate when you signed: a reader
               can ask today, but after {identity.validTo.toISOString().slice(0, 10)} perhaps not.</Info
             >
           </div>

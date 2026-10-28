@@ -81,8 +81,18 @@
     {:else}
       <div class="flow-shell">
         <div class="flow-main">
-          <Stepper steps={[...journey.stages]} current={stageOf(here!) + 1} />
+          <!-- Per journey, for the same reason as the panel below: an answer can lead into another one. -->
+          {#key journey.id}
+            <Stepper steps={[...journey.stages]} current={stageOf(here!) + 1} />
+          {/key}
 
+          <!--
+            Rebuilt for every step, not updated in place. A browser translator (Chrome's, Edge's)
+            swaps the page's text nodes for its own; text Svelte then updates in place changes in
+            nodes nobody sees, and the old question stays on screen beside the new answers.
+            Fresh elements are translated afresh.
+          -->
+          {#key here}
           <div class="flow-panel">
             <div class="situation-journey">{journey.title}</div>
             {#if node.kind === 'question'}
@@ -136,6 +146,7 @@
               <button class="link-button" type="button" onclick={() => (path = [])}>Start over</button>
             </div>
           </div>
+          {/key}
         </div>
       </div>
     {/if}

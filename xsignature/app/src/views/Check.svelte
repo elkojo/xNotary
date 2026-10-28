@@ -160,7 +160,7 @@
 
           {#if fileName && !error}
             <div class="picked">
-              <div class="picked-name">{fileName}</div>
+              <div class="picked-name" translate="no">{fileName}</div>
               <div class="picked-facts">
                 {#if checking}
                   Checking…
@@ -272,10 +272,10 @@
                 <div><span>Location</span><strong>{result.location}</strong></div>
               {/if}
               {#if result.signedBy}
-                <div><span>Signed by</span><strong>{result.signedBy}</strong></div>
+                <div><span>Signed by</span><strong translate="no">{result.signedBy}</strong></div>
               {/if}
               {#if result.policy}
-                <div><span>Policy</span><code>{result.policy}</code></div>
+                <div><span>Policy</span><code translate="no">{result.policy}</code></div>
               {/if}
               {#if result.timestamp}
                 <div>
@@ -321,7 +321,7 @@
                     {#each result.chain as link}
                       <span>
                         {link.holds ? '✓' : '✗'}
-                        <strong>{link.subject}</strong> signed by <strong>{link.issuer}</strong>
+                        <strong translate="no">{link.subject}</strong> signed by <strong translate="no">{link.issuer}</strong>
                         {link.holds ? '' : ' — but that signature does not hold'}
                       </span>
                     {/each}
@@ -338,7 +338,7 @@
                 <div class="notice" class:warn={!supplied[index]?.links.length}>
                   <strong>This signature carries no issuer certificates.</strong>
                   Only the signer's own, which names its issuer:
-                  <strong>{result.issuedBy ?? 'not by any name it gives'}</strong>.<Info
+                  <strong translate="no">{result.issuedBy ?? 'not by any name it gives'}</strong>.<Info
                     >Most readers hold a well-known authority already, and an online one fetches it
                     by itself — which is why this often validates elsewhere without complaint. A
                     reader that does neither has a name and no way to trace it.</Info
@@ -364,7 +364,7 @@
                       {#each supplied[index].links as link}
                         <span>
                           {link.holds ? '✓' : '✗'}
-                          <strong>{link.subject}</strong> signed by <strong>{link.issuer}</strong>
+                          <strong translate="no">{link.subject}</strong> signed by <strong translate="no">{link.issuer}</strong>
                           {link.holds ? '' : ' — but that signature does not hold'}
                         </span>
                       {/each}
@@ -466,7 +466,7 @@
               Saying "verified" without this would be the dishonest version.
             -->
             <div class="notice">
-              <strong>Not checked:</strong> whether <em>{result.signedBy ?? 'that signer'}</em> is who
+              <strong>Not checked:</strong> whether <em translate="no">{result.signedBy ?? 'that signer'}</em> is who
               they say they are — open the file in a PDF reader for that.<Info
                 >That takes a list of trusted authorities, which this app chooses not to ship, and a
                 revocation check, which needs a network it does not use. The name above is read out
@@ -480,10 +480,10 @@
                   Where that check would go, uncalled:
                   <span class="outgoing-list">
                     {#if result.claims.ocspUrl}
-                      <span><strong>Asked at:</strong> <code>{result.claims.ocspUrl}</code></span>
+                      <span><strong>Asked at:</strong> <code translate="no">{result.claims.ocspUrl}</code></span>
                     {/if}
                     {#each result.claims.crlUrls as url}
-                      <span><strong>Listed at:</strong> <code>{url}</code></span>
+                      <span><strong>Listed at:</strong> <code translate="no">{url}</code></span>
                     {/each}
                   </span>
                 {/if}</Info

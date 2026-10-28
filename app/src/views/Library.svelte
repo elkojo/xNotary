@@ -5,6 +5,7 @@
   import { baseName, downloadBytes, formatDate } from '../lib/download';
   import { formatBytes } from '../site/size';
   import { fromHex, groupHex } from '../lib/hash';
+  import Fresh from '../site/Fresh.svelte';
   import {
     deleteCertificate,
     listCertificates,
@@ -178,7 +179,7 @@
           {#if pendingCount > 0}
             <button class="button ghost-dark small" onclick={upgradeAll} disabled={busyId !== null}>
               {#if busyId === '*'}<span class="spinner"></span>{/if}
-              Upgrade {pendingCount} pending proof{pendingCount === 1 ? '' : 's'}
+              <Fresh text={`Upgrade ${pendingCount} pending proof${pendingCount === 1 ? '' : 's'}`} />
             </button>
           {/if}
         </div>
@@ -203,8 +204,8 @@
           <div>
             <div class="table-row">
               <div>
-                <span class="doc-name">{record.fileName}</span>
-                <span class="doc-hash">{record.id.slice(0, 32)}…</span>
+                <span class="doc-name" translate="no">{record.fileName}</span>
+                <span class="doc-hash" translate="no">{record.id.slice(0, 32)}…</span>
               </div>
               <span class="table-value">{formatDate(record.createdAt)}</span>
               <span class="table-value">{formatBytes(record.fileSize)}</span>
@@ -231,7 +232,7 @@
                   {#if record.note}
                     <div class="review-row">
                       <span>Note</span>
-                      <strong>{record.note}</strong>
+                      <strong translate="no">{record.note}</strong>
                     </div>
                   {/if}
                   {#if record.status.kind === 'confirmed'}
@@ -241,12 +242,12 @@
                     </div>
                     <div class="review-row">
                       <span>Bitcoin block</span>
-                      <strong>{record.status.blockHeights.join(', ')}</strong>
+                      <strong translate="no">{record.status.blockHeights.join(', ')}</strong>
                     </div>
                   {:else if record.status.kind === 'pending'}
                     <div class="review-row">
                       <span>Waiting on</span>
-                      <strong>{record.status.calendars.join(', ')}</strong>
+                      <strong translate="no">{record.status.calendars.join(', ')}</strong>
                     </div>
                   {:else}
                     <div class="review-row">

@@ -9,6 +9,7 @@
 -->
 <script lang="ts">
   import type { Certificate } from 'pkijs';
+  import Fresh from '../../../../app/src/site/Fresh.svelte';
 
   import Info from '../../../../app/src/site/Info.svelte';
   import { findIssuers, siteDirectory } from '../lib/document/certificate/read/directory';
@@ -56,7 +57,7 @@
 
 <div class="action-group">
   <button class="button dark small" type="button" disabled={looking} onclick={() => void find()}>
-    {looking ? 'Looking…' : 'Fetch from the issuer directory'}
+    <Fresh text={looking ? 'Looking…' : 'Fetch from the issuer directory'} />
   </button>
   <Info label="About the issuer directory"
     >This site keeps a copy of every qualified issuer on the trusted lists of the EU, Switzerland and
@@ -98,7 +99,7 @@
       }}
     />
     <p class="field-note">
-      A <code>.pem</code>, <code>.crt</code> or <code>.p7b</code>. Read here; nothing is sent.
+      A <code translate="no">.pem</code>, <code translate="no">.crt</code> or <code translate="no">.p7b</code>. Read here; nothing is sent.
     </p>
   </div>
 {/if}

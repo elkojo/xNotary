@@ -5,6 +5,7 @@
   before the button does it. See update-check.ts.
 -->
 <script lang="ts">
+  import Fresh from './Fresh.svelte';
   import {
     dismissBuild,
     onHoldsChange,
@@ -45,7 +46,7 @@
     </span>
     <span class="update-actions">
       <button class="button dark small" type="button" onclick={refresh}
-        >{wouldLose ? 'Refresh anyway' : 'Refresh'}</button
+        ><Fresh text={wouldLose ? 'Refresh anyway' : 'Refresh'} /></button
       >
       <button class="button ghost-dark small" type="button" onclick={later}>Later</button>
     </span>
