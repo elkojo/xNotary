@@ -825,6 +825,33 @@
   let saveError = $state('');
 
   /**
+   * What the saved file turned out to carry, read back from the bytes that were downloaded by
+   * the Check screen's own reader — the level shown after saving is evidence, not intent.
+   */
+  let produced = $state<
+    | { readonly kind: 'signed'; readonly qualified: boolean }
+    | { readonly kind: 'none' }
+    | { readonly kind: 'unreadable'; readonly detail: string }
+    | null
+  >(null);
+
+  async function finish(out: Uint8Array<ArrayBuffer>) {
+    downloadBlob(new Blob([out], { type: 'application/pdf' }), signedName());
+    saved = true;
+    savedFor = destination;
+    if (!(wantCertificate && identity)) {
+      produced = { kind: 'none' };
+      return;
+    }
+    // Appended last, so the last signature of identity is the one just made.
+    const ours = (await checkSignatures(out)).filter((c) => c.kind === 'signature').at(-1);
+    produced =
+      ours?.verdict === 'intact' && ours.claims
+        ? { kind: 'signed', qualified: ours.claims.qualified }
+        : { kind: 'unreadable', detail: ours?.detail ?? 'No signature was found in it.' };
+  }
+
+  /**
    * Once a timestamp is saved, the notice about what will be sent has done its
    * job and the result says what was. Change where it would go, and the result
    * no longer describes the next save — so it goes, and the notice comes back
@@ -931,6 +958,7 @@
     answeredBy = null;
     passedOver = [];
     customError = '';
+    produced = null;
     try {
       // Re-open from the original bytes so that saving twice does not stamp a
       // document that was already stamped.
@@ -1008,16 +1036,12 @@
           out = (await signWithCertificate(out)).bytes;
         }
 
-        downloadBlob(new Blob([out], { type: 'application/pdf' }), signedName());
-        saved = true;
-        savedFor = destination;
+        await finish(out);
         return;
       }
 
       if (!wantTimestamp) {
-        downloadBlob(new Blob([out], { type: 'application/pdf' }), signedName());
-        saved = true;
-        savedFor = destination;
+        await finish(out);
         return;
       }
 
@@ -1031,17 +1055,13 @@
         stamped = result.timestamp;
         answeredBy = result.by;
         passedOver = result.passed;
-        downloadBlob(new Blob([result.bytes], { type: 'application/pdf' }), signedName());
-        saved = true;
-        savedFor = destination;
+        await finish(result.bytes);
       } catch (cause) {
         timestampError =
           cause instanceof Error
             ? cause.message
             : 'The timestamp could not be fetched, and the reason was not one the app recognises.';
-        downloadBlob(new Blob([out], { type: 'application/pdf' }), signedName());
-        saved = true;
-        savedFor = destination;
+        await finish(out);
       }
     } catch (cause) {
       saveError =
@@ -2149,6 +2169,23 @@
                 <div class="notice ok">
                   <strong>Saved.</strong>
                   A copy; the original is untouched.
+                </div>
+              {/if}
+
+              <!-- The level of what was saved, read back from the saved bytes (`finish`). -->
+              {#if produced?.kind === 'signed'}
+                <SignatureLevel qualified={produced.qualified} onQualifiedDevice={false}>
+                  Read back from the saved file. Made with a key file, so it cannot be a qualified
+                  signature.
+                </SignatureLevel>
+              {:else if produced?.kind === 'none'}
+                <SignatureLevel certificate={false}>
+                  {#if signature}The picture on it proves nothing about who put it there.{/if}
+                </SignatureLevel>
+              {:else if produced?.kind === 'unreadable'}
+                <div class="notice bad">
+                  <strong>The saved file does not read back as signed.</strong>
+                  {produced.detail} Do not rely on it; sign again.
                 </div>
               {/if}
               <SupportLink />
