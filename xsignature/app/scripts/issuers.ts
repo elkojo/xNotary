@@ -13,8 +13,11 @@
  * signatures are not checked, and need not be — the app takes a certificate from the directory
  * only when its key verifies the signer's certificate, so a wrong entry is harmless.
  *
- * A national list that cannot be read this time keeps the entries it had last time, and is
- * named in index.json, so a refresh on a bad day never silently shrinks the directory.
+ * A national server that cannot be reached — some sit behind bot checks that only a browser
+ * passes (Estonia's, on 2026-10-28), some do not answer (Finland's) — is read instead from the
+ * copy the European Commission republishes on its eIDAS dashboard; index.json says which lists
+ * came from there. A list neither can serve keeps the entries it had last time, and is named in
+ * index.json too, so a refresh on a bad day never silently shrinks the directory.
  * Commit what it writes; the build serves public/ as it is.
  */
 import { webcrypto } from 'node:crypto';
@@ -29,6 +32,8 @@ if (!globalThis.crypto) Object.defineProperty(globalThis, 'crypto', { value: web
 setEngine('node', new CryptoEngine({ name: 'node', crypto: globalThis.crypto }));
 
 const LOTL = 'https://ec.europa.eu/tools/lotl/eu-lotl.xml';
+/** The Commission's republished copy of each national list, by territory: the eIDAS dashboard's own download. */
+const MIRROR = (territory: string) => `https://eidas.ec.europa.eu/efda/api/v2/browse/eidas/tl/download/${territory}`;
 const CA_QC = 'http://uri.etsi.org/TrstSvc/Svctype/CA/QC';
 const OUT = fileURLToPath(new URL('../public/issuers/', import.meta.url));
 /** Some lists sit behind bot checks that turn away a client with no name. */
@@ -61,12 +66,20 @@ const pointers = all(lotl, 'OtherTSLPointer')
 const certificates: { der: Uint8Array; tl: string }[] = [];
 const lists: Record<string, number> = {};
 const missing: string[] = [];
+const mirrored: string[] = [];
 
 for (const { territory, url } of pointers) {
-  const xml = await get(url);
+  let xml = await get(url);
+  if (!xml) {
+    xml = await get(MIRROR(territory));
+    if (xml) {
+      mirrored.push(territory);
+      console.warn(`${territory}: could not read ${url} — read the Commission's copy instead`);
+    }
+  }
   if (!xml) {
     missing.push(territory);
-    console.warn(`${territory}: could not read ${url} — keeping its previous entries`);
+    console.warn(`${territory}: could not read ${url} or the Commission's copy — keeping its previous entries`);
     continue;
   }
   let count = 0;
@@ -102,9 +115,10 @@ for (const [name, shard] of Object.entries(shards)) writeFileSync(`${OUT}${name}
 writeFileSync(`${OUT}names.json`, JSON.stringify(names));
 writeFileSync(
   `${OUT}index.json`,
-  JSON.stringify({ asOf, source: LOTL, lists, missing: missing.sort() }, null, 2) + '\n',
+  JSON.stringify({ asOf, source: LOTL, lists, fromCommissionCopy: mirrored.sort(), missing: missing.sort() }, null, 2) + '\n',
 );
 
 const kept = Object.values(shards).reduce((n, s) => n + Object.keys(s.entries).length, 0);
 console.log(`\n${kept} issuer key identifiers in ${Object.keys(shards).length} shards, as of ${asOf}.`);
+if (mirrored.length) console.log(`Read from the Commission's copy: ${mirrored.join(', ')}`);
 if (missing.length) console.log(`Not read this time (previous entries kept): ${missing.join(', ')}`);
