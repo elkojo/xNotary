@@ -16,6 +16,8 @@
   import Info from '../../../../app/src/site/Info.svelte';
   import SignatureLevel from '../../../../app/src/site/SignatureLevel.svelte';
   import SupportLink from '../../../../app/src/site/SupportLink.svelte';
+  import type { Certificate } from 'pkijs';
+  import FindIssuers from './FindIssuers.svelte';
   import { holdRefresh } from '../../../../app/src/site/update-check';
   import { formatBytes } from '../../../../app/src/site/size';
   import { openPdf, UnreadablePdf, type OpenPdf } from '../lib/document/pdf/inspect';
@@ -602,17 +604,29 @@
    * exist.
    */
   let issuerName = $state('');
+  /** Where the directory found them, said once they are added. */
+  let issuerFrom = $state('');
   let issuerError = $state('');
-  let issuerInput = $state<HTMLInputElement | null>(null);
   let supplied = $state<Awaited<ReturnType<typeof readKeyFile>>[number]['chain']>([]);
   let links = $state<ChainLink[]>([]);
 
   /** The chain that will actually be embedded: the file's own, or what was added. */
   let chain = $derived(identity ? (identity.chain.length > 0 ? identity.chain : supplied) : []);
 
+  /** From the issuer directory, already walked and verified (FindIssuers). */
+  async function takeFoundIssuers(found: Certificate[], from: string) {
+    if (!identity) return;
+    issuerError = '';
+    supplied = found;
+    issuerName = 'The issuer directory';
+    issuerFrom = from;
+    links = await checkLinks(identity.certificate, found);
+  }
+
   async function takeIssuers(file: File | undefined) {
     if (!file || !identity) return;
     issuerError = '';
+    issuerFrom = '';
     const found = readCertificates(new Uint8Array(await file.arrayBuffer()));
 
     if (found.length === 0) {
@@ -639,8 +653,8 @@
     supplied = [];
     links = [];
     issuerName = '';
+    issuerFrom = '';
     issuerError = '';
-    if (issuerInput) issuerInput.value = '';
   }
 
   // A different key means a different chain; keeping the old one would embed
@@ -1805,47 +1819,23 @@
                     <div class="notice">
                       <strong>This file holds no issuer certificates.</strong>
                       Without them, a reader that lacks <strong>{identity.issuer}</strong> shows your
-                      name with no way to check it.
-                      {#if signerClaims?.issuerUrl}
-                        Your certificate says where that one is published:
-                        <span class="outgoing-list">
-                          <span>
-                            <strong>Published at:</strong>
-                            <!-- A link the reader follows, never a request this app makes. -->
-                            <a href={signerClaims.issuerUrl} target="_blank" rel="noopener noreferrer">
-                              {signerClaims.issuerUrl}
-                            </a>
-                          </span>
-                        </span>
-                        Fetch it and add it below, or re-export the key file with its full
-                        certification path.<Info
-                          >Online readers often follow that address themselves — but a signature that
-                          encloses its chain does not depend on them being online, and this app will
-                          not fetch it for you.</Info
-                        >
-                      {:else}
-                        Add them below, or re-export the key file with its full certification path
-                        — your authority publishes both.
-                      {/if}
+                      name with no way to check it.<Info
+                        >A signature that encloses its chain does not depend on the reader being
+                        online, or already holding the authority. Re-exporting the key file with its
+                        full certification path does the same.</Info
+                      >
                     </div>
+                    {#key identity}
+                      <FindIssuers
+                        leaf={identity.certificate}
+                        issuerUrl={signerClaims?.issuerUrl ?? null}
+                        onfound={(chain, from) => void takeFoundIssuers(chain, from)}
+                        onfile={(file) => void takeIssuers(file)}
+                      />
+                    {/key}
                   {/if}
 
                   {#if identity.chain.length === 0}
-                    <div class="field">
-                      <span class="field-label">Issuer certificates</span>
-                      <input
-                        bind:this={issuerInput}
-                        class="input"
-                        type="file"
-                        accept=".pem,.crt,.cer,.p7b,.p7c,application/x-pkcs7-certificates"
-                        onchange={(event) => void takeIssuers(event.currentTarget.files?.[0])}
-                      />
-                      <p class="field-note">
-                        A <code>.pem</code>, <code>.crt</code> or <code>.p7b</code>. Public, embedded
-                        in the signature; nothing is sent.
-                      </p>
-                    </div>
-
                     {#if issuerError}
                       <div class="notice bad">{issuerError}</div>
                     {/if}
@@ -1853,6 +1843,7 @@
                     {#if supplied.length > 0}
                       <div class="notice ok">
                         <strong>{issuerName} continues this chain.</strong>
+                        {issuerFrom}
                         <span class="outgoing-list">
                           {#each links as link}
                             <span>

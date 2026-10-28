@@ -20,7 +20,8 @@
     "dump:draw": "vite-node scripts/dump-draw-svg.ts",
     "check:png": "echo \"npm run dev, then open http://localhost:5173/scripts/png-check.html and read the console\"",
     "dump:stamp": "vite-node scripts/dump-stamp-pdf.ts",
-    "check:key": "vite-node scripts/check-key-file.ts"
+    "check:key": "vite-node scripts/check-key-file.ts",
+    "issuers:refresh": "vite-node scripts/issuers.ts"
   },
   "devDependencies": {
     "@expo-google-fonts/allura": "^0.4.2",

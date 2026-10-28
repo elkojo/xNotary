@@ -79,7 +79,7 @@ export function readCertificates(bytes: Uint8Array): Certificate[] {
 }
 
 /** Two names are the same when their encodings are. */
-function sameName(a: Certificate['subject'], b: Certificate['issuer']): boolean {
+export function sameName(a: Certificate['subject'], b: Certificate['issuer']): boolean {
   const left = new Uint8Array(a.toSchema().toBER(false));
   const right = new Uint8Array(b.toSchema().toBER(false));
   return left.length === right.length && left.every((byte, index) => byte === right[index]);

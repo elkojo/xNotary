@@ -155,7 +155,7 @@ export interface GeneratedChain {
  * the signatures between the three genuinely verify — a chain assembled from
  * unrelated certificates would pass a test that only compared names.
  */
-export async function makeChain(password = 'test123'): Promise<GeneratedChain> {
+export async function makeChain(password = 'test123', options: { readonly keyIds?: boolean } = {}): Promise<GeneratedChain> {
   const utf8 = (value: string) => ({
     value,
     valueTagClass: forge.asn1.Type.UTF8 as unknown as number,
@@ -202,13 +202,34 @@ export async function makeChain(password = 'test123'): Promise<GeneratedChain> {
     return cert;
   }
 
+  /**
+   * With key identifiers, as real authorities issue them: each certificate states its own,
+   * and the one it was signed by. Without, a chain can only be followed by name.
+   */
+  function identified(
+    cert: forge.pki.Certificate,
+    issuer: forge.pki.Certificate,
+    signingKey: forge.pki.rsa.PrivateKey,
+    ca: boolean,
+  ) {
+    if (!options.keyIds) return cert;
+    cert.setExtensions([
+      { name: 'basicConstraints', cA: ca },
+      { name: 'subjectKeyIdentifier' },
+      { name: 'authorityKeyIdentifier', keyIdentifier: issuer.generateSubjectKeyIdentifier().getBytes() },
+    ]);
+    cert.sign(signingKey, forge.md.sha256.create());
+    return cert;
+  }
+
   const rootName = nameFor('Test Root CA');
   const interName = nameFor('Test Issuing CA');
   const leafName = nameFor('Jiří Novák');
 
   const root = certificate(rootName, rootName, rootKey, rootKey, '01', true);
-  const intermediate = certificate(interName, rootName, interKey, rootKey, '02', true);
-  const leaf = certificate(leafName, interName, leafKey, interKey, '03', false);
+  identified(root, root, rootKey, true);
+  const intermediate = identified(certificate(interName, rootName, interKey, rootKey, '02', true), root, rootKey, true);
+  const leaf = identified(certificate(leafName, interName, leafKey, interKey, '03', false), intermediate, interKey, false);
 
   const der = (cert: forge.pki.Certificate) =>
     fromBinary(forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes());

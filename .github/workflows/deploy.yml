@@ -206,6 +206,8 @@ jobs:
           done
           test -s dist/xconvert/THIRD-PARTY.txt || { echo '::error::dist/xconvert/THIRD-PARTY.txt is missing'; exit 1; }
           test -s dist/xconvert/licences/pandoc-wasm-loader-MIT.txt || { echo "::error::the pandoc loader's MIT notice is missing"; exit 1; }
+          test -s dist/xsignature/issuers/index.json || { echo '::error::the issuer directory is missing from dist/xsignature/issuers/'; exit 1; }
+          test "$(ls dist/xsignature/issuers/ | wc -l)" -gt 200 || { echo '::error::the issuer directory has too few shards'; exit 1; }
           grep -q '"build":' dist/version.json || { echo '::error::dist/version.json is missing — open pages could never learn of a new release'; exit 1; }
           grep -A1 '^/version.json' dist/_headers | grep -q 'no-store' || { echo '::error::/version.json is not served no-store'; exit 1; }
           grep -q 'registration.unregister' dist/sw.js || { echo '::error::dist/sw.js, which retires the pre-0.5.0 worker, is missing'; exit 1; }
