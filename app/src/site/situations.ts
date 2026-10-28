@@ -18,7 +18,9 @@
  * on screen. It is the one route here that is specific to one country, and it is shown only
  * when the document goes to Czechia.
  */
+import type { Lang } from './lang.svelte';
 import type { ServiceId } from './services';
+import { JOURNEYS_CS, LIGHTS_CS, NODES_CS, SOURCES_CS, type OutcomeCs, type QuestionCs } from './situations.cs';
 
 export type NodeId = string;
 export type JourneyId = 'official' | 'sign' | 'poa' | 'proof' | 'check' | 'copy' | 'company' | 'property' | 'abroad';
@@ -563,7 +565,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     journey: 'company',
     light: 'online',
     title: 'Sign it with a recognised electronic signature',
-    lead: 'Where the register requires an officially verified signature on such a document, the Czech online route applies: a recognised electronic signature on a qualified certificate that the register can tie to you (§ 6(2) of Act 12/2020 Coll.).',
+    lead: 'Where the register requires an officially verified signature on such a document, the Czech online route applies: a recognised electronic signature on a qualified certificate that can be tied to you through the population register (§ 6(2) of Act 12/2020 Coll.).',
     steps: CZ_ROUTE_STEPS,
     go: [{ service: 'xsignature', page: 'document', label: 'Sign a PDF' }],
     sources: [S.dia, S.act12, S.portal, S.act297],
@@ -699,4 +701,36 @@ export const journeyOf = (node: NodeId): Journey => JOURNEYS.find((j) => j.id ==
 export function stageOf(node: NodeId): number {
   const n = NODES[node];
   return n.kind === 'question' ? n.stage : journeyOf(node).stages.length - 1;
+}
+
+/**
+ * The journeys, nodes and lights in `lang`. English is the source; another language replaces the
+ * words and keeps everything else — the graph, the lights, the sources' addresses — from it.
+ */
+export function situationsIn(lang: Lang): {
+  journeys: readonly Journey[];
+  nodes: Readonly<Record<NodeId, SituationNode>>;
+  lights: typeof LIGHTS;
+} {
+  if (lang === 'en') return { journeys: JOURNEYS, nodes: NODES, lights: LIGHTS };
+  const journeys = JOURNEYS.map((j) => ({ ...j, ...JOURNEYS_CS[j.id] }));
+  const nodes: Record<NodeId, SituationNode> = {};
+  for (const [id, node] of Object.entries(NODES)) {
+    const cs = NODES_CS[id];
+    if (node.kind === 'question') {
+      const q = cs as QuestionCs;
+      nodes[id] = { ...node, title: q.title, lead: q.lead, answers: node.answers.map((a, i) => ({ ...a, ...q.answers[i] })) };
+    } else {
+      const o = cs as OutcomeCs;
+      nodes[id] = {
+        ...node,
+        title: o.title,
+        lead: o.lead,
+        steps: o.steps,
+        go: node.go.map((g, i) => ({ ...g, label: o.go[i] })),
+        sources: node.sources?.map((s) => ({ ...s, label: SOURCES_CS[s.url] ?? s.label })),
+      };
+    }
+  }
+  return { journeys, nodes, lights: LIGHTS_CS };
 }

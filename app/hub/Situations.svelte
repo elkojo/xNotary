@@ -11,8 +11,9 @@
   import Info from '../src/site/Info.svelte';
   import SiteBar from '../src/site/SiteBar.svelte';
   import Stepper from '../src/site/Stepper.svelte';
+  import { pick, site } from '../src/site/lang.svelte';
   import { TASKS, pageHref } from '../src/site/services';
-  import { JOURNEYS, LIGHTS, NODES, journeyOf, stageOf, type NodeId } from '../src/site/situations';
+  import { JOURNEYS, NODES, journeyOf, situationsIn, stageOf, type NodeId } from '../src/site/situations';
   import HubFooter from './HubFooter.svelte';
 
   let menu = $state<'services' | 'tasks' | null>(null);
@@ -35,9 +36,44 @@
     return () => removeEventListener('hashchange', open);
   });
 
+  /** The same graph in the chosen language (situations.ts, situations.cs.ts). */
+  const words = $derived(situationsIn(site.lang));
   const here = $derived(path.at(-1) ?? null);
-  const node = $derived(here ? NODES[here] : null);
-  const journey = $derived(here ? journeyOf(here) : null);
+  const node = $derived(here ? words.nodes[here] : null);
+  const journey = $derived(here ? words.journeys.find((j) => j.id === journeyOf(here).id)! : null);
+
+  const TEXT = {
+    en: {
+      title: 'What do you need to do?',
+      intro: 'A few questions, then the right tool — or what to ask first.',
+      nothingSent: 'Nothing is sent',
+      nothingSentInfo: 'Your answers stay in this page. Nothing is sent and nothing is stored.',
+      other: 'Something else',
+      back: 'Back',
+      startOver: 'Start over',
+      sources: 'Sources',
+      checked: 'checked',
+      notAdvice: 'Information, not legal advice. Rules change; the recipient has the last word.',
+      foot: 'Document tools and guidance, not notarial services or legal advice. What a recipient accepts depends on the country, the document and the recipient.',
+    },
+    cs: {
+      title: 'Co potřebujete vyřídit?',
+      intro: 'Pár otázek a pak správný nástroj — nebo na co se nejdřív zeptat.',
+      nothingSent: 'Nic se neodesílá',
+      nothingSentInfo: 'Odpovědi zůstávají na této stránce. Nic se neodesílá ani neukládá.',
+      other: 'Něco jiného',
+      back: 'Zpět',
+      startOver: 'Začít znovu',
+      sources: 'Zdroje',
+      checked: 'ověřeno',
+      notAdvice: 'Informace, ne právní rada. Pravidla se mění; poslední slovo má příjemce.',
+      foot: 'Nástroje pro dokumenty a orientace v nich, ne notářské služby ani právní poradenství. Co příjemce přijme, záleží na zemi, na dokumentu a na příjemci.',
+    },
+  };
+  const t = $derived(pick(TEXT));
+  $effect(() => {
+    document.documentElement.lang = site.lang;
+  });
 
   /** Covered by a journey's outcome; the rest are listed under "Something else". */
   const routed = new Set(['xsignature/document', 'xsignature/signature', 'xsignature/check', 'xnotary/notarize', 'xnotary/verify']);
@@ -54,17 +90,17 @@
   <div class="workspace">
     <div class="page-head">
       <div>
-        <h1>What do you need to do?</h1>
-        <p>A few questions, then the right tool — or what to ask first.</p>
+        <h1>{t.title}</h1>
+        <p>{t.intro}</p>
       </div>
       <span class="secure-note"
-        >Nothing is sent<Info>Your answers stay in this page. Nothing is sent and nothing is stored.</Info></span
+        >{t.nothingSent}<Info>{t.nothingSentInfo}</Info></span
       >
     </div>
 
     {#if !node || !journey}
       <div class="situation-grid">
-        {#each JOURNEYS as j, i}
+        {#each words.journeys as j, i}
           <button class="situation-card" class:lead={i === 0} type="button" onclick={() => begin(j.first)}>
             <strong>{j.title}</strong>
             <span>{j.description}</span>
@@ -72,10 +108,10 @@
         {/each}
       </div>
 
-      <h2 class="situations-other">Something else</h2>
+      <h2 class="situations-other">{t.other}</h2>
       <div class="situation-links">
         {#each others as task}
-          <a href={pageHref(task.service, task.page)}>{task.title}</a>
+          <a href={pageHref(task.service, task.page)}>{site.lang === 'cs' ? task.cs.title : task.title}</a>
         {/each}
       </div>
     {:else}
@@ -112,8 +148,8 @@
                   class="pill"
                   class:good={node.light === 'online'}
                   class:waiting={node.light === 'assisted'}
-                  class:bad={node.light === 'in-person'}>{LIGHTS[node.light].label}</span
-                ><span>{LIGHTS[node.light].line}</span>
+                  class:bad={node.light === 'in-person'}>{words.lights[node.light].label}</span
+                ><span>{words.lights[node.light].line}</span>
               </div>
               <h2 class="panel-title">{node.title}</h2>
               <p class="panel-copy">{node.lead}</p>
@@ -130,20 +166,20 @@
               {#if node.sources?.length}
                 <!-- The rules this rests on, as published by those who make them, and when we read them. -->
                 <div class="situation-sources">
-                  <strong>Sources</strong>, checked {node.checked}:
+                  <strong>{t.sources}</strong>, {t.checked} {node.checked}:
                   <ul>
                     {#each node.sources as source}
                       <li><a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a></li>
                     {/each}
                   </ul>
-                  Information, not legal advice. Rules change; the recipient has the last word.
+                  {t.notAdvice}
                 </div>
               {/if}
             {/if}
 
             <div class="situation-nav">
-              <button class="link-button" type="button" onclick={() => (path = path.slice(0, -1))}>Back</button>
-              <button class="link-button" type="button" onclick={() => (path = [])}>Start over</button>
+              <button class="link-button" type="button" onclick={() => (path = path.slice(0, -1))}>{t.back}</button>
+              <button class="link-button" type="button" onclick={() => (path = [])}>{t.startOver}</button>
             </div>
           </div>
           {/key}
@@ -152,8 +188,7 @@
     {/if}
 
     <p class="situations-foot">
-      Document tools and guidance, not notarial services or legal advice. What a recipient accepts
-      depends on the country, the document and the recipient.
+      {t.foot}
     </p>
   </div>
 </main>

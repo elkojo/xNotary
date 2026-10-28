@@ -1,10 +1,40 @@
 <script lang="ts">
   import SiteBar from '../src/site/SiteBar.svelte';
-  import { SERVICES, SITUATIONS_HREF } from '../src/site/services';
-  import { JOURNEYS } from '../src/site/situations';
+  import { pick, site } from '../src/site/lang.svelte';
+  import { SERVICES, SITUATIONS_HREF, TABS_CS } from '../src/site/services';
+  import { situationsIn } from '../src/site/situations';
   import HubFooter from './HubFooter.svelte';
 
   let menu = $state<'services' | 'tasks' | null>(null);
+
+  const TEXT = {
+    en: {
+      eyebrow: 'Independent document tools',
+      lead: 'What do you need to',
+      mark: 'do?',
+      intro: 'Choose your situation. A few questions lead to the tool that does it — or to what to ask first.',
+      tools: 'Or go straight to a tool',
+      more: 'More services',
+      next: 'Next, perhaps: remote multiparty agreements.',
+      trust: ['No document upload', 'No account', 'No backend', 'Open source'],
+    },
+    cs: {
+      eyebrow: 'Nezávislé nástroje pro dokumenty',
+      lead: 'Co potřebujete',
+      mark: 'vyřídit?',
+      intro: 'Vyberte svou situaci. Pár otázek vás dovede k nástroji, který to udělá — nebo k tomu, na co se nejdřív zeptat.',
+      tools: 'Nebo rovnou k nástroji',
+      more: 'Další služby',
+      next: 'Příště možná: smlouvy více stran na dálku.',
+      trust: ['Bez nahrávání dokumentů', 'Bez účtu', 'Bez serveru', 'Otevřený kód'],
+    },
+  };
+  const t = $derived(pick(TEXT));
+  const journeys = $derived(situationsIn(site.lang).journeys);
+  /** This page is wholly in the chosen language, so it says so: a translator then leaves it alone. */
+  $effect(() => {
+    document.documentElement.lang = site.lang;
+  });
 </script>
 
 <SiteBar bind:menu />
@@ -13,9 +43,9 @@
   <section class="home hub">
     <div class="home-wrap">
       <div class="hero">
-        <div class="eyebrow">Independent document tools</div>
-        <h1>What do you need to <mark class="hlm">do?</mark></h1>
-        <p>Choose your situation. A few questions lead to the tool that does it — or to what to ask first.</p>
+        <div class="eyebrow">{t.eyebrow}</div>
+        <h1>{t.lead} <mark class="hlm">{t.mark}</mark></h1>
+        <p>{t.intro}</p>
       </div>
 
       <!--
@@ -24,7 +54,7 @@
         on /situations/.
       -->
       <div class="situation-grid hub-situations">
-        {#each JOURNEYS as j, i}
+        {#each journeys as j, i}
           <a class="situation-card" class:lead={i === 0} href={`${SITUATIONS_HREF}#${j.id}`}>
             <strong>{j.title}</strong>
             <span>{j.description}</span>
@@ -32,7 +62,7 @@
         {/each}
       </div>
 
-      <h2 class="hub-tools-head">Or go straight to a tool</h2>
+      <h2 class="hub-tools-head">{t.tools}</h2>
       <div class="product-grid">
         {#each SERVICES as s}
           <a class="product-card" href={s.href}>
@@ -41,10 +71,10 @@
               <h2 translate="no">{s.name}</h2>
               <span class="kicker" aria-hidden="true">↗</span>
             </div>
-            <p>{s.description}</p>
+            <p>{site.lang === 'cs' ? s.cs.description : s.description}</p>
             <div class="pages">
               {#each s.tabs.slice(0, 4) as tab}
-                <span class="chip">{tab.label}</span>
+                <span class="chip">{site.lang === 'cs' ? (TABS_CS[tab.label] ?? tab.label) : tab.label}</span>
               {/each}
             </div>
           </a>
@@ -52,17 +82,14 @@
         <div class="product-card soon">
           <div class="top">
             <span class="brand-mark"><span>+</span></span>
-            <h2>More services</h2>
+            <h2>{t.more}</h2>
           </div>
-          <p>Next, perhaps: remote multiparty agreements.</p>
+          <p>{t.next}</p>
         </div>
       </div>
 
       <div class="trust-row">
-        <span>No document upload</span>
-        <span>No account</span>
-        <span>No backend</span>
-        <span>Open source</span>
+        {#each t.trust as item}<span>{item}</span>{/each}
       </div>
     </div>
   </section>

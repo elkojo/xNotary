@@ -779,3 +779,37 @@ a.situation-card {
 .hub-tools-head + .product-grid {
   margin-top: 18px;
 }
+
+/* ------------------------------------------------------------ language -- */
+/* The switcher, in the bar beside "I want to…"; and, on a service screen shown in another
+   language than its own, one line saying so (SiteBar.svelte, lang.svelte.ts). */
+
+.lang-switch {
+  display: inline-flex;
+  margin-left: 10px;
+  border: 1px solid var(--bar-line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.lang-switch button {
+  padding: 6px 9px;
+  border: 0;
+  color: var(--bar-fg);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+.lang-switch button.on {
+  color: var(--primary-fg);
+  background: var(--primary-bg);
+}
+.lang-note {
+  padding: 6px 16px;
+  border-top: 1px solid var(--line-dark);
+  color: var(--ink-soft);
+  background: var(--well);
+  font-size: 12.5px;
+  text-align: center;
+}

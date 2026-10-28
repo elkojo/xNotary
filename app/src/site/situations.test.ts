@@ -122,3 +122,86 @@ describe('what it may say', () => {
     expect(textOf(NODES['copy-what'])).toMatch(/not a certified copy/);
   });
 });
+
+import { FORBIDDEN_CS, GLOSSARY_CS } from './glossary';
+import { JOURNEYS_CS, NODES_CS, SOURCES_CS } from './situations.cs';
+import { situationsIn } from './situations';
+
+describe('the Czech', () => {
+  const cs = situationsIn('cs');
+  const textCs = (id: string) => textOf(cs.nodes[id]);
+
+  it('mirrors the English shape exactly: every journey, node, answer, step and link', () => {
+    expect(Object.keys(JOURNEYS_CS).sort()).toEqual(JOURNEYS.map((j) => j.id).sort());
+    expect(Object.keys(NODES_CS).sort()).toEqual(Object.keys(NODES).sort());
+    for (const j of JOURNEYS) expect(JOURNEYS_CS[j.id].stages.length, j.id).toBe(j.stages.length);
+    for (const [id, node] of Object.entries(NODES)) {
+      const c = NODES_CS[id];
+      if (node.kind === 'question') {
+        expect('answers' in c && c.answers.length, id).toBe(node.answers.length);
+        if ('answers' in c) node.answers.forEach((a, i) => expect(Boolean(c.answers[i].hint), `${id}#${i} hint`).toBe(Boolean(a.hint)));
+      } else {
+        expect('steps' in c && c.steps.length, id).toBe(node.steps.length);
+        expect('go' in c && c.go.length, id).toBe(node.go.length);
+      }
+    }
+  });
+
+  it('keeps the graph, the lights and the sources’ addresses from the English', () => {
+    for (const [id, node] of Object.entries(NODES)) {
+      const c = cs.nodes[id];
+      expect(c.kind, id).toBe(node.kind);
+      if (node.kind === 'question' && c.kind === 'question') expect(c.answers.map((a) => a.next), id).toEqual(node.answers.map((a) => a.next));
+      if (node.kind === 'outcome' && c.kind === 'outcome') {
+        expect(c.light, id).toBe(node.light);
+        expect(c.sources?.map((s) => s.url), id).toEqual(node.sources?.map((s) => s.url));
+        expect(c.go.map((g) => `${g.service}/${g.page}`), id).toEqual(node.go.map((g) => `${g.service}/${g.page}`));
+      }
+    }
+  });
+
+  it('names every source in Czech', () => {
+    for (const [, outcome] of outcomes) for (const s of outcome.sources ?? []) expect(SOURCES_CS[s.url], s.url).toBeTruthy();
+  });
+
+  it('uses the statutory term wherever the English uses the legal term', () => {
+    for (const id of Object.keys(NODES)) {
+      const en = textOf(NODES[id]);
+      const c = textCs(id);
+      for (const term of GLOSSARY_CS) if (term.en.test(en)) expect(c, `${id}: ${term.note}`).toMatch(term.cs);
+    }
+  });
+
+  it('never uses a near miss, or claims an official act', () => {
+    const all = Object.keys(NODES).map(textCs).join(' ') + ' ' + Object.values(JOURNEYS_CS).map((j) => `${j.title} ${j.description}`).join(' ');
+    for (const f of FORBIDDEN_CS) expect(all, f.why).not.toMatch(f.cs);
+    expect(all).not.toMatch(/https?:\/\//);
+  });
+
+  it('keeps every limit the English states', () => {
+    expect(textCs('official-cz')).toMatch(/tato stránka to neověřuje a ani nemůže/);
+    for (const id of ['official-cz', 'company-filing']) expect(textCs(id), id).toMatch(/§ 6 odst\. 3/);
+    expect(textCs('poa-deed')).toMatch(/nevztahuje \(§ 6 odst\. 3\)/);
+    expect(textCs('sign-keyfile')).toMatch(/nikdy kvalifikovaný/);
+    expect(textCs('abroad-esig-eu')).toMatch(/zaručený, ne kvalifikovaný/);
+    expect(textCs('sign-picture')).toMatch(/nic nedokazuje/);
+    expect(textCs('copy-what')).toMatch(/nejsou ověřená kopie/);
+  });
+});
+
+describe('the glossary itself', () => {
+  it('catches the near misses it exists for', () => {
+    const caught = (text: string) => FORBIDDEN_CS.some((f) => f.cs.test(text));
+    expect(caught('pokročilý elektronický podpis')).toBe(true);
+    expect(caught('uznaný elektronický podpis')).toBe(true);
+    expect(caught('notarizace dokumentu')).toBe(true);
+    expect(caught('xNotary ověří váš podpis')).toBe(true);
+    expect(caught('tato stránka to neověřuje a ani nemůže')).toBe(false);
+  });
+
+  it('requires the statutory term in every inflection', () => {
+    const term = GLOSSARY_CS.find((t) => t.note.startsWith('uznávaný'))!;
+    for (const form of ['uznávaný elektronický podpis', 'uznávaným elektronickým podpisem', 'uznávaného elektronického podpisu'])
+      expect(form).toMatch(term.cs);
+  });
+});

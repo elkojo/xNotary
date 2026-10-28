@@ -1,5 +1,6 @@
 <!-- The footer of the site's own pages: the front page and /support/. -->
 <script lang="ts">
+  import { site } from '../src/site/lang.svelte';
   import { SERVICES } from '../src/site/services';
   import { SUPPORT_HREF } from '../src/site/support';
 
@@ -16,14 +17,24 @@
       {#each SERVICES as s}
         <a href={s.href}>{s.name}{s.external ? ' ↗' : ''}</a>
       {/each}
-      <a href={SUPPORT_HREF}>Support</a>
+      <a href={SUPPORT_HREF}>{site.lang === 'cs' ? 'Podpora' : 'Support'}</a>
     </div>
-    Your documents never leave your device. Free and open source under the
-    <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">
-      AGPL-3.0</a
-    >{#if revisionUrl}, built from
-      <a href={revisionUrl} target="_blank" rel="noopener noreferrer"
-        ><span class="mono">{revision}</span></a
-    >{/if}. <a href="/THIRD-PARTY.txt">Third-party code</a>. Not legal advice.
+    {#if site.lang === 'cs'}
+      Vaše dokumenty nikdy neopustí vaše zařízení. Svobodný a otevřený software pod licencí
+      <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">
+        AGPL-3.0</a
+      >{#if revisionUrl}, sestavený z
+        <a href={revisionUrl} target="_blank" rel="noopener noreferrer"
+          ><span class="mono" translate="no">{revision}</span></a
+      >{/if}. <a href="/THIRD-PARTY.txt">Kód třetích stran</a>. Nejde o právní radu.
+    {:else}
+      Your documents never leave your device. Free and open source under the
+      <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">
+        AGPL-3.0</a
+      >{#if revisionUrl}, built from
+        <a href={revisionUrl} target="_blank" rel="noopener noreferrer"
+          ><span class="mono" translate="no">{revision}</span></a
+      >{/if}. <a href="/THIRD-PARTY.txt">Third-party code</a>. Not legal advice.
+    {/if}
   </div>
 </footer>
