@@ -4,24 +4,30 @@
   src/site/situations.ts, where its limits are tested; this only walks it.
 
   The answers stay in this page: nothing is sent and nothing is stored. A journey can be opened
-  directly as /situations/#sign (or #official, #proof, #check).
+  directly as /situations/#sign (any journey id), and a single step as /situations/#sign-nocert
+  (any node id) — which is how xSignature points a reader without a certificate here.
 -->
 <script lang="ts">
   import Info from '../src/site/Info.svelte';
   import SiteBar from '../src/site/SiteBar.svelte';
   import Stepper from '../src/site/Stepper.svelte';
   import { TASKS, pageHref } from '../src/site/services';
-  import { JOURNEYS, NODES, journeyOf, stageOf, type NodeId } from '../src/site/situations';
+  import { JOURNEYS, LIGHTS, NODES, journeyOf, stageOf, type NodeId } from '../src/site/situations';
   import HubFooter from './HubFooter.svelte';
 
   let menu = $state<'services' | 'tasks' | null>(null);
   /** The questions answered so far, and where they led; the last is on screen. */
   let path = $state<NodeId[]>(fromHash());
 
-  /** `#sign` and the like open that journey — on arrival, and when the hash changes later. */
+  /**
+   * `#sign` and the like open that journey; `#sign-nocert` and the like open that very step —
+   * on arrival, and when the hash changes later.
+   */
   function fromHash(): NodeId[] {
-    const journey = JOURNEYS.find((j) => `#${j.id}` === location.hash);
-    return journey ? [journey.first] : [];
+    const id = decodeURIComponent(location.hash.slice(1));
+    const journey = JOURNEYS.find((j) => j.id === id);
+    if (journey) return [journey.first];
+    return id in NODES ? [id] : [];
   }
   $effect(() => {
     const open = () => (path = fromHash());
@@ -91,7 +97,14 @@
                 {/each}
               </div>
             {:else}
-              <span class="pill" class:good={!node.status.warn} class:waiting={node.status.warn}>{node.status.text}</span>
+              <div class="situation-light">
+                <span
+                  class="pill"
+                  class:good={node.light === 'online'}
+                  class:waiting={node.light === 'assisted'}
+                  class:bad={node.light === 'in-person'}>{LIGHTS[node.light].label}</span
+                ><span>{LIGHTS[node.light].line}</span>
+              </div>
               <h2 class="panel-title">{node.title}</h2>
               <p class="panel-copy">{node.lead}</p>
               <ol class="outcome-steps">
@@ -102,6 +115,18 @@
                   {#each node.go as go, i}
                     <a class="button small {i === 0 ? 'dark' : 'ghost-dark'}" href={pageHref(go.service, go.page)}>{go.label}</a>
                   {/each}
+                </div>
+              {/if}
+              {#if node.sources?.length}
+                <!-- The rules this rests on, as published by those who make them, and when we read them. -->
+                <div class="situation-sources">
+                  <strong>Sources</strong>, checked {node.checked}:
+                  <ul>
+                    {#each node.sources as source}
+                      <li><a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a></li>
+                    {/each}
+                  </ul>
+                  Information, not legal advice. Rules change; the recipient has the last word.
                 </div>
               {/if}
             {/if}
