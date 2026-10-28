@@ -1658,6 +1658,15 @@
                   <span class="check-note">Never a qualified signature: a key file can be copied.</span>
                 </span>
               </label>
+              {#if !identities}
+                <!--
+                  The dead end the beta testers hit: no certificate, and nothing saying how to get
+                  one. The site's own guide, not another service (CLAUDE.md, the second exception).
+                -->
+                <p class="field-note">
+                  No certificate? <a href="/situations/#sign-nocert">How to get one</a>
+                </p>
+              {/if}
             </div>
 
             {#if wantCertificate}
