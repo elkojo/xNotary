@@ -2013,28 +2013,18 @@
             <div class="field timestamp-field">
               <label class="check">
                 <input type="checkbox" bind:checked={wantTimestamp} />
-                <span>
-                  <strong>Add a timestamp</strong>
-                  <span class="check-note">Sends a 32-byte digest — shown below before it goes.</span>
-                </span>
+                <span><strong>Add a timestamp</strong></span>
               </label>
             </div>
 
             {#if wantTimestamp}
-              <div class="field">
-                <span class="field-label" id="tsa-choice-label"
-                  >Timestamp authority<Info
-                    >Who independently dates it. Not the certificate you sign with, and it neither
-                    issues nor checks that certificate.</Info
-                  ></span
-                >
-                <select
-                  id="tsa-choice"
-                  class="input"
-                  aria-labelledby="tsa-choice-label"
-                  bind:value={choice}
-                >
-                  <option value={AUTOMATIC}>Automatic — the first qualified one that answers</option>
+              <!--
+                One choice on screen; what it means, in the ⓘ beside it. The default answers for
+                almost everyone, so the explanation is there for those who change it.
+              -->
+              <div class="field select-row">
+                <select id="tsa-choice" class="input" aria-label="Timestamp authority" bind:value={choice}>
+                  <option value={AUTOMATIC}>Automatic (recommended)</option>
                   {#each STANDINGS as standing}
                     <optgroup label={standing.label}>
                       {#each AUTHORITIES.filter(standing.has) as option}
@@ -2044,18 +2034,20 @@
                   {/each}
                   <option value={CUSTOM}>Your own authority…</option>
                 </select>
-                <p class="field-note">
-                  {#if choice === AUTOMATIC}
+                <Info label="About the timestamp authority"
+                  >{#if choice === AUTOMATIC}
                     Asks {automaticOrder()
                       .map((a) => a.signedBy)
                       .join(', then ')} in turn, and stops at the first that answers. Each is qualified
                     (eIDAS) and recognised by Acrobat.
                   {:else if authority}
-                    {summary(authority)}<Info>{authority.note}</Info>
+                    {summary(authority)} {authority.note}
                   {:else}
                     Any RFC 3161 authority, if it allows requests from a web page.
                   {/if}
-                </p>
+                  The authority only dates the file: it neither issues nor checks the certificate you
+                  sign with.</Info
+                >
               </div>
 
               {#if useCustom}
@@ -2084,42 +2076,42 @@
 
               {#if !(saved && stamped)}
                 <!--
-                  The one place in this app where something leaves the device. It
-                  is stated before it happens, in full, rather than explained
-                  afterwards in a changelog — every address it could go to included.
+                  The one request that leaves for another site. The limit stays on screen as one
+                  sentence; every address it could go to is a click away, before anything is sent.
                 -->
-                <div class="notice warn">
-                  <strong
-                    >{candidates && candidates.length > 1
-                      ? 'This sends one request at a time off your device'
-                      : 'This sends one request off your device'}</strong
-                  > — the only kind the app makes.<Info
-                    >A timestamp cannot work without it: somebody independent has to see the file's
-                    fingerprint and sign it. A digest cannot be turned back into the file, so the
-                    authority learns that something existed, not what.{#if candidates && candidates.length > 1}
-                      Each authority is sent the same 32 bytes, and none is asked once one has
-                      answered.{/if}</Info
-                  >
-                  <span class="outgoing-list">
-                    <span>
-                      <strong>What goes:</strong>
-                      32 bytes — the SHA-256 of
-                      {wantCertificate && identity ? 'your signature' : 'the finished PDF'}
+                <p class="field-note">
+                  Sends a 32-byte digest to {candidates && candidates.length > 1
+                    ? 'one timestamp authority at a time'
+                    : 'the timestamp authority'} — never the document.
+                </p>
+                <details class="explain">
+                  <summary>What is sent, and where</summary>
+                  <div>
+                    <span class="outgoing-list">
+                      <span>
+                        <strong>What goes:</strong>
+                        32 bytes — the SHA-256 of
+                        {wantCertificate && identity ? 'your signature' : 'the finished PDF'}
+                      </span>
+                      <span><strong>What does not:</strong> the document, your name, the signature</span>
+                      <span
+                        ><strong>Where:</strong>
+                        {#if candidates}
+                          {#each candidates as candidate, index}{index ? ', then ' : ''}<code
+                              >{candidate.url}</code
+                            >{/each}{#if candidates.length > 1}{' '}— each only if the one before does
+                            not answer{/if}
+                        {:else}
+                          <code>nowhere — the address above is not valid</code>
+                        {/if}</span
+                      >
                     </span>
-                    <span><strong>What does not:</strong> the document, your name, the signature</span>
-                    <span
-                      ><strong>Where:</strong>
-                      {#if candidates}
-                        {#each candidates as candidate, index}{index ? ', then ' : ''}<code
-                            >{candidate.url}</code
-                          >{/each}{#if candidates.length > 1}{' '}— each only if the one before does
-                          not answer{/if}
-                      {:else}
-                        <code>nowhere — the address above is not valid</code>
-                      {/if}</span
-                    >
-                  </span>
-                </div>
+                    A timestamp cannot work without it: somebody independent has to see the file's
+                    fingerprint and sign it. A digest cannot be turned back into the file, so the
+                    authority learns that something existed, not what.{#if candidates && candidates.length > 1}{' '}Each
+                      authority is sent the same 32 bytes, and none is asked once one has answered.{/if}
+                  </div>
+                </details>
               {/if}
 
               {#if customError}
