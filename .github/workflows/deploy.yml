@@ -84,10 +84,6 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run check
-
-      - run: npm test
-
       - name: Install xSignature
         # xSignature (xsignature/app) is its own package, built into
         # dist/xsignature/ by `npm run build:only` below.
@@ -120,6 +116,15 @@ jobs:
       - name: Test xConvert
         # After the vendor step: the Typst tests run the real wrapper.
         run: npm test --prefix ../xconvert/app
+
+      # After the other services are installed, as in ci.yml: the site's own code imports
+      # their navigation (src/site/services.ts), and resolving those files needs their
+      # tsconfig's packages. Before v0.9.0 no test reached them, so the order did not show.
+      - name: Type-check
+        run: npm run check
+
+      - name: Test
+        run: npm test
 
       - name: Build
         # The whole site: the front page into dist/, xNotary into dist/xnotary/,
