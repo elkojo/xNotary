@@ -7,7 +7,8 @@
  * certificates they point at often over plain http, which is why the app cannot fetch either
  * itself (src/lib/document/certificate/read/directory.ts says why the directory exists at all).
  *
- * Reads the List of Trusted Lists, then each national list it points to, and keeps the
+ * Reads the List of Trusted Lists, then each national list it points to — and Switzerland's and
+ * Ukraine's, which it does not (OTHER_LISTS) — and keeps the
  * certificate of every qualified certificate-issuing service (CA/QC), current and historical:
  * a signature made years ago still needs the issuer it was made under. The lists' own XML
  * signatures are not checked, and need not be — the app takes a certificate from the directory
@@ -34,10 +35,29 @@ setEngine('node', new CryptoEngine({ name: 'node', crypto: globalThis.crypto }))
 const LOTL = 'https://ec.europa.eu/tools/lotl/eu-lotl.xml';
 /** The Commission's republished copy of each national list, by territory: the eIDAS dashboard's own download. */
 const MIRROR = (territory: string) => `https://eidas.ec.europa.eu/efda/api/v2/browse/eidas/tl/download/${territory}`;
-const CA_QC = 'http://uri.etsi.org/TrstSvc/Svctype/CA/QC';
+/**
+ * A qualified certificate-issuing service. The EU's lists name it with ETSI's URI; Switzerland's
+ * and Ukraine's with their own namespaces (`https://uri.tsl-switzerland.ch/…`,
+ * `http://czo.gov.ua/…`), so the type is matched by its path, not by one exact address.
+ */
+const CA_QC = /<(?:\w+:)?ServiceTypeIdentifier>\s*[^<]*\/TrstSvc\/Svctype\/CA\/QC\s*</;
+/**
+ * Lists outside the EU's List of Trusted Lists, each qualified under its own framework, not
+ * eIDAS: Switzerland's (ZertES, published by the Swiss accreditation body) and Ukraine's (as the
+ * Commission republishes it among third-country lists). Used, like every other entry, only to
+ * complete a chain whose links verify.
+ */
+const OTHER_LISTS = [
+  { territory: 'CH', url: 'https://trustedlist.tsl-switzerland.ch/tsl-ch.xml' },
+  { territory: 'UA', url: 'https://eidas.ec.europa.eu/efda/api/v2/browse/ades/download/UA' },
+];
 const OUT = fileURLToPath(new URL('../public/issuers/', import.meta.url));
-/** Some lists sit behind bot checks that turn away a client with no name. */
-const HEADERS = { 'user-agent': 'xSignature issuer-directory refresh (+https://xnotary.digital)' };
+/** Some lists sit behind firewalls that turn away a client with no name, or one that asks for nothing in particular. */
+const HEADERS = {
+  'user-agent': 'xSignature issuer-directory refresh (+https://xnotary.digital)',
+  accept: 'application/xml,text/xml;q=0.9,*/*;q=0.8',
+  'accept-language': 'en',
+};
 
 const tag = (name: string) => new RegExp(`<(?:\\w+:)?${name}>([\\s\\S]*?)</(?:\\w+:)?${name}>`, 'g');
 const all = (xml: string, name: string) => [...xml.matchAll(tag(name))].map((m) => m[1].trim());
@@ -59,9 +79,13 @@ async function get(url: string): Promise<string | null> {
 const lotl = await get(LOTL);
 if (!lotl) throw new Error(`Could not read ${LOTL}`);
 
-const pointers = all(lotl, 'OtherTSLPointer')
-  .map((p) => ({ territory: first(p, 'SchemeTerritory'), url: first(p, 'TSLLocation'), mime: first(p, 'MimeType') }))
-  .filter((p) => p.mime.includes('xml') && p.territory && p.territory !== 'EU' && p.territory !== 'UK');
+const pointers = [
+  ...all(lotl, 'OtherTSLPointer')
+    .map((p) => ({ territory: first(p, 'SchemeTerritory'), url: first(p, 'TSLLocation'), mime: first(p, 'MimeType') }))
+    .filter((p) => p.mime.includes('xml') && p.territory && p.territory !== 'EU' && p.territory !== 'UK'),
+  ...OTHER_LISTS.map((l) => ({ ...l, mime: 'xml' })),
+];
+const outsideEu = OTHER_LISTS.map((l) => l.territory);
 
 const certificates: { der: Uint8Array; tl: string }[] = [];
 const lists: Record<string, number> = {};
@@ -70,7 +94,7 @@ const mirrored: string[] = [];
 
 for (const { territory, url } of pointers) {
   let xml = await get(url);
-  if (!xml) {
+  if (!xml && !outsideEu.includes(territory)) {
     xml = await get(MIRROR(territory));
     if (xml) {
       mirrored.push(territory);
@@ -84,7 +108,7 @@ for (const { territory, url } of pointers) {
   }
   let count = 0;
   for (const service of all(xml, 'TSPService')) {
-    if (!service.includes(CA_QC)) continue;
+    if (!CA_QC.test(service)) continue;
     for (const base64 of all(service, 'X509Certificate')) {
       certificates.push({ der: Uint8Array.from(Buffer.from(base64.replace(/\s/g, ''), 'base64')), tl: territory });
       count += 1;
@@ -115,7 +139,18 @@ for (const [name, shard] of Object.entries(shards)) writeFileSync(`${OUT}${name}
 writeFileSync(`${OUT}names.json`, JSON.stringify(names));
 writeFileSync(
   `${OUT}index.json`,
-  JSON.stringify({ asOf, source: LOTL, lists, fromCommissionCopy: mirrored.sort(), missing: missing.sort() }, null, 2) + '\n',
+  JSON.stringify(
+    {
+      asOf,
+      source: LOTL,
+      outsideEu: Object.fromEntries(OTHER_LISTS.map((l) => [l.territory, l.url])),
+      lists,
+      fromCommissionCopy: mirrored.sort(),
+      missing: missing.sort(),
+    },
+    null,
+    2,
+  ) + '\n',
 );
 
 const kept = Object.values(shards).reduce((n, s) => n + Object.keys(s.entries).length, 0);

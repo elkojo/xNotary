@@ -6,7 +6,7 @@
  * plain `http://`, which a page served over `https` may not load. Reaching it would take a
  * server in between, and this site has none (no backend, invariant 2). So the certificates are
  * fetched the other way round: ahead of time, on the build machine, from the trusted lists the
- * EU publishes (scripts/issuers.ts), and served from this site in small shards
+ * EU publishes, and Switzerland's and Ukraine's (scripts/issuers.ts), and served from this site in small shards
  * (public/issuers/). A click fetches one shard, from this origin, carrying nothing from the
  * reader.
  *

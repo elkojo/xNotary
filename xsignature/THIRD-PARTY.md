@@ -135,7 +135,10 @@ distributed under Apache-2.0 rather than the OFL.
 
 `public/issuers/` (served at `/xsignature/issuers/`) holds the certificates of the qualified
 certificate-issuing services listed on the EU Member States' trusted lists, as published through
-the European Commission's List of Trusted Lists (https://ec.europa.eu/tools/lotl/eu-lotl.xml).
+the European Commission's List of Trusted Lists (https://ec.europa.eu/tools/lotl/eu-lotl.xml), and
+those on Switzerland's trusted list (https://trustedlist.tsl-switzerland.ch/tsl-ch.xml, published by
+the Swiss Accreditation Service under ZertES) and Ukraine's (as republished by the Commission among
+third-country trusted lists).
 They are public certificates, reproduced unmodified so that a signature can carry its issuer;
 `index.json` records the date they were read and from which lists. `npm run issuers:refresh`
 regenerates them.

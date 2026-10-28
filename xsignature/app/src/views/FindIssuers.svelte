@@ -59,8 +59,9 @@
     {looking ? 'Looking…' : 'Fetch from the issuer directory'}
   </button>
   <Info label="About the issuer directory"
-    >This site keeps a copy of every qualified issuer on the EU's trusted lists. The click fetches one
-    small part of it from this site — nothing about you or the document is sent — and a certificate is
+    >This site keeps a copy of every qualified issuer on the trusted lists of the EU, Switzerland and
+    Ukraine — each qualified under its own framework. The click fetches one small part of it from this
+    site — nothing about you or the document is sent — and a certificate is
     taken only if its key verifies the one below it. That it was on a trusted list is not checked
     here: that is the PDF reader's call.</Info
   >
@@ -71,7 +72,8 @@
 
 {#if missed}
   <div class="notice warn">
-    <strong>Not in the directory</strong>, which holds qualified issuers from the EU's trusted lists only.
+    <strong>Not in the directory</strong>, which holds qualified issuers from the trusted lists of the
+    EU, Switzerland and Ukraine only.
     {#if issuerUrl}
       The certificate says this one is published at
       <!-- A link the reader follows, never a request this app makes. -->
