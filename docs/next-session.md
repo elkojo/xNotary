@@ -1,6 +1,38 @@
 # Where things stand — handoff
 
-## Pick up here (2026-10-07): deploy v0.8.1
+## Pick up here (2026-10-28): v0.9.0 to beta
+
+**v0.9.0 goes to beta only** (`beta.xnotary.digital`); production stays on v0.8.1 until the
+owner says otherwise. Beta served v0.8.2 before it. Tag `v0.9.0` builds the release and attaches
+`xnotary-v0.9.0-dist.zip`; the operator deploys that zip. Agents never touch the Cloudflare
+account.
+
+### What changed since 0.8.2
+
+- **Updates reach people.** xNotary's and xConvert's workers serve the page network-first (the
+  cache-first page kept every visitor one release behind). `/version.json` (no-store) names the
+  build; an open page offers "A newer version of the site is out — Refresh / Later" and never
+  reloads mid-task. The footer names the build when it is not a tagged release.
+- **Sign a document:** the level of what was saved, read back from the saved file, with a new
+  ○○○ "No certificate signature"; a **Paste** button for phones; **Fetch from the issuer
+  directory** (also on Check a PDF) — 1,875 qualified issuers from the 30 EU/EEA trusted lists,
+  Switzerland's and Ukraine's, refreshed by `npm run issuers:refresh` in `xsignature/app`; a
+  shorter timestamp step; "No certificate? How to get one".
+- **Start from your situation:** `/situations/`, nine journeys with a traffic light and dated
+  official sources, including the Czech § 6(2) route with its § 6(3) exception. First and bold in
+  every "I want to…" menu; the front page now leads with it.
+- **Languages** (`docs/i18n.md`): browser translation made safe (data marked `translate="no"`,
+  labels that stay true); a Czech layer for the bar, front page and `/situations/`. An **EN | CS**
+  switcher shows for everyone; Czech is **unreviewed**, so no browser starts in it automatically
+  until a native reviewer signs it off.
+
+### Check after the deploy
+- `/version.json` is served with `cache-control: no-store`.
+- `/situations/` and `/xsignature/issuers/index.json` return the right content (not the front
+  page's fallback).
+- A first visit is English, even from a Czech browser; the EN | CS switcher shows in the bar.
+
+## Earlier (2026-10-07): deploy v0.8.1
 
 **v0.8.1 is the release to deploy.** It supersedes 0.8.0, which was never deployed to
 production, so one deploy brings both. Tag `v0.8.1` builds it and attaches
