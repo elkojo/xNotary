@@ -1,55 +1,87 @@
 <script lang="ts">
   /**
-   * Reading a PDF back: what does it claim, and does the claim hold?
+   * Reading a signed file back: what does it claim, and does the claim hold?
    *
    * The counterpart to the timestamp on the signing screen, and it exists
    * because an app that can make a thing nobody can check has not really made
-   * anything. It works on any PDF, not only the ones this app produced.
+   * anything. It works on any PDF or signature container, not only the ones this
+   * app produced.
    *
    * The screen is careful about the difference between what it checked and what
    * it did not. It can say the file has not changed and the token is sound; it
    * cannot say the authority deserves to be believed, and it does not imply it.
    */
   import Info from '../../../../app/src/site/Info.svelte';
-  import SignatureLevel from '../../../../app/src/site/SignatureLevel.svelte';
+  import { formatBytes } from '../../../../app/src/site/size';
+  import { downloadBlob } from '../lib/signature/download';
+  import { checkContainer, checkUnpacked } from '../lib/document/verify/asic/container';
+  import { readFolder } from '../lib/document/verify/asic/folder';
+  import type { CheckedContainer, ContainerFile, ContainerSignature } from '../lib/document/verify/asic/types';
+  import { ContainerRefused, looksLikeZip, printable, savedName } from '../lib/document/verify/asic/zip';
   import { checkSignatures, type CheckedSignature } from '../lib/document/verify/verify';
-  import type { Certificate } from 'pkijs';
-  import FindIssuers from './FindIssuers.svelte';
-  import {
-    checkLinks,
-    orderChain,
-    readCertificates,
-    type ChainLink,
-  } from '../lib/document/certificate/read/chain';
+  import SignerChecks from './SignerChecks.svelte';
 
   let fileName = $state('');
   let fileSize = $state(0);
   let checking = $state(false);
   let checked = $state<CheckedSignature[] | null>(null);
+  let opened = $state<CheckedContainer | null>(null);
   let error = $state('');
   let over = $state(false);
   let fileInput = $state<HTMLInputElement | null>(null);
+
+  const found = $derived(checked?.length ?? opened?.signatures.length ?? null);
 
   async function take(file: File | undefined) {
     if (!file) return;
     fileName = file.name;
     checked = null;
+    opened = null;
     error = '';
     checking = true;
 
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       fileSize = bytes.length;
-      if (!looksLikePdf(bytes)) {
-        error = 'This is not a PDF. Only a PDF can carry a timestamp of this kind.';
-        return;
+      // By content, not by name: real containers arrive called `.zip`.
+      if (looksLikePdf(bytes)) {
+        checked = await checkSignatures(bytes);
+      } else if (looksLikeZip(bytes)) {
+        opened = await checkContainer(bytes);
+      } else {
+        error = 'This is neither a PDF nor a signature container, so it cannot carry a signature of this kind.';
       }
-      checked = await checkSignatures(bytes);
-    } catch {
-      error = 'This file could not be read. It may be damaged, or only partly downloaded.';
+    } catch (failure) {
+      error =
+        failure instanceof ContainerRefused
+          ? failure.message
+          : 'This file could not be read. It may be damaged, or only partly downloaded.';
     } finally {
       checking = false;
     }
+  }
+
+  /** What a file manager leaves when it unpacks a container, dropped rather than picked. */
+  async function takeFolder(folder: FileSystemDirectoryEntry) {
+    fileName = folder.name;
+    checked = null;
+    opened = null;
+    error = '';
+    checking = true;
+    try {
+      opened = await checkUnpacked(await readFolder(folder));
+    } catch (failure) {
+      error = failure instanceof ContainerRefused ? failure.message : 'This folder could not be read.';
+    } finally {
+      checking = false;
+    }
+  }
+
+  /** A dropped item has to be asked what it is during the drop itself; the list empties after. */
+  function takeDrop(transfer: DataTransfer | null) {
+    const entry = transfer?.items?.[0]?.webkitGetAsEntry?.();
+    if (entry?.isDirectory) void takeFolder(entry as FileSystemDirectoryEntry);
+    else void take(transfer?.files?.[0]);
   }
 
   function looksLikePdf(bytes: Uint8Array): boolean {
@@ -58,91 +90,52 @@
 
   function clear() {
     checked = null;
+    opened = null;
     error = '';
     fileName = '';
-    supplied = {};
     if (fileInput) fileInput.value = '';
-  }
-
-  /**
-   * Issuer certificates the reader went and fetched, per signature.
-   *
-   * A signature that encloses only the signer's own certificate is not a dead
-   * end — the certificate names its issuer and usually says where that one is
-   * published, and a reader who follows that address has the missing piece. It
-   * cannot be followed from here: those addresses are plain http, which a page
-   * served over https may not fetch, and they answer no CORS preflight either.
-   * Both are the browser's rules, not this app's policy, and no opt-in lifts
-   * them.
-   *
-   * So the reader fetches it and drops it in, and the arithmetic happens here,
-   * offline, exactly as it does on the signing screen. Keyed by signature
-   * because a document may carry several, each wanting a different issuer.
-   */
-  let supplied = $state<Record<number, { name: string; from?: string; links: ChainLink[]; error: string }>>({});
-
-  /** From the issuer directory, already walked and verified (FindIssuers). */
-  async function takeFound(index: number, result: CheckedSignature, chain: Certificate[], from: string) {
-    if (!result.certificate) return;
-    supplied[index] = { name: 'The issuer directory', from, links: await checkLinks(result.certificate, chain), error: '' };
-  }
-
-  async function takeIssuers(index: number, result: CheckedSignature, file: File | undefined) {
-    if (!file) return;
-
-    const leaf = result.certificate;
-    if (!leaf) {
-      supplied[index] = {
-        name: file.name,
-        links: [],
-        error: 'This signature carries no readable certificate to continue from.',
-      };
-      return;
-    }
-
-    const found = readCertificates(new Uint8Array(await file.arrayBuffer()));
-    if (found.length === 0) {
-      supplied[index] = {
-        name: file.name,
-        links: [],
-        error:
-          'No certificate could be read from that file. The .crt an authority publishes, or a ' +
-          '.pem bundle, will work.',
-      };
-      return;
-    }
-
-    const ordered = orderChain(leaf, found);
-    if (ordered.length === 0) {
-      supplied[index] = {
-        name: file.name,
-        links: [],
-        error:
-          'None of the certificates in that file signed this one, so they do not continue this ' +
-          'chain. It may be for a different authority.',
-      };
-      return;
-    }
-
-    supplied[index] = { name: file.name, links: await checkLinks(leaf, ordered), error: '' };
   }
 
   /** UTC, spelled out. A timestamp in local time invites reading it as local. */
   function when(time: Date): string {
-    return `${time.toISOString().replace('T', ' ').replace('.000Z', '')} UTC`;
+    return `${time.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')} UTC`;
   }
+
+  /** Never rendered, only saved: what a container holds is whatever somebody put there. */
+  function save(file: ContainerFile) {
+    downloadBlob(new Blob([file.bytes.slice()], { type: 'application/octet-stream' }), savedName(file.name));
+  }
+
+  const signatureTitle = (signature: ContainerSignature): string =>
+    signature.form === 'timestamp' ? 'Timestamp' : 'Signature';
+
+  /** "Signature 2", when there is more than one to tell apart. */
+  const titleOf = (index: number): string => {
+    const signature = opened!.signatures[index];
+    if (signature.counters !== null) return `Counter-signature on ${titleOf(signature.counters)}`;
+    return opened!.signatures.filter((other) => other.counters === null).length > 1
+      ? `${signatureTitle(signature)} ${index + 1}`
+      : signatureTitle(signature);
+  };
+
+  const coveredByText = (file: ContainerFile): string =>
+    file.coveredBy.length === 0 ? 'Not covered by any signature that holds' : `Covered by ${file.coveredBy.map(titleOf).join(', ')}`;
+
+  const uncovered = $derived(opened?.files.filter((file) => file.coveredBy.length === 0).length ?? 0);
+  const containerJudge = 'a validator that holds the trust lists';
 </script>
 
 <section class="product-view">
   <div class="workspace">
     <div class="page-head">
       <div>
-        <h1>Check a PDF</h1>
+        <h1>Check a signed file</h1>
       </div>
       <span class="secure-note"
         >Processed in this browser<Info
-          >Nothing is uploaded and nothing is fetched — the whole check runs on this device, on the
-          file's own bytes.</Info
+          >Nothing is uploaded — the whole check runs on this device, on the file's own bytes. All it
+          fetches is from this site: its copy of the trusted lists and of a revocation list, for the
+          certificate's issuer. Nothing about you or the file is sent.</Info
         ></span
       >
     </div>
@@ -151,10 +144,10 @@
       <div class="flow-main">
         <div class="flow-panel">
           <h2 class="panel-title">
-            Open a PDF<Info
-              >Any PDF, not only one made here. Checked: that it still matches each timestamp and
-              signature byte for byte, that each token holds against its certificate, and whether
-              anything was appended afterwards.</Info
+            Open a signed file<Info
+              >Any PDF or signature container (.asice, .asics, .bdoc, sometimes .zip), or a container's
+              unpacked folder dropped here, not only one made here. Checked: that it still matches each timestamp and signature byte for byte, that
+              each token holds against its certificate, and whether anything was added afterwards.</Info
             >
           </h2>
 
@@ -164,10 +157,8 @@
               <div class="picked-facts">
                 {#if checking}
                   Checking…
-                {:else if checked}
-                  {checked.length === 0
-                    ? 'No timestamp or signature found'
-                    : `${checked.length} found`}
+                {:else if found !== null}
+                  {found === 0 ? 'No timestamp or signature found' : `${found} found`}
                 {/if}
               </div>
             </div>
@@ -189,18 +180,18 @@
               ondrop={(event) => {
                 event.preventDefault();
                 over = false;
-                void take(event.dataTransfer?.files?.[0]);
+                takeDrop(event.dataTransfer);
               }}
             >
               <div>
-                <div class="file-icon" aria-hidden="true">PDF</div>
-                <strong>Drop a PDF here</strong>
+                <div class="file-icon" aria-hidden="true">FILE</div>
+                <strong>Drop a PDF or a signature container here</strong>
                 <div class="drop-hint">or click to choose one</div>
               </div>
               <input
                 bind:this={fileInput}
                 type="file"
-                accept=".pdf"
+                accept=".pdf,.asice,.sce,.asics,.scs,.bdoc,.edoc,.adoc,.zip"
                 onchange={(event) => void take(event.currentTarget.files?.[0])}
               />
             </label>
@@ -216,16 +207,307 @@
           {/if}
         </div>
 
-        {#if checked && checked.length === 0 && !error}
+        {#if found === 0 && !error}
           <div class="flow-panel">
             <h2 class="panel-title">Nothing to check</h2>
             <p class="panel-copy">
-              No timestamp and no digital signature — most PDFs have neither.<Info
-                >So nothing in the file says when it existed. A picture of a signature on a page
-                cannot be checked: it leaves no trace of who put it there.</Info
-              >
+              {#if opened}
+                This container holds no signature and no timestamp.<Info
+                  >So nothing in it says who signed these files or when they existed.</Info
+                >
+              {:else}
+                No timestamp and no digital signature — most PDFs have neither.<Info
+                  >So nothing in the file says when it existed. A picture of a signature on a page
+                  cannot be checked: it leaves no trace of who put it there.</Info
+                >
+              {/if}
             </p>
           </div>
+        {/if}
+
+        {#if opened}
+          <div class="flow-panel">
+            <h2 class="panel-title">
+              In this container<Info
+                >Saved exactly as they are inside it, and never opened here. A file no signature covers
+                could have been added by anyone.</Info
+              >
+            </h2>
+
+            <div class="facts">
+              {#each opened.files as file}
+                <div class="container-file">
+                  <span class="container-file-name" translate="no">{printable(file.name)}</span>
+                  <span class="container-file-facts">
+                    {formatBytes(file.bytes.length)} · {coveredByText(file)}
+                  </span>
+                  <button class="button secondary small" type="button" onclick={() => save(file)}>Save</button>
+                </div>
+              {/each}
+            </div>
+
+            {#if uncovered > 0 && opened.signatures.length > 0}
+              <div class="notice warn">
+                <strong>
+                  {uncovered === 1 ? 'One file here is' : `${uncovered} files here are`} covered by no signature that holds.
+                </strong>
+                Treat {uncovered === 1 ? 'it' : 'them'} as unsigned.
+              </div>
+            {/if}
+
+            {#if opened.unusualMediaType}
+              <div class="notice warn">
+                <strong>This container describes itself as something else.</strong>
+                It says it is <code translate="no">{printable(opened.mediaType ?? '')}</code>. Its signatures were read
+                anyway.
+              </div>
+            {/if}
+
+            {#if opened.fromFolder}
+              <div class="notice">
+                <strong>Checked from an unpacked folder.</strong> The signatures read the same, but anything
+                only the container itself could show cannot be checked here.<Info
+                  >A container is a ZIP. Some problems exist only at that level, such as one name listed twice so
+                  that different programs open different files. A folder has no way to carry them, and no way to
+                  show they were never there. Anything your system added to the folder also appears above.</Info
+                >
+              </div>
+            {/if}
+
+            {#each opened.archives as archive}
+              {#if archive.standing === 'holds' && archive.renewedBy && (archive.changed.length > 0 || archive.missing.length > 0)}
+                <div class="notice">
+                  <strong>An older archive timestamp no longer matches, and a newer one covers it.</strong>
+                  So the protection here rests on the newer one.<Info
+                    >Evidence is added to a signature file as it is renewed, so the file an older archive timestamp
+                    listed can legitimately differ from the one here.</Info
+                  >
+                </div>
+              {:else if archive.standing === 'holds' && (archive.changed.length > 0 || archive.missing.length > 0)}
+                <div class="notice bad">
+                  <strong>Part of what the archive timestamp lists has changed.</strong>
+                  <span class="outgoing-list">
+                    {#each archive.changed as name}
+                      <span><strong translate="no">{printable(name)}</strong> is not what it stamped.</span>
+                    {/each}
+                    {#each archive.missing as name}
+                      <span><strong translate="no">{printable(name)}</strong> was stamped and is no longer here.</span>
+                    {/each}
+                  </span>
+                </div>
+              {:else if archive.standing === 'holds' && !archive.coversEverySignature}
+                <div class="notice warn">
+                  <strong>The archive timestamp does not cover every signature here.</strong>
+                  A signature outside it gets no long-term protection from it.
+                </div>
+              {:else if archive.standing === 'holds'}
+                <div class="notice ok">
+                  <strong>An archive timestamp covers the signatures here.</strong>
+                  {archive.signedBy ?? 'An authority'} dated it {when(archive.time!)}.<Info
+                    >It renews the evidence for everything it lists, so that evidence can outlast the
+                    certificates behind it. Whether that authority is worth believing is {containerJudge}'s call.</Info
+                  >
+                </div>
+              {:else if archive.standing === 'other-signature'}
+                <div class="notice bad">
+                  <strong>The archive timestamp is not for this list of files.</strong>
+                  It attests to something else, so it protects nothing here.
+                </div>
+              {:else if archive.standing === 'broken'}
+                <div class="notice bad">
+                  <strong>The archive timestamp does not hold up.</strong>
+                  It does not check out against its own certificate, so it protects nothing here.
+                </div>
+              {:else}
+                <div class="notice warn">
+                  <strong>The archive timestamp could not be checked.</strong> No finding here rests on it.
+                </div>
+              {/if}
+            {/each}
+
+            {#if opened.uncheckedEvidence}
+              <div class="notice">
+                <strong>It carries an evidence record this check does not read.</strong> No finding here rests on it.
+              </div>
+            {/if}
+
+            {#if opened.signatures.length > 0}
+              <!-- The container's own limit: true of every result, so it stays on screen. -->
+              <div class="notice">
+                <strong>This shows the signatures still here,</strong> not all there ever were. Taking one out
+                of a container leaves no trace.
+              </div>
+            {/if}
+          </div>
+
+          {#each opened.signatures as signature, index}
+            <div class="flow-panel">
+              <h2 class="panel-title">{titleOf(index)}</h2>
+
+              {#if signature.verdict === 'intact' && signature.counters !== null}
+                <div class="notice ok">
+                  <strong>The signature it counter-signs has not changed since.</strong>
+                  {#if signature.covers.length > 0}
+                    Nor {signature.covers.length === 1 ? 'has the file' : `have the ${signature.covers.length} files`} it also signs.
+                  {/if}
+                </div>
+              {:else if signature.verdict === 'intact'}
+                <div class="notice ok">
+                  <strong>
+                    {signature.covers.length === 1 ? 'The file it covers has' : `The ${signature.covers.length} files it covers have`}
+                    not changed since it was {signature.form === 'timestamp' ? 'stamped' : 'signed'}.
+                  </strong>
+                </div>
+              {:else if signature.verdict === 'altered'}
+                <div class="notice bad">
+                  {#if signature.changed.length > 0 || signature.missing.length > 0}
+                    <strong>This container has been changed.</strong>
+                    <span class="outgoing-list">
+                      {#each signature.changed as name}
+                        <span><strong translate="no">{printable(name)}</strong> is not the file that was signed.</span>
+                      {/each}
+                      {#each signature.missing as name}
+                        <span><strong translate="no">{printable(name)}</strong> was signed and is no longer here.</span>
+                      {/each}
+                    </span>
+                  {/if}
+                  {#if signature.detailsChanged}
+                    <strong>What this signature states has been changed.</strong>
+                    Its signed details no longer match it, so the time and the certificate in them mean nothing.
+                  {/if}
+                  {#if signature.counterChanged}
+                    <strong>The signature this counter-signs has been changed.</strong>
+                    It no longer matches what was counter-signed.
+                  {/if}
+                </div>
+              {:else if signature.verdict === 'broken'}
+                <div class="notice bad">
+                  <strong>The signature does not hold up.</strong>
+                  {signature.detail} So it says nothing about the files.
+                </div>
+              {:else if signature.verdict === 'covers-nothing'}
+                <div class="notice warn">
+                  <strong>This signature signs none of the files in this container.</strong>
+                  It may be sound, and it is no evidence for anything you can see here.
+                </div>
+              {:else if signature.verdict === 'cannot-check'}
+                <div class="notice warn">
+                  <strong>Could not check this one.</strong>
+                  {signature.detail} That says nothing either way about whether it holds.
+                </div>
+              {:else}
+                <div class="notice warn">
+                  <strong>Could not read it.</strong>
+                  {signature.detail}
+                </div>
+              {/if}
+
+              <div class="facts">
+                {#if signature.time}
+                  <div>
+                    <span>{signature.form === 'timestamp' ? 'Stated time' : "Signer's own clock"}</span>
+                    <strong>{when(signature.time)}</strong>
+                  </div>
+                {/if}
+                {#if signature.signedBy}
+                  <div><span>Signed by</span><strong translate="no">{signature.signedBy}</strong></div>
+                {/if}
+                {#if signature.timestamp}
+                  <div>
+                    <span>Timestamped</span>
+                    <strong>
+                      {when(signature.timestamp.time)}{signature.timestamp.signedBy
+                        ? ` by ${signature.timestamp.signedBy}`
+                        : ''}
+                    </strong>
+                  </div>
+                {/if}
+              </div>
+
+              <SignerChecks
+                {signature}
+                signerClock={signature.time}
+                carriedRevocation={signature.revocation}
+                isTimestamp={signature.form === 'timestamp'}
+                judge={containerJudge}
+                goTo={`${containerJudge} can say that`}
+              >
+                {#if signature.revocation}
+                  {@const answer = signature.revocation}
+                  {@const source = answer.from ?? 'An unnamed source'}
+                  {#if answer.standing === 'broken'}
+                    <div class="notice bad">
+                      <strong>The revocation answer it carries does not hold up.</strong>
+                      It does not check out against its own certificate, so it says nothing.
+                    </div>
+                  {:else if answer.standing === 'cannot-check'}
+                    <div class="notice warn">
+                      <strong>The revocation answer it carries could not be checked.</strong> So it says nothing
+                      here.<Info>The certificate it was made with is not here, or it uses something this browser cannot compute.</Info>
+                    </div>
+                  {:else if answer.status === 'revoked'}
+                    <div class="notice bad">
+                      <strong>It carries an answer saying this certificate was revoked.</strong>
+                      {source} said so {answer.at ? when(answer.at) : ''}{answer.revokedAt ? `, giving ${when(answer.revokedAt)} as the time of revocation` : ''}.
+                      Compare that with when it was signed.
+                    </div>
+                  {:else if answer.status === 'unknown'}
+                    <div class="notice warn">
+                      <strong>It carries an answer that does not know this certificate.</strong>
+                      {source} said so {answer.at ? when(answer.at) : ''}.
+                    </div>
+                  {:else}
+                    <div class="notice">
+                      <strong>It carries an answer saying this certificate was not revoked.</strong>
+                      {source} said so {answer.at ? when(answer.at) : ''}. Who answered is not checked.<Info
+                        >Read from the signature, not asked for: nothing left this device. It verifies against the
+                        certificate it names, but anyone can add such an answer to a file, and nothing here shows
+                        {source} is entitled to give one. That is {containerJudge}'s call.</Info
+                      >
+                    </div>
+                  {/if}
+                {/if}
+
+                {#each signature.archiveTimestamps as stamp}
+                  {#if stamp.standing === 'holds'}
+                    <div class="notice ok">
+                      <strong>An archive timestamp also covers this signature.</strong>
+                      {stamp.signedBy ?? 'An authority'} dated it {when(stamp.time)}.
+                    </div>
+                  {:else if stamp.standing === 'broken'}
+                    <div class="notice bad">
+                      <strong>The archive timestamp on this signature does not hold up.</strong>
+                      It does not check out against its own certificate, so it protects nothing.
+                    </div>
+                  {:else}
+                    <div class="notice warn">
+                      <strong>The archive timestamp on this signature could not be confirmed.</strong> No finding here
+                      rests on it.<Info
+                        >What it covers has to be reassembled from many parts, and writers have read those rules
+                        differently. That could be damage, or only this check's reading, so it says nothing either way.</Info
+                      >
+                    </div>
+                  {/if}
+                {/each}
+
+                {#each signature.unchecked as part}
+                  <div class="notice">
+                    {#if part === 'counter-signature'}
+                      <strong>It carries a further counter-signature this check does not read.</strong> Nobody is named
+                      or vouched for by it here.
+                    {:else}
+                      <strong>It carries an archive timestamp this check does not read.</strong> No finding here
+                      rests on it.
+                    {/if}
+                  </div>
+                {/each}
+
+                {#snippet limits()}
+                  Any revocation answer above is one the signature carried; nothing newer was asked for.
+                {/snippet}
+              </SignerChecks>
+            </div>
+          {/each}
         {/if}
 
         {#each checked ?? [] as result, index}
@@ -308,191 +590,73 @@
               </div>
             </div>
 
-            {#if !result.isTimestamp && result.certificateCount > 0}
-              <!--
-                Whether the signature brought the certificates a reader needs to
-                trace it. This is the half the recipient cares about, and the
-                half a leaf-only key file leaves out.
-              -->
-              {#if result.chain.length > 0}
-                <div class="notice ok">
-                  <strong>It carries the certificates above it.</strong>
-                  <span class="outgoing-list">
-                    {#each result.chain as link}
-                      <span>
-                        {link.holds ? '✓' : '✗'}
-                        <strong translate="no">{link.subject}</strong> signed by <strong translate="no">{link.issuer}</strong>
-                        {link.holds ? '' : ' — but that signature does not hold'}
-                      </span>
-                    {/each}
-                  </span>
-                  Each checked against the next — arithmetic only.
-                </div>
-              {:else}
-                <!--
-                  Amber until the reader has continued the chain below, then
-                  plain. What it says stays true either way — the *document*
-                  still encloses nothing — but leaving a warning above a green
-                  result reads as unresolved when it is not.
-                -->
-                <div class="notice" class:warn={!supplied[index]?.links.length}>
-                  <strong>This signature carries no issuer certificates.</strong>
-                  Only the signer's own, which names its issuer:
-                  <strong translate="no">{result.issuedBy ?? 'not by any name it gives'}</strong>.<Info
-                    >Most readers hold a well-known authority already, and an online one fetches it
-                    by itself — which is why this often validates elsewhere without complaint. A
-                    reader that does neither has a name and no way to trace it.</Info
-                  >
-                </div>
-
-                {#if !supplied[index]?.links.length && result.certificate}
-                  <FindIssuers
-                    leaf={result.certificate}
-                    issuerUrl={result.claims?.issuerUrl ?? null}
-                    onfound={(chain, from) => void takeFound(index, result, chain, from)}
-                    onfile={(file) => void takeIssuers(index, result, file)}
-                  />
-                {/if}
-
-                {#if supplied[index]?.error}
-                  <div class="notice bad">{supplied[index].error}</div>
-                {:else if supplied[index]?.links.length}
-                  <div class="notice ok">
-                    <strong>{supplied[index].name} continues this chain.</strong>
-                    {supplied[index].from}
-                    <span class="outgoing-list">
-                      {#each supplied[index].links as link}
-                        <span>
-                          {link.holds ? '✓' : '✗'}
-                          <strong translate="no">{link.subject}</strong> signed by <strong translate="no">{link.issuer}</strong>
-                          {link.holds ? '' : ' — but that signature does not hold'}
-                        </span>
-                      {/each}
-                    </span>
-                    Checked link by link, which is arithmetic and all that is checked. Nothing
-                    was written back: the file still carries only the signer's certificate, so the
-                    next reader will have to do this too. Whether
-                    {supplied[index].links[supplied[index].links.length - 1]?.issuer ??
-                      'the authority at the top'} deserves belief is still not this app's call.
+            <SignerChecks
+              signature={result}
+              signerClock={result.isTimestamp ? null : result.time}
+              isTimestamp={result.isTimestamp}
+              judge="your PDF reader"
+              goTo="open the file in a PDF reader for that"
+            >
+              {#if !result.coversToEndOfFile}
+                {@const next = (checked ?? [])[index + 1]}
+                {#if next && next.covers > result.covers}
+                  <!--
+                    When what came afterwards is itself a signature covering this
+                    one, the file says what was added and there is no need to
+                    leave the reader guessing.
+                  -->
+                  <div class="notice">
+                    <strong>
+                      What was added after this is the
+                      {next.isTimestamp ? 'timestamp' : 'signature'} below{next.signedBy
+                        ? `, by ${next.signedBy}`
+                        : ''}.
+                    </strong>
+                    Normal for a document signed by more than one party.<Info
+                      >Each signature covers everything before it, and the last one covers the whole
+                      file. Nothing was changed behind anyone's back.</Info
+                    >
+                  </div>
+                {:else}
+                  <div class="notice warn">
+                    <strong>
+                      Something was added after this was {result.isTimestamp ? 'stamped' : 'signed'},
+                      and it is not another signature.
+                    </strong>
+                    Part of what you see on opening it is covered by nothing above — find out what was
+                    added.<Info
+                      >That is how a document is made to show one thing while being signed as
+                      another.</Info
+                    >
                   </div>
                 {/if}
               {/if}
-            {/if}
-
-            {#if result.claims && !result.isTimestamp}
-              <!--
-                The level, from the certificate's own statements, kept apart from the app's
-                findings: "this certificate says it is qualified" is a fact about the file; "this
-                signature is qualified" is a judgement this app is not entitled to make.
-              -->
-              <SignatureLevel qualified={result.claims.qualified} onQualifiedDevice={result.claims.onQualifiedDevice}>
-                {#if result.claims.purpose === 'seal'}Issued to an organisation, as a seal.{/if}
-                {#if result.claims.purpose === 'website'}
-                  It is a website certificate, which is not meant for signing documents.
+              {#snippet limits()}
+                {#if !result.isTimestamp}
+                  Reason and Location were typed by whoever signed; nothing makes them true.
                 {/if}
-                {#if result.claims.limit}
-                  It declares a transaction limit of {result.claims.limit.value.toLocaleString()}
-                  {result.claims.limit.currency}.
-                {/if}
-              </SignatureLevel>
-
-              {#if result.claims.keyUsage.stated && !result.claims.keyUsage.digitalSignature && !result.claims.keyUsage.nonRepudiation}
-                <div class="notice warn">
-                  <strong>This certificate was not issued for signing.</strong>
-                  Readers that enforce key usage will reject it.<Info
-                    >Its key usage permits neither digital signature nor non-repudiation. The
-                    signature is still sound arithmetic.</Info
-                  >
-                </div>
-              {/if}
-            {/if}
-
-            {#if result.timestamp && !result.timestamp.coversSignature}
-              <!--
-                A token attached to a signature it does not describe would read
-                as corroboration and be none, which is worth saying loudly.
-              -->
-              <div class="notice bad">
-                <strong>The timestamp inside this signature is not for this signature.</strong>
-                It attests to some other signature. Treat the time above as meaning nothing.
-              </div>
-            {:else if result.timestamp}
-              <div class="notice ok">
-                <strong>The time on this signature is not the signer's own.</strong>
-                {result.timestamp.signedBy ?? 'An authority'} dated it.<Info
-                  >So the time does not rest on the signer's computer. Whether that authority is
-                  worth believing is, like the signer's identity, your PDF reader's call.</Info
-                >
-              </div>
-            {/if}
-
-            {#if !result.coversToEndOfFile}
-              {@const next = (checked ?? [])[index + 1]}
-              {#if next && next.covers > result.covers}
-                <!--
-                  When what came afterwards is itself a signature covering this
-                  one, the file says what was added and there is no need to
-                  leave the reader guessing.
-                -->
-                <div class="notice">
-                  <strong>
-                    What was added after this is the
-                    {next.isTimestamp ? 'timestamp' : 'signature'} below{next.signedBy
-                      ? `, by ${next.signedBy}`
-                      : ''}.
-                  </strong>
-                  Normal for a document signed by more than one party.<Info
-                    >Each signature covers everything before it, and the last one covers the whole
-                    file. Nothing was changed behind anyone's back.</Info
-                  >
-                </div>
-              {:else}
-                <div class="notice warn">
-                  <strong>
-                    Something was added after this was {result.isTimestamp ? 'stamped' : 'signed'},
-                    and it is not another signature.
-                  </strong>
-                  Part of what you see on opening it is covered by nothing above — find out what was
-                  added.<Info
-                    >That is how a document is made to show one thing while being signed as
-                    another.</Info
-                  >
-                </div>
-              {/if}
-            {/if}
-
-            <!--
-              The limit of the check, next to the check rather than in a footnote.
-              Saying "verified" without this would be the dishonest version.
-            -->
-            <div class="notice">
-              <strong>Not checked:</strong> whether <em translate="no">{result.signedBy ?? 'that signer'}</em> is who
-              they say they are — open the file in a PDF reader for that.<Info
-                >That takes a list of trusted authorities, which this app chooses not to ship, and a
-                revocation check, which needs a network it does not use. The name above is read out
-                of the token, not vouched for.{#if !result.isTimestamp}
-                  Reason and Location were typed by whoever signed; nothing makes them true.{/if}
-                <!--
-                  Named, not called: a refusal is easier to weigh against the addresses it
-                  applies to than in the abstract. In the bubble, so the screen stays short.
-                -->
-                {#if result.claims?.ocspUrl || result.claims?.crlUrls.length}
-                  Where that check would go, uncalled:
-                  <span class="outgoing-list">
-                    {#if result.claims.ocspUrl}
-                      <span><strong>Asked at:</strong> <code translate="no">{result.claims.ocspUrl}</code></span>
-                    {/if}
-                    {#each result.claims.crlUrls as url}
-                      <span><strong>Listed at:</strong> <code translate="no">{url}</code></span>
-                    {/each}
-                  </span>
-                {/if}</Info
-              >
-
-            </div>
+              {/snippet}
+            </SignerChecks>
           </div>
         {/each}
       </div>
     </div>
   </div>
 </section>
+
+<style>
+  .container-file {
+    align-items: center;
+  }
+
+  .container-file-name {
+    color: var(--ink);
+    font-weight: 650;
+    overflow-wrap: anywhere;
+    flex: 1 1 200px;
+  }
+
+  .container-file-facts {
+    flex: 2 1 240px;
+  }
+</style>

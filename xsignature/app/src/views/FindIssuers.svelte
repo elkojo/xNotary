@@ -1,18 +1,18 @@
 <!--
   Continuing a certificate chain that stops at the signer: one button that looks the issuer up
   in the directory this site serves, and — when it is not there, or the reader prefers — a file
-  of their own. The same on Sign a document and on Check a PDF.
+  of their own. On Sign a document the click is the consent. On Check a signed file the lookup runs
+  by itself (owner's decision, 2026-11-05) and only this file route is shown, when it finds nothing.
 
-  The click is the consent: nothing is fetched until it, and what it fetches is one small file
-  from this site (src/lib/document/certificate/read/directory.ts). The screen using this shows
-  what was added; this only finds it.
+  What it fetches is one small file from this site (src/lib/document/certificate/read/directory.ts).
+  The screen using this shows what was added; this only finds it.
 -->
 <script lang="ts">
   import type { Certificate } from 'pkijs';
   import Fresh from '../../../../app/src/site/Fresh.svelte';
 
   import Info from '../../../../app/src/site/Info.svelte';
-  import { findIssuers, siteDirectory } from '../lib/document/certificate/read/directory';
+  import { DirectoryUnreachable, findIssuers, siteDirectory } from '../lib/document/certificate/read/directory';
 
   interface Props {
     /** The certificate to continue from. */
@@ -23,13 +23,17 @@
     onfound: (chain: Certificate[], from: string) => void;
     /** A file the reader chose instead. */
     onfile: (file: File) => void;
+    /** The directory was already asked and does not have it: only the file route is left. */
+    alreadyMissed?: boolean;
   }
 
-  let { leaf, issuerUrl, onfound, onfile }: Props = $props();
+  let { leaf, issuerUrl, onfound, onfile, alreadyMissed = false }: Props = $props();
 
   let looking = $state(false);
-  let missed = $state(false);
+  // svelte-ignore state_referenced_locally
+  let missed = $state(alreadyMissed);
   let byFile = $state(false);
+  let unreachable = $state(false);
 
   /** Trusted lists are named by territory; the EU writes Greece as EL. */
   const regions = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames(['en'], { type: 'region' }) : null;
@@ -38,6 +42,7 @@
   async function find() {
     looking = true;
     missed = false;
+    unreachable = false;
     try {
       const found = await findIssuers(leaf, siteDirectory(import.meta.env.BASE_URL));
       if (!found) {
@@ -49,12 +54,16 @@
         found.chain,
         `From ${lists.join(' and ')}'s trusted list, as read on ${found.asOf}.`,
       );
+    } catch (error) {
+      if (!(error instanceof DirectoryUnreachable)) throw error;
+      unreachable = true;
     } finally {
       looking = false;
     }
   }
 </script>
 
+{#if !alreadyMissed}
 <div class="action-group">
   <button class="button dark small" type="button" disabled={looking} onclick={() => void find()}>
     <Fresh text={looking ? 'Looking…' : 'Fetch from the issuer directory'} />
@@ -70,6 +79,13 @@
     <button class="link-button" type="button" onclick={() => (byFile = true)}>or add it from a file</button>
   {/if}
 </div>
+{/if}
+
+{#if unreachable}
+  <div class="notice warn">
+    <strong>Could not reach the issuer directory.</strong> Try again, or add the certificate from a file.
+  </div>
+{/if}
 
 {#if missed}
   <div class="notice warn">

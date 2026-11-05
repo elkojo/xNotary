@@ -24,9 +24,13 @@
     children?: Snippet;
     /** Further detail for this screen, at the end of the bubble. */
     more?: Snippet;
+    /** Replaces the not-checked sentence, for a screen that did check against a trust list. */
+    checked?: Snippet;
+    /** That check held against a list known to be current: the box says so in colour. */
+    confirmed?: boolean;
   }
 
-  let { qualified = false, onQualifiedDevice = false, certificate = true, compact = false, children, more }: Props =
+  let { qualified = false, onQualifiedDevice = false, certificate = true, compact = false, children, more, checked, confirmed = false }: Props =
     $props();
 
   const level = $derived(certificate ? LEVELS[signatureLevel({ qualified, onQualifiedDevice })] : NO_CERTIFICATE);
@@ -60,7 +64,7 @@
     >
   </span>
 {:else}
-  <div class="notice signature-level">
+  <div class="notice signature-level" class:ok={confirmed}>
     <div class="level-head">
       {@render marks()}<strong>{level.title}</strong>
     </div>
@@ -68,7 +72,9 @@
       {level.line}{#if !certificate}<Info label="About this signature level">{@render bubble()}</Info>{/if}
     </div>
     {#if children}<div>{@render children()}</div>{/if}
-    {#if certificate}
+    {#if checked}
+      <div class="level-limit">{@render checked()}</div>
+    {:else if certificate}
       <div class="level-limit">
         {NOT_CHECKED}<Info label="About this signature level">{@render bubble()}</Info>
       </div>

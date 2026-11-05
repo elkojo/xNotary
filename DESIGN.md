@@ -287,7 +287,8 @@ marks are diamonds (rotated squares) with a letter or two inside.
   qualified and that the key is on a certified device. "Advanced signature with a qualified
   certificate" is the qualified claim alone. "Signature with a certificate" is neither.
 - One line beneath the name says what the certificate says. One visible sentence says it was not
-  checked against a trust list. The EU names (QES, AdES/QC) belong in the ⓘ.
+  checked against a trust list, unless the screen did check (xSignature's Check screen), and then it
+  says which list and as of when. The EU names (QES, AdES/QC) belong in the ⓘ.
 - The steps are ink, never traffic-light colours: green would read as "valid", which nothing on the
   site establishes. Nothing in the wording may say "verified".
 - `app/src/site/SignatureLevel.svelte` implements it; `compact` is the one-line form for a list of

@@ -20,11 +20,27 @@ Three screens:
   own certificate, and optionally attach a timestamp. A document somebody has
   already signed can be signed again, which is how a contract gets a second
   party's name on it.
-- **Check a PDF** — read any PDF and report what it claims: a timestamp, a
-  signature of identity, or both. Whether the document still matches them,
+- **Check a signed file** — read any PDF or signature container (ASiC-E and ASiC-S:
+  `.asice`, `.asics`, `.sce`, `.scs`, `.bdoc`, sometimes named `.zip`) and report what it
+  claims: a timestamp, a signature of identity, or both. Whether the document still matches them,
   whether anything was appended afterwards, what the signer's certificate says
   about itself, and whether the certificates needed to trace it back are there.
   When they are not, they can be supplied and checked on the spot.
+
+A signature container is held to the same claims as a PDF: nothing on that screen says
+"valid", because that takes a trust list and a revocation check. What a file is comes from
+its bytes, since real containers arrive named `.zip`. A signature's value is checked before
+anything it says about the files is believed; a name and a time are only read from what it
+signed; a ZIP two programs could read differently is refused; and what cannot be completed
+is reported as not checked, never as intact. Counter-signatures and archive timestamps are
+checked too. A revocation answer the signature already carries is read and nothing is asked of
+anybody, so "not revoked" is reported as something the file says, with who said it. The issuer is
+looked up in this site's copy of the trusted lists, whose signatures are verified up to the EU's
+Official Journal when the site reads them, and the screen reports what the list says at the time of
+signing, naming the list and the date read. A revocation list the reader brings is checked against the
+issuer's key. None of this makes the screen a validator: it never says a signature is valid. Taking a signature out of a container leaves
+no trace, and the screen says that too. Real containers are never committed, because their
+certificates identify people. The tests generate their own.
 
 xSignature has no backend of its own and talks to no other application: the
 page loads, and from then on everything it does happens on your machine. The
