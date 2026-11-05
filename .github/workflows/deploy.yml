@@ -126,6 +126,13 @@ jobs:
       - name: Test
         run: npm test
 
+      # What "Fetch it" on Check a signed file reads. Collected here rather than committed, so the
+      # copies are as new as this release. An authority being down never stops a release: the
+      # screen handles a missing copy, and every copy is verified against the issuer's key.
+      - name: Collect revocation lists for xSignature
+        continue-on-error: true
+        run: npm run crls:refresh --prefix ../xsignature/app
+
       - name: Build
         # The whole site: the front page into dist/, xNotary into dist/xnotary/,
         # xSignature into dist/xsignature/.

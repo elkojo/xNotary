@@ -1,7 +1,7 @@
 import { Certificate } from 'pkijs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { authorityKeyIdOf, buildDirectory, findIssuers, keyIdOf, type DirectorySource } from './directory';
+import { authorityKeyIdOf, buildDirectory, DirectoryUnreachable, findIssuers, keyIdOf, siteDirectory, type DirectorySource } from './directory';
 import { makeChain, type GeneratedChain } from './fixtures/make-keys';
 
 const parse = (der: Uint8Array) => Certificate.fromBER(der.slice().buffer as ArrayBuffer);
@@ -102,5 +102,66 @@ describe('buildDirectory', () => {
       'd',
     );
     expect(Object.values(shards).flatMap((s) => Object.values(s.entries).flat())).toHaveLength(1);
+  });
+});
+
+describe('what a verified list records', () => {
+  const service = { n: ['Provider'], h: [{ s: 'granted', t: '2020-01-01T00:00:00Z', a: ['ForeSignatures'] }] };
+
+  it('travels with the certificate, and merges when one certificate identifies two services', async () => {
+    const { rootDer: der } = await makeChain();
+    const second = { ...service, n: ['Second'] };
+    const { shards } = await buildDirectory(
+      [
+        { der, tl: 'SK', services: [service] },
+        { der, tl: 'SK', services: [second] },
+      ],
+      '2026-11-05',
+    );
+    const entry = Object.values(Object.values(shards)[0].entries)[0][0];
+    expect(entry.s?.map((s) => s.n[0])).toEqual(['Provider', 'Second']);
+  });
+
+  it('is absent from a list nothing verified, which still completes a chain', async () => {
+    const { rootDer: der } = await makeChain();
+    const { shards } = await buildDirectory([{ der, tl: 'CH' }], '2026-11-05');
+    expect(Object.values(Object.values(shards)[0].entries)[0][0].s).toBeUndefined();
+  });
+});
+
+describe('the directory as this site serves it', () => {
+  const answering = (response: () => Promise<Response>) => {
+    const real = globalThis.fetch;
+    globalThis.fetch = response as typeof fetch;
+    return () => {
+      globalThis.fetch = real;
+    };
+  };
+  const read = () => siteDirectory('/x/')('42');
+
+  it('returns a shard', async () => {
+    const restore = answering(async () => new Response('{"asOf":"x"}'));
+    await expect(read()).resolves.toEqual({ asOf: 'x' });
+    restore();
+  });
+
+  it('says a missing file is missing', async () => {
+    const restore = answering(async () => new Response('', { status: 404 }));
+    await expect(read()).resolves.toBeNull();
+    restore();
+  });
+
+  it('does not mistake a server answering with its HTML page for a directory without the entry', async () => {
+    const restore = answering(async () => new Response('<!doctype html><html></html>'));
+    await expect(read()).rejects.toBeInstanceOf(DirectoryUnreachable);
+    restore();
+  });
+
+  it('does not mistake being offline for it either', async () => {
+    const restore = answering(async () => {
+      throw new TypeError('offline');
+    });
+    await expect(read()).rejects.toBeInstanceOf(DirectoryUnreachable);
+    restore();
   });
 });

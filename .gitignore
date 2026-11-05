@@ -28,3 +28,6 @@ coverage/
 # anyone reading it. The invariants they refer to are in CONTRIBUTING.md, where
 # a contributor would look for them.
 CLAUDE.md
+
+# Revocation list copies: collected when a release is built, 18 MB and changing daily.
+xsignature/app/public/crls/
