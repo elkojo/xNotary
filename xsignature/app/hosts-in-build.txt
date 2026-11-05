@@ -22,6 +22,7 @@ www.w3.org               # SVG and XMP namespaces
 ns.adobe.com             # XMP namespaces written by the PDF writer
 purl.org                 # Dublin Core, in XMP
 www.aiim.org             # PDF/A namespace
+uri.etsi.org             # the XAdES counter-signature reference type, compared as text
 
 # --- Never fetched: documentation and licence links -------------------------
 svelte.dev               # framework error messages

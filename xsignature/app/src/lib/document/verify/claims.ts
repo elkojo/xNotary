@@ -66,6 +66,8 @@ export interface CertificateClaims {
    */
   readonly onQualifiedDevice: boolean;
   readonly purpose: Purpose | null;
+  /** Every QcType it states: 1 signature, 2 seal, 3 website. The trust-list rules ask for all of them. */
+  readonly types: readonly (1 | 2 | 3)[];
   /** Years the authority undertakes to keep its records, when it says. */
   readonly retentionYears: number | null;
   /** A transaction value limit, when one is declared. */
@@ -115,6 +117,7 @@ export function claimsOf(certificate: Certificate): CertificateClaims {
     qualified: statements.has(QC_COMPLIANCE),
     onQualifiedDevice: statements.has(QC_SSCD),
     purpose: purposeFrom(statements.get(QC_TYPE)),
+    types: typesFrom(statements.get(QC_TYPE)),
     retentionYears: integerFrom(statements.get(QC_RETENTION)),
     limit: limitFrom(statements.get(QC_LIMIT_VALUE)),
     issuerUrl: accessUrlOf(certificate, CA_ISSUERS),
@@ -168,6 +171,19 @@ function purposeFrom(info: asn1js.AsnType | undefined): Purpose | null {
     }
   }
   return null;
+}
+
+function typesFrom(info: asn1js.AsnType | undefined): (1 | 2 | 3)[] {
+  const values = (info as asn1js.Sequence | undefined)?.valueBlock?.value ?? [];
+  const found: (1 | 2 | 3)[] = [];
+  for (const value of values) {
+    if (!(value instanceof asn1js.ObjectIdentifier)) continue;
+    const id = value.valueBlock.toString();
+    if (id === '0.4.0.1862.1.6.1') found.push(1);
+    if (id === '0.4.0.1862.1.6.2') found.push(2);
+    if (id === '0.4.0.1862.1.6.3') found.push(3);
+  }
+  return found;
 }
 
 function integerFrom(info: asn1js.AsnType | undefined): number | null {

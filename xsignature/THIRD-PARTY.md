@@ -14,6 +14,7 @@ is built into the bundle and served from the same origin as the app.
 | [opentype.js](https://github.com/opentypejs/opentype.js) | 2.0.0 | MIT | Reading `.ttf` files and turning text into glyph outlines |
 | [signature_pad](https://github.com/szimek/signature_pad) | 5.1.4 | MIT | Smoothing pointer input into curves, and weighting them by pen speed |
 | [@cantoo/pdf-lib](https://github.com/cantoo-scribe/pdf-lib) | 2.11.0 | MIT | Reading a PDF and writing the signature onto one of its pages |
+| [fflate](https://github.com/101arrowz/fflate) | 0.8.3 | MIT | Inflating the entries of a signature container |
 | [pdfjs-dist](https://github.com/mozilla/pdf.js) | 6.3.289 | Apache-2.0 | Drawing a page on screen so the signature can be positioned on it |
 | [pkijs](https://github.com/PeculiarVentures/PKI.js) | 3.4.0 | BSD-3-Clause | Building the RFC 3161 timestamp request and reading the reply |
 | [asn1js](https://github.com/PeculiarVentures/ASN1.js) | 3.0.10 | BSD-3-Clause | The ASN.1 encoding underneath it |
