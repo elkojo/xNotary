@@ -24,8 +24,8 @@ account.
   every "I want to…" menu; the front page now leads with it.
 - **Languages** (`docs/i18n.md`): browser translation made safe (data marked `translate="no"`,
   labels that stay true); a Czech layer for the bar, front page and `/situations/`. An **EN | CS**
-  switcher shows for everyone; Czech is **unreviewed**, so no browser starts in it automatically
-  until a native reviewer signs it off.
+  switcher shows for everyone; Czech was unreviewed in that release, so no browser started in it automatically. The owner signed
+  it off on 2026-11-06, and from the next release a Czech browser starts in Czech.
 
 ### Check after the deploy
 - `/version.json` is served with `cache-control: no-store`.

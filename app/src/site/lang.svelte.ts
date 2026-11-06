@@ -8,9 +8,9 @@
  * translated by the browser, which is why everything this layer translates is also marked
  * translate="no" with its own lang — so a browser translator leaves it alone.
  *
- * The switcher offers every language to everyone (owner's decision, 2026-10-28). Until a native
- * speaker — a lawyer for the legal parts — has approved a language, `reviewed` is false and it is
- * never chosen automatically: a Czech browser still starts in English, and the reader chooses.
+ * The switcher offers every language to everyone (owner's decision, 2026-10-28). Until someone has
+ * signed a language off, `reviewed` is false and it is never chosen automatically: a browser in that
+ * language starts in English, and the reader chooses. Czech was signed off by the owner on 2026-11-06.
  */
 export type Lang = 'en' | 'cs';
 

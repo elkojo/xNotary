@@ -3,8 +3,8 @@
  * mirrors its shape exactly (situations.test.ts checks it) and uses the legal terms in
  * glossary.ts, never a near miss — "zaručený", not "pokročilý"; "uznávaný", not "uznaný".
  *
- * Unreviewed until a native speaker, a lawyer for the legal parts, has approved it: see
- * LANGUAGES in lang.svelte.ts and docs/i18n.md.
+ * Approved by the owner on 2026-11-06; changed text gets the same review: see LANGUAGES in
+ * lang.svelte.ts and docs/i18n.md.
  */
 import type { JourneyId, Light, NodeId } from './situations';
 
