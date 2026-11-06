@@ -38,7 +38,7 @@ import { factsFor, readTimestampToken, timestampTokenFrom, type AttachedTimestam
 import { C14N_10, canonicalize, isCanonicalization } from './c14n';
 import { revocationOf, type EmbeddedRevocation } from './revocation';
 import { blankSignature, type ContainerSignature, type ContainerVerdict } from './types';
-import { childNamed, childrenNamed, decodeBase64, descendantsNamed, descendantsOf, digest, DIGESTS, DS, sameBytes } from './xml';
+import { childNamed, childrenNamed, decodeBase64, descendantsNamed, descendantsOf, digest, DIGESTS, DS, fileNamed, sameBytes } from './xml';
 
 const M = 'http://www.w3.org/2001/04/xmldsig-more#';
 const M07 = 'http://www.w3.org/2007/05/xmldsig-more#';
@@ -80,24 +80,6 @@ type ReferenceResult =
   | { readonly status: 'missing'; readonly file: string }
   | { readonly status: 'cannot-check'; readonly why: string };
 
-/**
- * A file named by a reference. Percent-decoded, as a URI; then the name as it
- * stands, since some writers do not encode; then by Unicode form, since a Mac
- * writes the other one. Never by anything looser: `report.pdf` is not `Report.pdf`.
- */
-function fileFor(uri: string, files: ReadonlyMap<string, Uint8Array>): string | null {
-  let decoded = uri;
-  try {
-    decoded = decodeURIComponent(uri);
-  } catch {
-    // Not valid percent-encoding, so the name as it stands is all there is.
-  }
-  if (files.has(decoded)) return decoded;
-  if (files.has(uri)) return uri;
-  const form = decoded.normalize('NFC');
-  return [...files.keys()].find((name) => name.normalize('NFC') === form) ?? null;
-}
-
 async function checkReference(
   reference: Element,
   signature: Element,
@@ -127,7 +109,7 @@ async function checkReference(
     if (transforms.length > 0) {
       return { status: 'cannot-check', why: 'It transforms a file before signing it, which this check does not do.' };
     }
-    const file = fileFor(uri, files);
+    const file = fileNamed(uri, files);
     if (!file) {
       let named = uri;
       try {
@@ -379,7 +361,7 @@ function bytesOfReference(reference: Element, signature: Element, files: Readonl
 
   if (!uri.startsWith('#')) {
     if (transforms.length > 0) return null;
-    const file = fileFor(uri, files);
+    const file = fileNamed(uri, files);
     return file ? files.get(file)! : null;
   }
 

@@ -1,4 +1,6 @@
 /** What checking a signature container reports. */
+import type { Certificate } from 'pkijs';
+
 import { NO_SIGNER, type AttachedTimestamp, type SignerFacts } from '../signer';
 import type { RevocationAnswer } from './revocation';
 
@@ -90,6 +92,8 @@ export interface ContainerArchive {
   readonly standing: AttachedTimestamp['standing'] | 'unreadable';
   readonly time: Date | null;
   readonly signedBy: string | null;
+  /** The certificate that made it, for asking whether that authority is listed. */
+  readonly certificate: Certificate | null;
   /** Parts it lists whose bytes no longer match. */
   readonly changed: readonly string[];
   /** Parts it lists that are no longer in the container. */

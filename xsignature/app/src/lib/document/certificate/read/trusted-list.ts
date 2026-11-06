@@ -114,6 +114,11 @@ function readState(element: Element): ServiceState {
   };
 }
 
+const KINDS: ReadonlyArray<readonly ['ca' | 'tsa', RegExp]> = [
+  ['ca', /\/TrstSvc\/Svctype\/CA\/QC$/],
+  ['tsa', /\/TrstSvc\/Svctype\/TSA\/QTST$/],
+];
+
 export interface ReadService {
   /** Base64 of each certificate that identifies the service. */
   readonly certificates: readonly string[];
@@ -140,19 +145,29 @@ export function readQualifiedServices(list: Element): ReadService[] {
 
     for (const entry of descendantsNamed(provider, 'TSPService')) {
       const current = childNamed(entry, 'ServiceInformation');
-      const type = current ? text(childNamed(current, 'ServiceTypeIdentifier')) : '';
-      const kind = /\/TrstSvc\/Svctype\/CA\/QC$/.test(type) ? 'ca' : /\/TrstSvc\/Svctype\/TSA\/QTST$/.test(type) ? 'tsa' : null;
-      if (!current || !kind) continue;
+      if (!current) continue;
 
+      // Current and historical: a service may have been re-keyed or retyped, and a signature made
+      // years ago still needs what it was then. Only the states of the kind in question count.
       const history = childNamed(entry, 'ServiceHistory');
-      const states = [current, ...(history ? childrenNamed(history, 'ServiceHistoryInstance') : [])].map(readState);
-      const identity = childNamed(current, 'ServiceDigitalIdentity');
-      found.push({
-        certificates: identity ? descendantsNamed(identity, 'X509Certificate').map((element) => text(element).replace(/\s/g, '')) : [],
-        service: { n: [...new Set(names)], h: states },
-        supplyPoints: descendantsNamed(current, 'ServiceSupplyPoint').map(text),
-        kind,
-      });
+      const instances = [current, ...(history ? childrenNamed(history, 'ServiceHistoryInstance') : [])];
+      for (const [kind, pattern] of KINDS) {
+        const matching = instances.filter((instance) => pattern.test(text(childNamed(instance, 'ServiceTypeIdentifier'))));
+        if (matching.length === 0) continue;
+        found.push({
+          certificates: [
+            ...new Set(
+              matching.flatMap((instance) => {
+                const identity = childNamed(instance, 'ServiceDigitalIdentity');
+                return identity ? descendantsNamed(identity, 'X509Certificate').map((element) => text(element).replace(/\s/g, '')) : [];
+              }),
+            ),
+          ],
+          service: { n: [...new Set(names)], h: matching.map(readState) },
+          supplyPoints: descendantsNamed(current, 'ServiceSupplyPoint').map(text),
+          kind,
+        });
+      }
     }
   }
   return found;

@@ -242,7 +242,7 @@ const HASH_OIDS: Record<string, string> = {
 export async function makeTimestampToken(
   stamped: Uint8Array,
   authority: Signer,
-  options: { hash?: string; hashOid?: string; constructed?: boolean } = {},
+  options: { hash?: string; hashOid?: string; constructed?: boolean; at?: Date } = {},
 ): Promise<Uint8Array> {
   const hash = options.hash ?? 'SHA-256';
   const info = new TSTInfo({
@@ -253,7 +253,7 @@ export async function makeTimestampToken(
       hashedMessage: new asn1js.OctetString({ valueHex: buffer(await sha(stamped, hash)) }),
     }),
     serialNumber: new asn1js.Integer({ value: 1 }),
-    genTime: new Date(Date.UTC(2026, 10, 5, 10, 0, 7)),
+    genTime: options.at ?? new Date(Date.UTC(2026, 10, 5, 10, 0, 7)),
   });
 
   const signed = new SignedData({

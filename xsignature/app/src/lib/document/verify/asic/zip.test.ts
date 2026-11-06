@@ -137,6 +137,37 @@ describe('what would give two programs two different files', () => {
     refused(rawZip([{ name: 'a.txt', bytes: signed, hiddenAfter: hidden }, entry('b.txt')]));
   });
 
+  it('a directory entry with a payload, which some programs would extract as a file', () => {
+    refused(rawZip([{ name: 'x/', bytes: utf8('hidden'), localName: 'report.pdf' }]));
+    refused(rawZip([{ name: 'x/', bytes: utf8('hidden') }]));
+  });
+
+  it('accepts an honest empty directory', () => {
+    expect(readZip(rawZip([{ name: 'x/', bytes: new Uint8Array(0) }, entry('x/a.txt')])).map((e) => e.name)).toEqual(['x/a.txt']);
+  });
+
+  it('a zip64 record that does not describe this directory, or any other bytes before the end', () => {
+    // A record whose locator points elsewhere: programs honouring it read another directory.
+    const zip = rawZip([entry('a.txt')]);
+    const end = zip.length - 22;
+    const record = new Uint8Array(56 + 20);
+    const view = new DataView(record.buffer);
+    view.setUint32(0, 0x06064b50, true);
+    view.setBigUint64(4, 44n, true);
+    view.setUint32(56, 0x07064b50, true);
+    view.setBigUint64(64, 999n, true);
+    const spliced = new Uint8Array(zip.length + record.length);
+    spliced.set(zip.subarray(0, end));
+    spliced.set(record, end);
+    spliced.set(zip.subarray(end), end + record.length);
+    refused(spliced);
+
+    const junk = new Uint8Array(zip.length + 8);
+    junk.set(zip.subarray(0, end));
+    junk.set(zip.subarray(end), end + 8);
+    refused(junk);
+  });
+
   it('a name with a dot in its path, which lands on the same file as one without', () => {
     refused(rawZip([entry('a.txt'), entry('./a.txt')]));
     refused(rawZip([entry('folder//a.txt')]));

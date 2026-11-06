@@ -31,6 +31,7 @@ const END_OF_CENTRAL_DIRECTORY = 0x06054b50;
 const CENTRAL_HEADER = 0x02014b50;
 const LOCAL_HEADER = 0x04034b50;
 const ZIP64_END = 0x06064b50;
+const ZIP64_LOCATOR = 0x07064b50;
 const ZIP64_EXTRA = 0x0001;
 const NOT_IN_FIELD = 0xffffffff;
 const UTF8_NAME_FLAG = 0x0800;
@@ -115,12 +116,12 @@ function readEntries(zip: Uint8Array, view: DataView): ZipEntry[] {
     seen.add(key);
 
     const isDirectory = name.endsWith('/');
-    if (!isDirectory) {
-      if (method !== 0 && method !== 8) throw new ContainerRefused(DAMAGED);
-      unpacked += size;
-      if (unpacked > MAX_UNPACKED_BYTES) {
-        throw new ContainerRefused('This container unpacks to more than 512 MB, which is too large to check in a browser.');
-      }
+    // A directory holds nothing. One with a payload is a file only some programs would find.
+    if (isDirectory && size !== 0) throw new ContainerRefused(TWO_READINGS);
+    if (method !== 0 && method !== 8) throw new ContainerRefused(DAMAGED);
+    unpacked += size;
+    if (unpacked > MAX_UNPACKED_BYTES) {
+      throw new ContainerRefused('This container unpacks to more than 512 MB, which is too large to check in a browser.');
     }
     listed.push({ name, rawName, size, compressedSize, offset, method, crc, flags, isDirectory });
   }
@@ -128,7 +129,7 @@ function readEntries(zip: Uint8Array, view: DataView): ZipEntry[] {
   // Every byte has to belong to the archive: the first entry starts the file, nothing but the
   // directory's own closing records sits before the end record, and there is nothing between
   // entries. A local entry the directory does not list is another file some programs will find.
-  if (position !== end && view.getUint32(position, true) !== ZIP64_END) throw new ContainerRefused(DAMAGED);
+  if (position !== end) refuseUnlessZip64Records(view, position, end, directoryOffset, count);
   const ordered = [...listed].sort((a, b) => a.offset - b.offset);
   if (ordered.length > 0 && ordered[0].offset !== 0) {
     throw new ContainerRefused('Something has been placed in front of this container, so programs may disagree about what it is. It cannot be checked as it stands.');
@@ -138,7 +139,29 @@ function readEntries(zip: Uint8Array, view: DataView): ZipEntry[] {
     refuseGap(entryEnd(view, entry), nextStart, entry);
   });
 
-  return listed.filter((entry) => !entry.isDirectory).map((entry) => ({ name: entry.name, bytes: readEntry(zip, view, entry) }));
+  // Directories too, so that their local headers are held to the same comparison.
+  const read = listed.map((entry) => ({ entry, bytes: readEntry(zip, view, entry) }));
+  return read.filter(({ entry }) => !entry.isDirectory).map(({ entry, bytes }) => ({ name: entry.name, bytes }));
+}
+
+/**
+ * The only thing allowed between the directory and the end record: a zip64 end record describing
+ * this same directory, and the locator pointing at it. Some programs follow a locator whenever one is
+ * present, so one pointing at a second directory is a second reading of the file.
+ */
+function refuseUnlessZip64Records(view: DataView, position: number, end: number, directoryOffset: number, count: number): void {
+  if (view.getUint32(position, true) !== ZIP64_END) throw new ContainerRefused(DAMAGED);
+  const recordLength = 12 + Number(view.getBigUint64(position + 4, true));
+  const locator = position + recordLength;
+  if (
+    locator + 20 !== end ||
+    view.getUint32(locator, true) !== ZIP64_LOCATOR ||
+    Number(view.getBigUint64(locator + 8, true)) !== position ||
+    Number(view.getBigUint64(position + 32, true)) !== count ||
+    Number(view.getBigUint64(position + 48, true)) !== directoryOffset
+  ) {
+    throw new ContainerRefused(TWO_READINGS);
+  }
 }
 
 const DATA_DESCRIPTOR_FLAG = 0x0008;

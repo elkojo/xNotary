@@ -12,6 +12,7 @@ const facts = (over: Partial<CertificateFacts> = {}): CertificateFacts => ({
   policies: ['1.2.3.4'],
   keyUsage: { digitalSignature: false, nonRepudiation: true, stated: true },
   notBefore: new Date('2025-01-01T00:00:00Z'),
+  notAfter: new Date('2028-01-01T00:00:00Z'),
   issuerCountry: 'SK',
   issuerOrganization: 'Národná agentúra',
   ...over,
@@ -45,6 +46,13 @@ describe('a certificate from a granted service', () => {
 
   it('is not qualified when the certificate does not say so and the list adds nothing', () => {
     expect(check([service()], facts({ qualified: false, types: [] })).result).toBe('not-qualified');
+  });
+});
+
+describe('the certificate\'s own dates', () => {
+  it('is not qualified at a time outside them, however the service stands', () => {
+    expect(check([service()], facts(), new Date('2028-06-01T00:00:00Z')).result).toBe('not-qualified');
+    expect(check([service()], facts(), new Date('2024-06-01T00:00:00Z')).result).toBe('not-qualified');
   });
 });
 

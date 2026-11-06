@@ -79,3 +79,21 @@ export function parseXmlBytes(bytes: Uint8Array, parse: ParseXml): Document {
   if (!parsed.documentElement) throw new Error('Not well-formed XML');
   return parsed;
 }
+
+/**
+ * A file named by a signature or a manifest. Percent-decoded, as a URI; then the name as it stands,
+ * since some writers do not encode; then by Unicode form, since a Mac writes the other one. Never by
+ * anything looser: `report.pdf` is not `Report.pdf`.
+ */
+export function fileNamed(uri: string, files: ReadonlyMap<string, Uint8Array>): string | null {
+  let decoded = uri;
+  try {
+    decoded = decodeURIComponent(uri);
+  } catch {
+    // Not valid percent-encoding, so the name as it stands is all there is.
+  }
+  if (files.has(decoded)) return decoded;
+  if (files.has(uri)) return uri;
+  const form = decoded.normalize('NFC');
+  return [...files.keys()].find((name) => name.normalize('NFC') === form) ?? null;
+}

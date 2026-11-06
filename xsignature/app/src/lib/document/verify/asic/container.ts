@@ -110,7 +110,9 @@ async function checkEntries(entries: readonly ZipEntry[], parse: ParseXml, fromF
   const claimed = new Set<string>();
   for (const source of [...manifestFiles, ...archiveManifests]) {
     try {
-      claimed.add(signatureNamedIn(parseXmlBytes(files.get(source)!, parse).documentElement));
+      const named = signatureNamedIn(parseXmlBytes(files.get(source)!, parse).documentElement);
+      // An archive manifest can only claim a token. Naming a signature file must not hide it.
+      if (manifestFiles.includes(source) || /\.tst$/i.test(named)) claimed.add(named);
     } catch {
       // An unreadable list claims nothing. It is reported where it is checked.
     }
@@ -133,14 +135,23 @@ async function checkEntries(entries: readonly ZipEntry[], parse: ParseXml, fromF
   const checkedArchives: Array<ContainerArchive & { readonly lists: readonly string[] }> = [];
   for (const source of archiveManifests) checkedArchives.push(await checkArchive(source, files, signatures, parse));
   const archives: ContainerArchive[] = checkedArchives.map(({ lists: _lists, ...archive }) => {
-    const renewal = checkedArchives.find(
-      (other) =>
-        other.source !== archive.source &&
-        other.standing === 'holds' &&
-        other.changed.length === 0 &&
-        other.missing.length === 0 &&
-        other.lists.includes(archive.source),
-    );
+    // Renewal adds evidence to signature files and changes nothing else, and comes later. So a data
+    // file changing or going missing is never explained by it. Whether the renewing authority means
+    // anything is for the screen, which can ask a list.
+    const explicable =
+      archive.missing.length === 0 && archive.changed.every((name) => name.startsWith(META)) && archive.time !== null;
+    const renewal = !explicable
+      ? undefined
+      : checkedArchives.find(
+          (other) =>
+            other.source !== archive.source &&
+            other.standing === 'holds' &&
+            other.changed.length === 0 &&
+            other.missing.length === 0 &&
+            other.time !== null &&
+            other.time.getTime() > archive.time!.getTime() &&
+            other.lists.includes(archive.source),
+        );
     return { ...archive, renewedBy: renewal?.source ?? null };
   });
 
@@ -174,7 +185,7 @@ async function checkArchive(
   signatures: readonly ContainerSignature[],
   parse: ParseXml,
 ): Promise<ContainerArchive & { readonly lists: readonly string[] }> {
-  const blank = { source, time: null, signedBy: null, changed: [], missing: [], coversEverySignature: false, renewedBy: null, lists: [] };
+  const blank = { source, time: null, signedBy: null, certificate: null, changed: [], missing: [], coversEverySignature: false, renewedBy: null, lists: [] };
 
   let root: Element;
   try {
@@ -206,6 +217,7 @@ async function checkArchive(
     standing: stamp.standing,
     time: stamp.time,
     signedBy: stamp.signedBy,
+    certificate: stamp.certificate,
     changed: listed.changed,
     missing: listed.missing,
     coversEverySignature: signatureFiles.every((name) => listed.covers.includes(name)),

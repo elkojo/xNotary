@@ -51,6 +51,7 @@ export interface CertificateFacts {
   readonly policies: readonly string[];
   readonly keyUsage: CertificateClaims['keyUsage'];
   readonly notBefore: Date;
+  readonly notAfter: Date;
   readonly issuerCountry: string | null;
   readonly issuerOrganization: string | null;
 }
@@ -210,6 +211,11 @@ export function checkAgainstList(
     return cannot('It dates from before 1 July 2016, when older rules applied that this check does not read.');
   }
 
+  // A certificate outside its own dates was not a qualified certificate then, whatever the list says.
+  if (moment.getTime() < certificate.notBefore.getTime() || moment.getTime() > certificate.notAfter.getTime()) {
+    return { result: 'not-qualified', onQualifiedDevice: null, detail: 'The certificate was not valid at that time.' };
+  }
+
   // PRO-4.4.4-01: the certificate's issuer has to belong to the country whose list this is.
   const country = certificate.issuerCountry?.toUpperCase();
   const expected = country === 'GR' ? 'EL' : country === 'GB' ? 'UK' : country;
@@ -268,6 +274,7 @@ export function factsOf(certificate: Certificate, claims: CertificateClaims, typ
     policies: policies?.certificatePolicies?.map((policy) => policy.policyIdentifier) ?? [],
     keyUsage: claims.keyUsage,
     notBefore: certificate.notBefore.value,
+    notAfter: certificate.notAfter.value,
     issuerCountry: name('2.5.4.6'),
     issuerOrganization: name('2.5.4.10'),
   };

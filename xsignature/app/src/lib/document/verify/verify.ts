@@ -218,6 +218,9 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
   // mean different things to the reader. Only a digest that does not match says
   // the file changed; the rest say something about the token.
   const noun = isTimestamp ? 'timestamp' : 'signature';
+  // Until the value holds, the name, the time and any timestamp beside it are only what the file
+  // says, and a real certificate copied onto a forgery must not collect a list's approval.
+  const unproven = { ...shared, ...NO_SIGNER, certificateCount: described.certificateCount, time: null, policy: null, timestamp: null };
   const stamp = isTimestamp ? await readTimestampToken(signed, covered) : null;
   const outcome = isTimestamp
     ? stamp?.standing === 'holds'
@@ -233,7 +236,7 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
       return { ...described, verdict: 'intact', detail: '' };
     case 'bad-signature':
       return {
-        ...described,
+        ...unproven,
         verdict: 'broken',
         detail: isTimestamp
           ? 'The timestamp covers this file, but its own signature does not check out against the certificate inside it.'
@@ -241,13 +244,13 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
       };
     case 'no-certificate':
       return {
-        ...described,
+        ...unproven,
         verdict: 'broken',
         detail: `This ${noun} does not carry the certificate it says it was made with, so nobody can be named as its signer and it cannot be checked.`,
       };
     case 'cannot-check':
       return {
-        ...described,
+        ...unproven,
         verdict: 'unreadable',
         detail: `This ${noun} uses an algorithm this browser cannot check. That says nothing either way about whether it holds.`,
       };

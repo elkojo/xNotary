@@ -24,7 +24,7 @@ import {
 } from '../signer';
 import { revocationInCms, revocationOf } from './revocation';
 import { blankSignature, type ContainerSignature, type ParseXml, type UncheckedPart } from './types';
-import { childNamed, decodeBase64, descendantsNamed, digest, DIGESTS, DS, parseXmlBytes, sameBytes } from './xml';
+import { childNamed, decodeBase64, descendantsNamed, digest, DIGESTS, DS, fileNamed, parseXmlBytes, sameBytes } from './xml';
 
 const SIGNING_TIME = '1.2.840.113549.1.9.5';
 const MESSAGE_DIGEST = '1.2.840.113549.1.9.4';
@@ -55,12 +55,13 @@ export async function readListedFiles(
 ): Promise<ListedFiles> {
   const result: ListedFiles = { covers: [], changed: [], missing: [], cannotCheck: null };
   for (const listed of descendantsNamed(root, 'DataObjectReference')) {
-    const name = decodedUri(listed.getAttribute('URI') ?? '');
-    const bytes = files.get(name);
-    if (!bytes) {
-      result.missing.push(name);
+    const uri = listed.getAttribute('URI') ?? '';
+    const name = fileNamed(uri, files);
+    if (!name) {
+      result.missing.push(decodedUri(uri));
       continue;
     }
+    const bytes = files.get(name)!;
 
     const method = childNamed(listed, 'DigestMethod', DS)?.getAttribute('Algorithm') ?? '';
     const hash = DIGESTS[method];

@@ -38,6 +38,7 @@ const service = (type: string) => `<TSPService><ServiceInformation>
   </ServiceInformationExtensions>
 </ServiceInformation>
 <ServiceHistory><ServiceHistoryInstance>
+  <ServiceTypeIdentifier>http://uri.etsi.org/TrstSvc/Svctype/${type}</ServiceTypeIdentifier>
   <ServiceStatus>${STATUS}undersupervision</ServiceStatus>
   <StatusStartingTime>2019-01-01T00:00:00Z</StatusStartingTime>
 </ServiceHistoryInstance></ServiceHistory></TSPService>`;
@@ -59,6 +60,18 @@ describe('reading a list', () => {
 
   it('keeps the certificate, without its whitespace', () => {
     expect(read.certificates).toEqual(['QUJDREVG']);
+  });
+
+  it('keeps a certificate that appears only in the service\'s history, and only that state', () => {
+    const rekeyed = `<TrustServiceStatusList xmlns="${T}"><TrustServiceProviderList><TrustServiceProvider><TSPInformation><TSPName><Name>P</Name></TSPName></TSPInformation><TSPServices><TSPService>
+      <ServiceInformation><ServiceTypeIdentifier>http://uri.etsi.org/TrstSvc/Svctype/CA/QC</ServiceTypeIdentifier><ServiceDigitalIdentity><DigitalId><X509Certificate>TkVX</X509Certificate></DigitalId></ServiceDigitalIdentity><ServiceStatus>${STATUS}granted</ServiceStatus><StatusStartingTime>2024-01-01T00:00:00Z</StatusStartingTime></ServiceInformation>
+      <ServiceHistory>
+        <ServiceHistoryInstance><ServiceTypeIdentifier>http://uri.etsi.org/TrstSvc/Svctype/CA/QC</ServiceTypeIdentifier><ServiceDigitalIdentity><DigitalId><X509Certificate>T0xE</X509Certificate></DigitalId></ServiceDigitalIdentity><ServiceStatus>${STATUS}granted</ServiceStatus><StatusStartingTime>2020-01-01T00:00:00Z</StatusStartingTime></ServiceHistoryInstance>
+        <ServiceHistoryInstance><ServiceTypeIdentifier>http://uri.etsi.org/TrstSvc/Svctype/PKC</ServiceTypeIdentifier><ServiceStatus>${STATUS}granted</ServiceStatus><StatusStartingTime>2018-01-01T00:00:00Z</StatusStartingTime></ServiceHistoryInstance>
+      </ServiceHistory></TSPService></TSPServices></TrustServiceProvider></TrustServiceProviderList></TrustServiceStatusList>`;
+    const [only] = readQualifiedServices(parseList(rekeyed));
+    expect(only.certificates).toEqual(['TkVX', 'T0xE']);
+    expect(only.service.h.map((state) => state.t)).toEqual(['2024-01-01T00:00:00Z', '2020-01-01T00:00:00Z']);
   });
 
   it('keeps the provider\'s names, trade name included', () => {

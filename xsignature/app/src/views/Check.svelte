@@ -19,7 +19,38 @@
   import type { CheckedContainer, ContainerFile, ContainerSignature } from '../lib/document/verify/asic/types';
   import { ContainerRefused, looksLikeZip, printable, savedName } from '../lib/document/verify/asic/zip';
   import { checkSignatures, type CheckedSignature } from '../lib/document/verify/verify';
+  import { listedTimeAuthority, siteDirectory } from '../lib/document/certificate/read/directory';
+  import { timeAuthorityGrantedAt } from '../lib/document/verify/trust';
+  import type { Certificate } from 'pkijs';
   import SignerChecks from './SignerChecks.svelte';
+
+  /** Which archive timestamps' authorities are on a verified list, granted at the time they state. */
+  let listedAuthorities = $state<Set<Certificate>>(new Set());
+
+  $effect(() => {
+    const container = opened;
+    if (!container) return;
+    const stamps = [
+      ...container.archives.map((archive) => ({ certificate: archive.certificate, time: archive.time })),
+      ...container.signatures.flatMap((signature) => signature.archiveTimestamps.map((stamp) => ({ certificate: stamp.certificate, time: stamp.time as Date | null }))),
+    ];
+    void (async () => {
+      const source = siteDirectory(import.meta.env.BASE_URL);
+      const found = new Set<Certificate>();
+      for (const { certificate, time } of stamps) {
+        if (!certificate || !time) continue;
+        try {
+          const authority = await listedTimeAuthority(certificate, source);
+          if (authority && timeAuthorityGrantedAt(authority.services, time)) found.add(certificate);
+        } catch {
+          // Not reached is not listed: nothing is claimed for it.
+        }
+      }
+      listedAuthorities = found;
+    })();
+  });
+
+  const isListed = (certificate: Certificate | null): boolean => !!certificate && listedAuthorities.has(certificate);
 
   let fileName = $state('');
   let fileSize = $state(0);
@@ -274,7 +305,8 @@
             {/if}
 
             {#each opened.archives as archive}
-              {#if archive.standing === 'holds' && archive.renewedBy && (archive.changed.length > 0 || archive.missing.length > 0)}
+              {@const renewal = opened.archives.find((other) => other.source === archive.renewedBy)}
+              {#if archive.standing === 'holds' && renewal && isListed(renewal.certificate) && (archive.changed.length > 0 || archive.missing.length > 0)}
                 <div class="notice">
                   <strong>An older archive timestamp no longer matches, and a newer one covers it.</strong>
                   So the protection here rests on the newer one.<Info
@@ -298,6 +330,11 @@
                 <div class="notice warn">
                   <strong>The archive timestamp does not cover every signature here.</strong>
                   A signature outside it gets no long-term protection from it.
+                </div>
+              {:else if archive.standing === 'holds' && !isListed(archive.certificate)}
+                <div class="notice">
+                  <strong>An archive timestamp from {archive.signedBy ?? 'an unnamed authority'} covers the signatures here.</strong>
+                  That authority is not on a list this site could verify, so its date is not confirmed.
                 </div>
               {:else if archive.standing === 'holds'}
                 <div class="notice ok">
@@ -468,7 +505,12 @@
                 {/if}
 
                 {#each signature.archiveTimestamps as stamp}
-                  {#if stamp.standing === 'holds'}
+                  {#if stamp.standing === 'holds' && !isListed(stamp.certificate)}
+                    <div class="notice">
+                      <strong>An archive timestamp from {stamp.signedBy ?? 'an unnamed authority'} also covers this signature.</strong>
+                      That authority is not on a list this site could verify, so its date is not confirmed.
+                    </div>
+                  {:else if stamp.standing === 'holds'}
                     <div class="notice ok">
                       <strong>An archive timestamp also covers this signature.</strong>
                       {stamp.signedBy ?? 'An authority'} dated it {when(stamp.time)}.

@@ -106,3 +106,22 @@ describe('checkSignatures', () => {
     expect(await checkSignatures(plain)).toEqual([]);
   });
 });
+
+describe('a signature that does not hold', () => {
+  it('names nobody and dates nothing, so a copied certificate collects no approval', async () => {
+    // TIMESTAMPED carries a real token. Damaging its signature value must not leave its facts standing.
+    const tampered = TIMESTAMPED.slice();
+    const [found] = findSignatures(TIMESTAMPED);
+    const holeEnd = found.byteRange[2] - 1;
+    const text = new TextDecoder('latin1').decode(TIMESTAMPED.subarray(found.byteRange[1], holeEnd));
+    const lastNonZero = text.replace(/0+$/, '').length - 1;
+    const at = found.byteRange[1] + lastNonZero;
+    tampered[at] = tampered[at] === 0x41 ? 0x42 : 0x41;
+
+    const [checked] = await checkSignatures(tampered);
+    expect(['broken', 'unreadable']).toContain(checked.verdict);
+    expect(checked.signedBy).toBeNull();
+    expect(checked.certificate).toBeNull();
+    expect(checked.timestamp).toBeNull();
+  });
+});

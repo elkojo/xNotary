@@ -319,12 +319,12 @@
     void fetchRevocationList();
   });
 
-  const listBacksIt = $derived(standing?.result === 'qualified' && moment?.independent === true);
+  const listBacksIt = $derived(standing?.result === 'qualified' && moment?.independent === true && validWhenUsed);
   /**
    * Green only when all of it holds: the list backs this certificate, at a time an authority dated,
    * the reader has confirmed this is the newest copy, and that copy has not outlived its list.
    */
-  const levelConfirmed = $derived(listBacksIt && confirmedCurrent && !listOverdue);
+  const levelConfirmed = $derived(listBacksIt && confirmedCurrent && !listOverdue && standing?.onQualifiedDevice !== null);
 </script>
 
 {#if lookupFailed}
@@ -492,6 +492,9 @@
           >
           {#if refreshed}<span>{refreshed}</span>{/if}
         </span>
+        {#if standing.result === 'qualified' && standing.onQualifiedDevice === null}
+          <span>The list does not settle whether the key is on a qualified device, so that part is only what the certificate says.</span>
+        {/if}
         {#if listOverdue && listFacts}
           <span>This copy is out of date: the list named {day(listFacts.next)} for its next issue.</span>
         {/if}

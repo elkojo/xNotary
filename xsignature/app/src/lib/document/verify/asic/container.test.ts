@@ -793,7 +793,7 @@ describe('an ASiCArchiveManifest', () => {
 
     // The older one listed the signature file as it was before evidence was added.
     const older = await makeManifest(OLDER_TST, { ...parts, [P7S]: utf8('the signature file, before renewal') });
-    const olderToken = await makeTimestampToken(older, authority);
+    const olderToken = await makeTimestampToken(older, authority, { at: new Date(Date.UTC(2025, 0, 1)) });
     const newer = await makeManifest(TST, { ...parts, [OLDER]: older, [OLDER_TST]: olderToken });
 
     const { archives } = await check(
@@ -989,6 +989,47 @@ describe('a CMS over another document', () => {
     expect(signatures[0].covers).toEqual([]);
     expect(signatures[0].signedBy).toBeNull();
     expect(files[0].coveredBy).toEqual([]);
+  });
+});
+
+describe('findings from review', () => {
+  it('finds a file the manifest names in the other Unicode form', async () => {
+    const nfc = 'smlouva-č.pdf'.normalize('NFC');
+    const nfd = nfc.normalize('NFD');
+    const P7S = 'META-INF/signature001.p7s';
+    const manifest = await makeManifest(P7S, { [nfc]: CONTENT });
+    const { signatures } = await check(container({ [nfd]: CONTENT, 'META-INF/ASiCManifest.xml': manifest, [P7S]: await makeCades(manifest, signer) }));
+    expect(signatures[0].verdict).toBe('intact');
+  });
+
+  it('does not let an archive manifest hide a signature file by naming it', async () => {
+    const p7s = await makeCades(CONTENT, signer);
+    const archive = await makeManifest('META-INF/signature.p7s', FILES);
+    const { signatures } = await check(container({ ...FILES, 'META-INF/signature.p7s': p7s, 'META-INF/ASiCArchiveManifest.xml': archive }, ASIC_S));
+    expect(signatures).toHaveLength(1);
+    expect(signatures[0].verdict).toBe('intact');
+  });
+
+  const renewalParts = async (older: Record<string, Uint8Array>) => {
+    const P7S = 'META-INF/signature001.p7s';
+    const manifest = await makeManifest(P7S, FILES);
+    const parts = { ...FILES, 'META-INF/ASiCManifest.xml': manifest, [P7S]: await makeCades(manifest, signer) };
+    const olderList = await makeManifest('META-INF/timestamp000.tst', { ...parts, ...older });
+    const olderToken = await makeTimestampToken(olderList, authority, { at: new Date(Date.UTC(2025, 0, 1)) });
+    const all = { ...parts, 'META-INF/ASiCArchiveManifest1.xml': olderList, 'META-INF/timestamp000.tst': olderToken };
+    const newer = await makeManifest('META-INF/timestamp001.tst', all);
+    return { ...all, 'META-INF/ASiCArchiveManifest.xml': newer, 'META-INF/timestamp001.tst': await makeTimestampToken(newer, authority) };
+  };
+  const older = 'META-INF/ASiCArchiveManifest1.xml';
+
+  it('explains a changed signature file by a later renewal', async () => {
+    const { archives } = await check(container(await renewalParts({ 'META-INF/signature001.p7s': utf8('before renewal') })));
+    expect(archives.find((archive) => archive.source === older)?.renewedBy).toBe('META-INF/ASiCArchiveManifest.xml');
+  });
+
+  it('never explains a changed data file by a renewal', async () => {
+    const { archives } = await check(container(await renewalParts({ [NAME]: utf8('the document as it was') })));
+    expect(archives.find((archive) => archive.source === older)?.renewedBy).toBeNull();
   });
 });
 
