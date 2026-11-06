@@ -126,11 +126,23 @@ jobs:
       - name: Test
         run: npm test
 
+      # A release should carry trust data from when it was made. Measured from the tagged commit, not
+      # today, so that re-running an old tag still works.
+      - name: Check the trusted lists were refreshed for this release
+        run: |
+          as_of=$(node -p "require('../xsignature/app/public/issuers/index.json').asOf")
+          age=$(( ( $(git log -1 --format=%ct) - $(date -u -d "$as_of" +%s) ) / 86400 ))
+          if [ "$age" -gt 10 ]; then
+            echo "::error::The trusted lists were read on $as_of, $age days before this commit. Run 'Refresh trusted lists', merge its pull request, and tag again."
+            exit 1
+          fi
+          echo "trusted lists read on $as_of, $age days before this commit"
+
       # What "Fetch it" on Check a signed file reads. Collected here rather than committed, so the
-      # copies are as new as this release. An authority being down never stops a release: the
-      # screen handles a missing copy, and every copy is verified against the issuer's key.
+      # copies are as new as this release. Every copy is verified against the issuer's key. One
+      # authority being down is normal; losing a whole country or most of the copies fails here,
+      # because the screen would handle it silently and green results would turn neutral.
       - name: Collect revocation lists for xSignature
-        continue-on-error: true
         run: npm run crls:refresh --prefix ../xsignature/app
 
       - name: Build
@@ -219,6 +231,7 @@ jobs:
           done
           test -s dist/xconvert/THIRD-PARTY.txt || { echo '::error::dist/xconvert/THIRD-PARTY.txt is missing'; exit 1; }
           test -s dist/xconvert/licences/pandoc-wasm-loader-MIT.txt || { echo "::error::the pandoc loader's MIT notice is missing"; exit 1; }
+          test -s dist/xsignature/crls/index.json || { echo '::error::the revocation list copies are missing from dist/xsignature/crls/'; exit 1; }
           test -s dist/xsignature/issuers/index.json || { echo '::error::the issuer directory is missing from dist/xsignature/issuers/'; exit 1; }
           test "$(ls dist/xsignature/issuers/ | wc -l)" -gt 200 || { echo '::error::the issuer directory has too few shards'; exit 1; }
           grep -q '"build":' dist/version.json || { echo '::error::dist/version.json is missing — open pages could never learn of a new release'; exit 1; }

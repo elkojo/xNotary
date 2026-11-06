@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { crlFileName, fetchCrlCopy } from './crl-copy';
+import { copiesShortfall, crlFileName, fetchCrlCopy } from './crl-copy';
 
 const DER = Uint8Array.from([0x30, 0x03, 0x02, 0x01, 0x01]);
 
@@ -56,5 +56,26 @@ describe('finding a copy', () => {
 
   it('asks for nothing when the certificate names no list', async () => {
     expect(await fetchCrlCopy('/x/', [], serving({}))).toBe('absent');
+  });
+});
+
+describe('whether a release can ship its copies', () => {
+  const sources = [{ list: 'HU' }, { list: 'HU' }, { list: 'PL' }, { list: 'SK' }];
+
+  it('one authority down is normal', () => {
+    expect(copiesShortfall(sources, 3, new Set(['HU', 'PL', 'SK']))).toBeNull();
+  });
+
+  it('a whole country gone stops it, and names the country', () => {
+    expect(copiesShortfall(sources, 3, new Set(['HU', 'SK']))).toContain('PL');
+  });
+
+  it('most of the copies gone stops it, even with every country present', () => {
+    const many = [...Array.from({ length: 9 }, () => ({ list: 'HU' })), { list: 'PL' }];
+    expect(copiesShortfall(many, 2, new Set(['HU', 'PL']))).toContain('2 of 10');
+  });
+
+  it('nothing at all stops it', () => {
+    expect(copiesShortfall(sources, 0, new Set())).not.toBeNull();
   });
 });
