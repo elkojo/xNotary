@@ -214,6 +214,9 @@ async function checkArchive(
   } catch {
     return { ...blank, standing: 'unreadable' };
   }
+  // A part it could not compare means it cannot be said to hold, or to renew anything.
+  if (listed.cannotCheck) return { ...blank, standing: 'cannot-check', time: stamp.time, signedBy: stamp.signedBy, certificate: stamp.certificate };
+
   const signatureFiles = signatures.filter((signature) => signature.form !== 'timestamp').map((signature) => signature.source);
   return {
     source,

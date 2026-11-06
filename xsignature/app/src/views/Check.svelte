@@ -19,8 +19,8 @@
   import type { CheckedContainer, ContainerFile, ContainerSignature } from '../lib/document/verify/asic/types';
   import { ContainerRefused, looksLikeZip, printable, savedName } from '../lib/document/verify/asic/zip';
   import { checkSignatures, type CheckedSignature } from '../lib/document/verify/verify';
-  import { listedTimeAuthority, siteDirectory } from '../lib/document/certificate/read/directory';
-  import { timeAuthorityGrantedAt } from '../lib/document/verify/trust';
+  import { siteDirectory } from '../lib/document/certificate/read/directory';
+  import { confirmedTimeAuthority } from '../lib/document/verify/trust';
   import type { Certificate } from 'pkijs';
   import SignerChecks from './SignerChecks.svelte';
 
@@ -30,6 +30,8 @@
   $effect(() => {
     const container = opened;
     if (!container) return;
+    // A slow lookup for an earlier container must not land on this one.
+    let current = true;
     const stamps = [
       ...container.archives.map((archive) => ({ certificate: archive.certificate, time: archive.time })),
       ...container.signatures.flatMap((signature) => signature.archiveTimestamps.map((stamp) => ({ certificate: stamp.certificate, time: stamp.time as Date | null }))),
@@ -40,14 +42,16 @@
       for (const { certificate, time } of stamps) {
         if (!certificate || !time) continue;
         try {
-          const authority = await listedTimeAuthority(certificate, source);
-          if (authority && timeAuthorityGrantedAt(authority.services, time)) found.add(certificate);
+          if (await confirmedTimeAuthority(certificate, time, source)) found.add(certificate);
         } catch {
           // Not reached is not listed: nothing is claimed for it.
         }
       }
-      listedAuthorities = found;
+      if (current) listedAuthorities = found;
     })();
+    return () => {
+      current = false;
+    };
   });
 
   const isListed = (certificate: Certificate | null): boolean => !!certificate && listedAuthorities.has(certificate);
@@ -498,7 +502,7 @@
                     <div class="notice bad">
                       <strong>It carries an answer saying this certificate was revoked.</strong>
                       {source} said so {answer.at ? when(answer.at) : ''}{answer.revokedAt ? `, giving ${when(answer.revokedAt)} as the time of revocation` : ''}.
-                      Compare that with when it was signed.
+                      Who answered is not checked, and anyone can add an answer to a file, so the issuer's own list decides this if it can be read.
                     </div>
                   {:else if answer.status === 'unknown'}
                     <div class="notice warn">

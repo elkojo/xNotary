@@ -305,8 +305,22 @@ export const damaged = (bytes: Uint8Array): Uint8Array => {
   return copy;
 };
 
+/** The signed attribute naming a certificate by digest: SigningCertificateV2, with the default hash. */
+async function essAttribute(certificate: Signer): Promise<Attribute> {
+  const id = new asn1js.Sequence({ value: [new asn1js.OctetString({ valueHex: buffer(await sha(certificate.der)) })] });
+  return new Attribute({
+    type: '1.2.840.113549.1.9.16.2.47',
+    values: [new asn1js.Sequence({ value: [new asn1js.Sequence({ value: [id] })] })],
+  });
+}
+
 /** A detached CMS over `content`, with `bundle` listed beside the signer's certificate. */
-export async function makeCades(content: Uint8Array, signer: Signer, bundle: readonly Signer[] = []): Promise<Uint8Array> {
+export async function makeCades(
+  content: Uint8Array,
+  signer: Signer,
+  bundle: readonly Signer[] = [],
+  options: { unbound?: boolean; bindTo?: Signer } = {},
+): Promise<Uint8Array> {
   const signed = new SignedData({
     version: 1,
     encapContentInfo: new EncapsulatedContentInfo({ eContentType: '1.2.840.113549.1.7.1' }),
@@ -320,6 +334,7 @@ export async function makeCades(content: Uint8Array, signer: Signer, bundle: rea
             new Attribute({ type: '1.2.840.113549.1.9.3', values: [new asn1js.ObjectIdentifier({ value: '1.2.840.113549.1.7.1' })] }),
             new Attribute({ type: '1.2.840.113549.1.9.4', values: [new asn1js.OctetString({ valueHex: buffer(await sha(content)) })] }),
             new Attribute({ type: '1.2.840.113549.1.9.5', values: [new asn1js.UTCTime({ valueDate: new Date(Date.UTC(2026, 10, 5, 10, 0, 0)) })] }),
+            ...(options.unbound ? [] : [await essAttribute(options.bindTo ?? signer)]),
           ],
         }),
       }),
@@ -461,7 +476,7 @@ async function certIdFor(subject: Signer, issuer: Signer): Promise<CertID> {
 export async function makeOcsp(
   subject: Signer,
   responder: Signer,
-  options: { status?: 'good' | 'revoked' | 'unknown'; carryResponder?: boolean; issuer?: Signer } = {},
+  options: { status?: 'good' | 'revoked' | 'unknown'; carryResponder?: boolean; issuer?: Signer; certIdHashOid?: string } = {},
 ): Promise<Uint8Array> {
   const status = options.status ?? 'good';
   const certStatus =
@@ -471,11 +486,14 @@ export async function makeOcsp(
         ? new asn1js.Primitive({ idBlock: { tagClass: 3, tagNumber: 2 } })
         : new asn1js.Constructed({ idBlock: { tagClass: 3, tagNumber: 1 }, value: [new asn1js.GeneralizedTime({ valueDate: new Date(Date.UTC(2026, 0, 2)) })] });
 
+  const certID = await certIdFor(subject, options.issuer ?? subject);
+  if (options.certIdHashOid) certID.hashAlgorithm = new AlgorithmIdentifier({ algorithmId: options.certIdHashOid, algorithmParams: new asn1js.Null() });
+
   const basic = new BasicOCSPResponse({
     tbsResponseData: new ResponseData({
       responderID: responder.certificate.subject,
       producedAt: new Date(Date.UTC(2026, 10, 5, 10, 0, 9)),
-      responses: [new SingleResponse({ certID: await certIdFor(subject, options.issuer ?? subject), certStatus, thisUpdate: new Date(Date.UTC(2026, 10, 5, 10, 0, 9)) })],
+      responses: [new SingleResponse({ certID, certStatus, thisUpdate: new Date(Date.UTC(2026, 10, 5, 10, 0, 9)) })],
     }),
     ...(options.carryResponder === false ? {} : { certs: [responder.certificate] }),
   });
@@ -538,6 +556,7 @@ export async function addCounterSignature(der: Uint8Array, counter: Signer, opti
   const attributes = [
     new Attribute({ type: '1.2.840.113549.1.9.4', values: [new asn1js.OctetString({ valueHex: buffer(await sha(value)) })] }),
     new Attribute({ type: '1.2.840.113549.1.9.5', values: [new asn1js.UTCTime({ valueDate: new Date(Date.UTC(2026, 10, 5, 10, 1, 0)) })] }),
+    await essAttribute(counter),
   ];
   const encoded = new asn1js.Set({ value: attributes.map((attribute) => attribute.toSchema()) }).toBER(false);
   // The digest stays SHA-256 while the signature uses its own, which is legal and which the algorithm names.

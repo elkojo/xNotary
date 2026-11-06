@@ -22,6 +22,7 @@
 import type { Certificate } from 'pkijs';
 
 import { RETYPED, type Criteria, type ListedService, type ServiceState } from '../certificate/read/trusted-list';
+import { listedTimeAuthority, type DirectorySource } from '../certificate/read/directory';
 import type { CertificateClaims } from './claims';
 
 /** Directive 1999/93/EC ended here. PRO-4.4.4-07. */
@@ -259,6 +260,17 @@ export function checkAgainstList(
 /** Whether a time authority's service was granted at that moment, by its own history. */
 export const timeAuthorityGrantedAt = (services: readonly ListedService[], moment: Date): boolean =>
   services.some((service) => stateAt(service, moment)?.s === 'granted');
+
+/**
+ * The trusted list a timestamp's time rests on, or null when it rests on none: its authority is on a
+ * verified list, granted at the time stated, and that time falls within its own certificate's dates.
+ * A listed authority's expired or leaked key must not be able to date anything.
+ */
+export async function confirmedTimeAuthority(certificate: Certificate, time: Date, source: DirectorySource): Promise<string | null> {
+  if (time.getTime() < certificate.notBefore.value.getTime() || time.getTime() > certificate.notAfter.value.getTime()) return null;
+  const listed = await listedTimeAuthority(certificate, source);
+  return listed && timeAuthorityGrantedAt(listed.services, time) ? listed.list : null;
+}
 
 /** The certificate's own side of the question, from what the claims reader already parsed. */
 export function factsOf(certificate: Certificate, claims: CertificateClaims, types: readonly (1 | 2 | 3)[]): CertificateFacts {

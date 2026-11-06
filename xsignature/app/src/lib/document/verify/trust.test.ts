@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ListedService, QualificationElement, ServiceState } from '../certificate/read/trusted-list';
-import { checkAgainstList, timeAuthorityGrantedAt, type CertificateFacts } from './trust';
+import { buildDirectory, type DirectorySource } from '../certificate/read/directory';
+import { makeSigner } from './asic/fixtures.test-helper';
+import { checkAgainstList, confirmedTimeAuthority, timeAuthorityGrantedAt, type CertificateFacts } from './trust';
 
 const SIGNED = new Date('2026-03-01T10:00:00Z');
 
@@ -201,3 +203,14 @@ describe('whether this is the right entry at all', () => {
     expect(check([later]).result).toBe('not-qualified');
   });
 });
+
+describe('a time authority\'s own dates', () => {
+  it('count for nothing outside them, however the service stands', async () => {
+    const authority = await makeSigner('Stamps Ltd');
+    const { shards } = await buildDirectory([{ der: authority.der, tl: 'SK', timeServices: [service()] }], 'x');
+    const source = (async (name: string) => shards[name] ?? null) as DirectorySource;
+    expect(await confirmedTimeAuthority(authority.certificate, SIGNED, source)).toBe('SK');
+    expect(await confirmedTimeAuthority(authority.certificate, new Date('2045-01-01T00:00:00Z'), source)).toBeNull();
+  });
+});
+

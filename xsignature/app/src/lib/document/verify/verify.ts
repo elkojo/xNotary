@@ -46,6 +46,7 @@ import {
   readTstInfo,
   signedDataFrom,
   signerFactsOf,
+  signingCertificateBinding,
   type AttachedTimestamp,
 } from './signer';
 
@@ -231,6 +232,21 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
           ? 'bad-signature'
           : 'cannot-check'
     : await checkSigner(signed, 0, covered);
+
+  // What was signed names another certificate: the one here was put there afterwards.
+  if (!isTimestamp && described.certificate && (await signingCertificateBinding(signed, 0, described.certificate)) === 'unbound') {
+    return {
+      ...shared,
+      ...NO_SIGNER,
+      certificateCount: described.certificateCount,
+      time: null,
+      policy: null,
+      timestamp: null,
+      verdict: 'broken',
+      detail: 'The certificate it carries is not the one its signed details name.',
+    };
+  }
+
   switch (outcome) {
     case 'holds':
       return { ...described, verdict: 'intact', detail: '' };

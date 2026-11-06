@@ -226,3 +226,24 @@ describe('a time authority', () => {
     expect(await listedTimeAuthority(certificate, await directoryOf(rootDer, { timeServices: [service] }))).toBeNull();
   });
 });
+
+describe('one certificate on two lists', () => {
+  it('keeps each list\'s history apart', async () => {
+    const issuer = await makeSigner('Shared CA');
+    const austria = { n: ['A'], h: [{ s: 'granted', t: '2020-01-01T00:00:00Z' }] };
+    const germany = { n: ['D'], h: [{ s: 'withdrawn', t: '2020-01-01T00:00:00Z' }] };
+    const { shards } = await buildDirectory(
+      [
+        { der: issuer.der, tl: 'AT', services: [austria] },
+        { der: issuer.der, tl: 'DE', services: [germany] },
+      ],
+      'x',
+    );
+    const entries = Object.values(Object.values(shards)[0].entries)[0];
+    expect(entries.map((entry) => [entry.tl, entry.s?.[0].n[0]])).toEqual([
+      ['AT', 'A'],
+      ['DE', 'D'],
+    ]);
+  });
+});
+

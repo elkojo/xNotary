@@ -11,7 +11,7 @@
  * show that this responder is entitled to answer, which is the same trust question
  * as the signer's name, and is not answered here. So a "not revoked" is reported as
  * something the file says, never as a finding, and it is never shown as a success.
- * A "revoked" is worth more than that: nobody forges one to their own disadvantage.
+ * A "revoked" is treated with the same care: somebody else may have added it to a good signature.
  *
  * An answer only speaks for the certificate it names. One about the timestamp
  * authority's certificate, which long-term signatures also carry, says nothing
@@ -100,11 +100,12 @@ function basicResponseFrom(der: Uint8Array): BasicOCSPResponse | null {
 }
 
 /** Whether a single response's CertID is this certificate's, on all the evidence available. */
-async function isAbout(single: SingleResponse, certificate: Certificate, issuers: readonly Certificate[]): Promise<boolean> {
+async function isAbout(single: SingleResponse, certificate: Certificate, issuers: readonly Certificate[]): Promise<boolean | 'unreadable'> {
   if (!single.certID.serialNumber.isEqual(certificate.serialNumber)) return false;
 
   const hash = hashForOid(single.certID.hashAlgorithm.algorithmId);
-  if (!hash) return false;
+  // The serial matches and the rest cannot be compared, so it may well be about this certificate.
+  if (!hash) return 'unreadable';
 
   const nameHash = new Uint8Array(single.certID.issuerNameHash.valueBlock.valueHexView);
   if (!sameBytes(await hashOf(hash, encodedName(certificate.issuer)), nameHash)) return false;
@@ -175,7 +176,9 @@ async function readOcsp(
   if (!basic) return UNREADABLE('OCSP');
 
   for (const single of basic.tbsResponseData.responses) {
-    if (!(await isAbout(single, certificate, issuers))) continue;
+    const about = await isAbout(single, certificate, issuers);
+    if (about === 'unreadable') return UNREADABLE('OCSP');
+    if (!about) continue;
 
     const responder = await responderOf(basic, others);
     const described = {

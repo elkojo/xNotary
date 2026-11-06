@@ -512,16 +512,18 @@ export async function checkXades(
   const candidates = binding.bound.length > 0 ? binding.bound : others;
   let holder: Certificate | null = null;
   let verified: boolean | 'cannot-check' = false;
+  let unsupported = false;
   for (const candidate of candidates) {
     verified = await verifySignatureValue(signedInfo, signature, candidate, method);
     if (verified === true) {
       holder = candidate;
       break;
     }
-    if (verified === 'cannot-check') break;
+    // A certificate of another key type says nothing about the next one, which may be the signer's.
+    if (verified === 'cannot-check') unsupported = true;
   }
 
-  if (verified === 'cannot-check') {
+  if (!holder && unsupported) {
     return { ...described, verdict: 'cannot-check', detail: 'It uses a key or a curve this browser cannot check.' };
   }
   if (!holder) {

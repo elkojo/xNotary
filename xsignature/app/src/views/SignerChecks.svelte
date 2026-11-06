@@ -23,7 +23,6 @@
   import {
     DirectoryUnreachable,
     findIssuers,
-    listedTimeAuthority,
     siteDirectory,
     type DirectoryIndex,
     type FoundIssuers,
@@ -31,7 +30,7 @@
   import { revocationOf, type RevocationAnswer } from '../lib/document/verify/asic/revocation';
   import { fetchCrlCopy } from '../lib/document/verify/crl-copy';
   import type { AttachedTimestamp, SignerFacts } from '../lib/document/verify/signer';
-  import { checkAgainstList, factsOf, timeAuthorityGrantedAt, type ListStanding } from '../lib/document/verify/trust';
+  import { checkAgainstList, confirmedTimeAuthority, factsOf, type ListStanding } from '../lib/document/verify/trust';
   import FindIssuers from './FindIssuers.svelte';
 
   interface Props {
@@ -195,9 +194,9 @@
     for (const stamp of stamps) {
       if (!stamp.certificate || stamp.standing !== 'holds') continue;
       try {
-        const listedAuthority = await listedTimeAuthority(stamp.certificate, source);
-        if (listedAuthority && timeAuthorityGrantedAt(listedAuthority.services, stamp.time)) {
-          found = { list: listedAuthority.list, stamp };
+        const list = await confirmedTimeAuthority(stamp.certificate, stamp.time, source);
+        if (list) {
+          found = { list, stamp };
           break;
         }
       } catch {
@@ -321,10 +320,9 @@
   });
   const clearedByList = $derived(listShortfall === '');
 
-  // Only a verified "revoked" settles it. A carried "not revoked" does not: anyone can add one, and
-  // it must not stop the issuer's own list from being read.
-  const carriedSettled = $derived(carriedRevocation?.standing === 'holds' && carriedRevocation.status === 'revoked');
-  const offerRevocationList = $derived(!isTimestamp && !!signature.certificate && !carriedSettled);
+  // Nothing carried settles it, either way: anyone can add an answer, including a forged "revoked"
+  // against somebody else's good signature. The issuer's own list is always read.
+  const offerRevocationList = $derived(!isTimestamp && !!signature.certificate);
 
   $effect(() => {
     if (fetchTried || !offerRevocationList || !issuerCertificate) return;
@@ -332,10 +330,11 @@
     void fetchRevocationList();
   });
 
-  /** A verified answer says this certificate was revoked, which no green may sit beside. */
+  /** An answer says this certificate was revoked, which no green may sit beside. */
   const knownRevoked = $derived(
     (listFile?.answer?.standing === 'holds' && listFile.answer.status === 'revoked') ||
-      (carriedRevocation?.standing === 'holds' && carriedRevocation.status === 'revoked'),
+      // The issuer's own list outranks an answer anyone could have added.
+      (carriedRevocation?.standing === 'holds' && carriedRevocation.status === 'revoked' && !clearedByList),
   );
   const listBacksIt = $derived(standing?.result === 'qualified' && moment?.independent === true && validWhenUsed && !knownRevoked);
   /**

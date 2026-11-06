@@ -249,6 +249,14 @@ if (mirrored.length) console.log(`Read from the Commission's copy: ${mirrored.jo
 if (unverified.length) console.log(`No status kept for: ${unverified.join(', ')}`);
 if (missing.length) console.log(`Not read this time (previous entries kept): ${missing.join(', ')}`);
 
+// A list not read this time keeps its addresses, as it keeps its entries.
+const previousSources: CrlSource[] = existsSync(new URL('./crl-sources.json', import.meta.url))
+  ? JSON.parse(readFileSync(new URL('./crl-sources.json', import.meta.url), 'utf8'))
+  : [];
+for (const source of previousSources) {
+  if (missing.includes(source.list) && !crlSources.has(source.url)) crlSources.set(source.url, source);
+}
+
 // Where the release build collects the revocation lists from (scripts/crls.ts). The addresses are
 // committed and the lists are not: they run to 18 MB and change daily.
 const sources = [...crlSources.values()].sort((a, b) => (a.url < b.url ? -1 : 1));

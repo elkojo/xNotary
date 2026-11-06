@@ -860,9 +860,9 @@ describe('the single-file kind of container, ASiC-S', () => {
     expect(signatures[0].detail).toMatch(/which of the 2/);
   });
 
-  it('does not look for that file in a subfolder', async () => {
+  it('does not look for that file in a subfolder, and claims nothing about what it never verified', async () => {
     const { signatures } = await check(container({ 'folder/a.txt': CONTENT, [P7S]: await makeCades(CONTENT, signer) }, ASIC_S));
-    expect(signatures[0].verdict).toBe('covers-nothing');
+    expect(signatures[0].verdict).toBe('cannot-check');
   });
 
   it('reads the shape without a mimetype too', async () => {
@@ -1076,6 +1076,52 @@ describe('findings from the third review', () => {
     });
     const { signatures } = await check(container({ ...FILES, [SIGNATURES]: xml }));
     expect(signatures[0].timestamps.map((stamp) => stamp.signedBy)).toEqual(['Test Authority', 'Self Made']);
+  });
+});
+
+describe('findings from the fourth review', () => {
+  const P7S = 'META-INF/signature.p7s';
+
+  it('refuses the same key wrapped in a certificate with another name', async () => {
+    // The value still verifies: only the signed digest says which certificate was meant.
+    const impostor = await certificateFor('A Well-Known Name', signer, 'RSA', 2);
+    const p7s = await makeCades(CONTENT, impostor, [], { bindTo: signer });
+    const { signatures } = await check(container({ ...FILES, [P7S]: p7s }, ASIC_S));
+    expect(signatures[0].verdict).toBe('broken');
+    expect(signatures[0].signedBy).toBeNull();
+    expect(signatures[0].covers).toEqual([]);
+  });
+
+  it('names nobody when nothing signed says whose certificate it is', async () => {
+    const { signatures, files } = await check(container({ ...FILES, [P7S]: await makeCades(CONTENT, signer, [], { unbound: true }) }, ASIC_S));
+    expect(signatures[0].verdict).toBe('cannot-check');
+    expect(signatures[0].signedBy).toBeNull();
+    expect(files[0].coveredBy).toEqual([]);
+  });
+
+  it('tries the signer after a certificate of another key type', async () => {
+    const rsaCa = await makeSigner('RSA CA');
+    const ecSigner = await makeSigner('EC Signer', 'EC');
+    const xml = (await makeXades(FILES, ecSigner)).replace('<ds:X509Data>', `<ds:X509Data><ds:X509Certificate>${btoa(String.fromCharCode(...rsaCa.der))}</ds:X509Certificate>`);
+    const { signatures } = await check(container({ ...FILES, [SIGNATURES]: xml }));
+    expect(signatures[0].verdict).toBe('intact');
+    expect(signatures[0].signedBy).toBe('EC Signer');
+  });
+
+  it('does not call an archive manifest holding when part of it could not be compared', async () => {
+    const MANIFEST = 'META-INF/ASiCManifest.xml';
+    const TST = 'META-INF/timestamp001.tst';
+    const manifest = await makeManifest('META-INF/signature001.p7s', FILES);
+    const parts = { ...FILES, [MANIFEST]: manifest, 'META-INF/signature001.p7s': await makeCades(manifest, signer) };
+    const archive = utf8(new TextDecoder().decode(await makeManifest(TST, parts)).replace(/Algorithm="[^"]+"/, 'Algorithm="urn:made-up"'));
+    const { archives } = await check(container({ ...parts, 'META-INF/ASiCArchiveManifest.xml': archive, [TST]: await makeTimestampToken(archive, authority) }));
+    expect(archives[0].standing).toBe('cannot-check');
+  });
+
+  it('reports an OCSP answer it cannot compare, rather than as no answer', async () => {
+    const ocsp = await makeOcsp(signer, authority, { status: 'revoked', certIdHashOid: '2.16.840.1.101.3.4.2.8' });
+    const answer = await revocationOf(signer.certificate, [], { ocsp: [ocsp], crl: [] });
+    expect(answer).toMatchObject({ standing: 'cannot-check' });
   });
 });
 

@@ -19,8 +19,10 @@ import {
   hashForOid,
   readTimestampToken,
   readTstInfo,
+  bindingIn,
   signatureValueHolds,
   signedDataFrom,
+  signingCertificateBinding,
   signerFactsOf,
 } from '../signer';
 import { revocationInCms, revocationOf } from './revocation';
@@ -140,8 +142,12 @@ export async function checkDetached(
     return [
       {
         ...blankSignature(signatureName, formOf(signatureName)),
-        verdict: rootFiles.length === 0 ? 'covers-nothing' : 'cannot-check',
-        detail: rootFiles.length === 0 ? '' : `It does not say which of the ${rootFiles.length} files here it signs.`,
+        // Nothing was verified, so this cannot say what it does or does not sign.
+        verdict: 'cannot-check',
+        detail:
+          rootFiles.length === 0
+            ? 'It does not say what it signs, and there is no file at the top of the container for it to be over.'
+            : `It does not say which of the ${rootFiles.length} files here it signs.`,
       },
     ];
   }
@@ -185,7 +191,24 @@ async function checkCms(
     const unsigned = signed.signerInfos[index]?.unsignedAttrs?.attributes ?? [];
     const unchecked: UncheckedPart[] = unsigned.some((attribute) => ARCHIVE_ATTRIBUTES.includes(attribute.type)) ? ['archive-timestamp'] : [];
 
-    const check = await checkSigner(signed, index, content);
+    const value = await checkSigner(signed, index, content);
+    // A container's CAdES has to bind its certificate, as a baseline signature does. Without that the
+    // name is only what an unsigned bundle says, which is why XAdES refuses the same thing.
+    const binding = value === 'holds' && facts.certificate ? await signingCertificateBinding(signed, index, facts.certificate) : 'bound';
+    if (binding !== 'bound') {
+      results.push({
+        ...blankSignature(signatureName, form),
+        certificateCount: facts.certificateCount,
+        verdict: binding === 'unbound' ? 'broken' : 'cannot-check',
+        detail:
+          binding === 'unbound'
+            ? 'The certificate it carries is not the one its signed details name.'
+            : 'Nothing it signed says whose certificate this is, so it names nobody.',
+      });
+      results.push(...(await counterSignaturesOf(signed, index, signatureName, results.length - 1)));
+      continue;
+    }
+    const check = value;
     results.push(
       finish(
         {
@@ -262,6 +285,16 @@ async function counterSignaturesOf(signed: SignedData, index: number, source: st
         }
         if (stated && !sameBytes(await digest(hash, value), new Uint8Array(stated.valueBlock.valueHexView))) {
           results.push({ ...blank, verdict: 'altered', counterChanged: true });
+          continue;
+        }
+
+        const binding = await bindingIn(counter, certificate);
+        if (binding !== 'bound') {
+          results.push({
+            ...blank,
+            verdict: binding === 'unbound' ? 'broken' : 'cannot-check',
+            detail: binding === 'unbound' ? 'The certificate it carries is not the one its signed details name.' : 'Nothing it signed says whose certificate this is, so it names nobody.',
+          });
           continue;
         }
 

@@ -165,6 +165,60 @@ export async function signerFactsOf(signed: SignedData, index = 0): Promise<Sign
   return factsFor(await signerCertificateOf(signed, index), certificates, certificates.length);
 }
 
+const SIGNING_CERTIFICATE = '1.2.840.113549.1.9.16.2.12';
+const SIGNING_CERTIFICATE_V2 = '1.2.840.113549.1.9.16.2.47';
+const SHA256_OID = '2.16.840.1.101.3.4.2.1';
+
+/**
+ * Whether what was signed names this certificate (ESS signing-certificate, RFC 2634 and 5035).
+ *
+ * The SignerInfo and the bundle beside it are unsigned. So anyone holding a signature can wrap the
+ * same key in a self-made certificate with any name, rewrite the SignerInfo to match, and the value
+ * still verifies. Only a digest inside the signed attributes ties the signature to one certificate.
+ *
+ * - `absent`: nothing signed names a certificate. Older plain CMS does this.
+ * - `cannot-check`: it names one by a digest a browser cannot compute, or unreadably.
+ */
+export async function signingCertificateBinding(
+  signed: SignedData,
+  index: number,
+  certificate: Certificate,
+): Promise<'bound' | 'unbound' | 'absent' | 'cannot-check'> {
+  return bindingIn(signed.signerInfos[index], certificate);
+}
+
+export async function bindingIn(info: SignerInfo | undefined, certificate: Certificate): Promise<'bound' | 'unbound' | 'absent' | 'cannot-check'> {
+  const attributes = info?.signedAttrs?.attributes ?? [];
+  const v2 = attributes.find((attribute) => attribute.type === SIGNING_CERTIFICATE_V2);
+  const v1 = attributes.find((attribute) => attribute.type === SIGNING_CERTIFICATE);
+  const attribute = v2 ?? v1;
+  if (!attribute) return 'absent';
+
+  const der = new Uint8Array(certificate.toSchema().toBER(false));
+  try {
+    // SigningCertificate(V2) ::= SEQUENCE { certs SEQUENCE OF ESSCertID(v2), policies OPTIONAL }
+    const certs = (attribute.values[0] as asn1js.Sequence).valueBlock.value[0] as asn1js.Sequence;
+    for (const id of certs.valueBlock.value as asn1js.Sequence[]) {
+      const parts = id.valueBlock.value;
+      // v2 may state a hash first, and defaults to SHA-256. v1 is always SHA-1.
+      const first = parts[0];
+      let oid = v2 ? SHA256_OID : '1.3.14.3.2.26';
+      let stated = first;
+      if (first instanceof asn1js.Sequence) {
+        oid = (first.valueBlock.value[0] as asn1js.ObjectIdentifier).valueBlock.toString();
+        stated = parts[1];
+      }
+      const hash = HASH_BY_OID[oid];
+      if (!hash) return 'cannot-check';
+      const actual = new Uint8Array(await crypto.subtle.digest(hash, der.slice().buffer as ArrayBuffer));
+      if (equalBytes(actual, new Uint8Array((stated as asn1js.OctetString).valueBlock.valueHexView))) return 'bound';
+    }
+    return 'unbound';
+  } catch {
+    return 'cannot-check';
+  }
+}
+
 export type SignatureCheck =
   /** The digest matches and the signature verifies. */
   | 'holds'

@@ -159,7 +159,9 @@ export async function buildDirectory(
     const keyId = await keyIdOf(certificate);
     const c = toBase64(der);
     const entries = byKey.get(keyId) ?? new Map<string, { c: string; tl: string; s?: ListedService[]; t?: ListedService[] }>();
-    const entry = entries.get(c) ?? { c, tl };
+    // By certificate and list: one certificate on two lists has two histories, which must not mix.
+    const entryKey = `${tl}:${c}`;
+    const entry = entries.get(entryKey) ?? { c, tl };
     // One certificate can identify several services, and the rules weigh all of them.
     if (services?.length) {
       const known = new Set((entry.s ?? []).map((service) => JSON.stringify(service)));
@@ -173,7 +175,7 @@ export async function buildDirectory(
         if (!known.has(JSON.stringify(service))) (entry.t ??= []).push(service);
       }
     }
-    entries.set(c, entry);
+    entries.set(entryKey, entry);
     byKey.set(keyId, entries);
 
     const name = await nameHash(certificate.subject);
@@ -183,7 +185,7 @@ export async function buildDirectory(
   const shards: Record<string, { asOf: string; entries: Record<string, DirectoryEntry[]> }> = {};
   for (const keyId of [...byKey.keys()].sort()) {
     const shard = (shards[shardOf(keyId)] ??= { asOf, entries: {} });
-    shard.entries[keyId] = [...byKey.get(keyId)!.values()].sort((a, b) => (a.c < b.c ? -1 : 1));
+    shard.entries[keyId] = [...byKey.get(keyId)!.values()].sort((a, b) => (a.c < b.c ? -1 : a.c > b.c ? 1 : a.tl < b.tl ? -1 : 1));
   }
   const index: Record<string, string[]> = {};
   for (const name of [...names.keys()].sort()) index[name] = [...names.get(name)!].sort();
@@ -233,7 +235,11 @@ export async function findIssuers(leaf: Certificate, source: DirectorySource): P
     let next: { certificate: Certificate; tl: string; services: ListedService[] } | null = null;
     for (const keyId of keyIds) {
       const shard = (await source(shardOf(keyId))) as DirectoryShard | null;
-      for (const entry of shard?.entries[keyId] ?? []) {
+      // The list of the issuer's own country first: that is the one that speaks for it.
+      const country = current.issuer.typesAndValues.find((part) => part.type === '2.5.4.6')?.value.valueBlock.value as string | undefined;
+      const home = country?.toUpperCase() === 'GR' ? 'EL' : country?.toUpperCase();
+      const ordered = [...(shard?.entries[keyId] ?? [])].sort((a, b) => Number(b.tl === home) - Number(a.tl === home));
+      for (const entry of ordered) {
         let candidate: Certificate;
         try {
           candidate = Certificate.fromBER(fromBase64(entry.c));
