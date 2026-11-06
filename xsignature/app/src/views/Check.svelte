@@ -329,7 +329,7 @@
 
             {#each opened.archives as archive}
               {@const renewal = opened.archives.find((other) => other.source === archive.renewedBy)}
-              {#if archive.standing === 'holds' && authorities !== 'known' && (renewal || (archive.changed.length === 0 && archive.missing.length === 0))}
+              {#if archive.standing === 'holds' && authorities !== 'known' && (renewal || (archive.changed.length === 0 && archive.missing.length === 0 && archive.coversEverySignature))}
                 <div class="notice">
                   <strong>
                     {authorities === 'asking' ? 'Checking the archive timestamp’s authority…' : 'Could not reach this site’s copy of the trusted lists.'}
@@ -363,13 +363,13 @@
                 </div>
               {:else if archive.standing === 'holds' && !isListed(archive.certificate)}
                 <div class="notice">
-                  <strong>An archive timestamp from {archive.signedBy ?? 'an unnamed authority'} covers the signatures here.</strong>
+                  <strong>An archive timestamp from <span translate="no">{archive.signedBy ?? 'an unnamed authority'}</span> covers the signatures here.</strong>
                   That authority is not on a list this site could verify, so its date is not confirmed.
                 </div>
               {:else if archive.standing === 'holds'}
                 <div class="notice ok">
                   <strong>An archive timestamp covers the signatures here.</strong>
-                  {archive.signedBy ?? 'An authority'} dated it {when(archive.time!)}.<Info
+                  <span translate="no">{archive.signedBy ?? 'An authority'}</span> dated it {when(archive.time!)}.<Info
                     >It renews the evidence for everything it lists, so that evidence can outlast the
                     certificates behind it. Whether that authority is worth believing is {containerJudge}'s call.</Info
                   >
@@ -516,21 +516,21 @@
                   {:else if answer.status === 'revoked'}
                     <div class="notice bad">
                       <strong>It carries an answer saying this certificate was revoked.</strong>
-                      {source} said so {answer.at ? when(answer.at) : ''}{answer.revokedAt ? `, giving ${when(answer.revokedAt)} as the time of revocation` : ''}.
+                      <span translate="no">{source}</span> said so {answer.at ? when(answer.at) : ''}{answer.revokedAt ? `, giving ${when(answer.revokedAt)} as the time of revocation` : ''}.
                       Who answered is not checked, and anyone can add an answer to a file, so the issuer's own list decides this if it can be read.
                     </div>
                   {:else if answer.status === 'unknown'}
                     <div class="notice warn">
                       <strong>It carries an answer that does not know this certificate.</strong>
-                      {source} said so {answer.at ? when(answer.at) : ''}.
+                      <span translate="no">{source}</span> said so {answer.at ? when(answer.at) : ''}.
                     </div>
                   {:else}
                     <div class="notice">
                       <strong>It carries an answer saying this certificate was not revoked.</strong>
-                      {source} said so {answer.at ? when(answer.at) : ''}. Who answered is not checked.<Info
+                      <span translate="no">{source}</span> said so {answer.at ? when(answer.at) : ''}. Who answered is not checked.<Info
                         >Read from the signature, not asked for: nothing left this device. It verifies against the
                         certificate it names, but anyone can add such an answer to a file, and nothing here shows
-                        {source} is entitled to give one. That is {containerJudge}'s call.</Info
+                        <span translate="no">{source}</span> is entitled to give one. That is {containerJudge}'s call.</Info
                       >
                     </div>
                   {/if}
@@ -543,13 +543,13 @@
                     </div>
                   {:else if stamp.standing === 'holds' && !isListed(stamp.certificate)}
                     <div class="notice">
-                      <strong>An archive timestamp from {stamp.signedBy ?? 'an unnamed authority'} also covers this signature.</strong>
+                      <strong>An archive timestamp from <span translate="no">{stamp.signedBy ?? 'an unnamed authority'}</span> also covers this signature.</strong>
                       That authority is not on a list this site could verify, so its date is not confirmed.
                     </div>
                   {:else if stamp.standing === 'holds'}
                     <div class="notice ok">
                       <strong>An archive timestamp also covers this signature.</strong>
-                      {stamp.signedBy ?? 'An authority'} dated it {when(stamp.time)}.
+                      <span translate="no">{stamp.signedBy ?? 'An authority'}</span> dated it {when(stamp.time)}.
                     </div>
                   {:else if stamp.standing === 'broken'}
                     <div class="notice bad">

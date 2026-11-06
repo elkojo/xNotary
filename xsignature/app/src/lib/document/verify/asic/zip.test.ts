@@ -176,6 +176,41 @@ describe('what would give two programs two different files', () => {
     refused(junk);
   });
 
+  /** A zip with zip64 closing records, as some writers add however small the file. */
+  const withZip64 = (edit?: (view: DataView, record: number, locator: number) => void) => {
+    const zip = rawZip([entry('a.txt')]);
+    const end = zip.length - 22;
+    const view0 = new DataView(zip.buffer);
+    const directorySize = view0.getUint32(end + 12, true);
+    const directoryOffset = view0.getUint32(end + 16, true);
+    const out = new Uint8Array(zip.length + 56 + 20);
+    out.set(zip.subarray(0, end));
+    out.set(zip.subarray(end), end + 76);
+    const view = new DataView(out.buffer);
+    view.setUint32(end, 0x06064b50, true);
+    view.setBigUint64(end + 4, 44n, true);
+    view.setBigUint64(end + 24, 1n, true);
+    view.setBigUint64(end + 32, 1n, true);
+    view.setBigUint64(end + 40, BigInt(directorySize), true);
+    view.setBigUint64(end + 48, BigInt(directoryOffset), true);
+    view.setUint32(end + 56, 0x07064b50, true);
+    view.setBigUint64(end + 64, BigInt(end), true);
+    view.setUint32(end + 72, 1, true);
+    edit?.(view, end, end + 56);
+    return out;
+  };
+
+  it('reads honest zip64 closing records', () => {
+    expect(readZip(withZip64()).map((e) => e.name)).toEqual(['a.txt']);
+  });
+
+  it('zip64 records stating another directory size, count or disk', () => {
+    refused(withZip64((view, record) => view.setBigUint64(record + 40, 1n, true)));
+    refused(withZip64((view, record) => view.setBigUint64(record + 24, 9n, true)));
+    refused(withZip64((view, record) => view.setUint32(record + 16, 1, true)));
+    refused(withZip64((view, _record, locator) => view.setUint32(locator + 16, 2, true)));
+  });
+
   it('a name with a dot in its path, which lands on the same file as one without', () => {
     refused(rawZip([entry('a.txt'), entry('./a.txt')]));
     refused(rawZip([entry('folder//a.txt')]));

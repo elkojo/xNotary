@@ -1165,3 +1165,24 @@ describe('findings from the fifth review', () => {
   });
 });
 
+describe('findings from the sixth review', () => {
+  it('resolves a signature file a manifest names from the root', async () => {
+    const P7S = 'META-INF/signature001.p7s';
+    const manifest = utf8(new TextDecoder().decode(await makeManifest(P7S, FILES)).replace(`URI="${P7S}"`, `URI="./${P7S}"`));
+    const { signatures } = await check(container({ ...FILES, 'META-INF/ASiCManifest.xml': manifest, [P7S]: await makeCades(manifest, signer) }));
+    expect(signatures).toHaveLength(1);
+    expect(signatures[0].verdict).toBe('intact');
+  });
+
+  it('is not stopped by junk before a real token in one XAdES property', async () => {
+    const xml = await makeXades(FILES, signer, {
+      unsigned: async (value) => {
+        const real = btoa(String.fromCharCode(...(await makeTimestampToken(value, authority))));
+        return unsignedXml(`<xades:SignatureTimeStamp><ds:CanonicalizationMethod Algorithm="${C14N_EXCLUSIVE}"/><xades:EncapsulatedTimeStamp>AAAA</xades:EncapsulatedTimeStamp><xades:EncapsulatedTimeStamp>${real}</xades:EncapsulatedTimeStamp></xades:SignatureTimeStamp>`);
+      },
+    });
+    const { signatures } = await check(container({ ...FILES, [SIGNATURES]: xml }));
+    expect(signatures[0].timestamps.map((stamp) => stamp.signedBy)).toEqual(['Test Authority']);
+  });
+});
+

@@ -166,7 +166,13 @@ function refuseUnlessZip64Records(view: DataView, position: number, end: number,
     locator + 20 !== end ||
     view.getUint32(locator, true) !== ZIP64_LOCATOR ||
     Number(view.getBigUint64(locator + 8, true)) !== position ||
+    view.getUint32(locator + 4, true) !== 0 ||
+    view.getUint32(locator + 16, true) !== 1 ||
+    view.getUint32(position + 16, true) !== 0 ||
+    view.getUint32(position + 20, true) !== 0 ||
+    Number(view.getBigUint64(position + 24, true)) !== count ||
     Number(view.getBigUint64(position + 32, true)) !== count ||
+    Number(view.getBigUint64(position + 40, true)) !== position - directoryOffset ||
     Number(view.getBigUint64(position + 48, true)) !== directoryOffset
   ) {
     throw new ContainerRefused(TWO_READINGS);

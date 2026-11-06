@@ -314,15 +314,22 @@ export async function listedTimeAuthority(
   const lookUp = async (candidate: Certificate) => {
     const keyId = await keyIdOf(candidate);
     const shard = (await source(shardOf(keyId))) as DirectoryShard | null;
-    let found: { list: string; services: readonly ListedService[]; certificates: Certificate[] } | null = null;
-    for (const entry of shard?.entries[keyId] ?? []) {
-      if (!entry.t?.length) continue;
+    const country = candidate.issuer.typesAndValues.find((part) => part.type === '2.5.4.6')?.value.valueBlock.value as string | undefined;
+    const home = country?.toUpperCase() === 'GR' ? 'EL' : country?.toUpperCase();
+    const ordered = [...(shard?.entries[keyId] ?? [])].sort((x, y) => Number(y.tl === home) - Number(x.tl === home));
+
+    // One list's entries together: a certificate reissued over one key has one history. Never another
+    // list's, which would mix what two supervisors recorded.
+    let found: { list: string; services: ListedService[]; certificates: Certificate[] } | null = null;
+    for (const entry of ordered) {
+      if (!entry.t?.length || (found && found.list !== entry.tl)) continue;
       try {
         // The key itself, not what the certificate says about it: a key identifier and a name can
         // be copied into a self-made certificate by anybody.
         const listed = Certificate.fromBER(fromBase64(entry.c));
-        if (sameName(listed.subject, candidate.subject) && keyBytes(listed) === keyBytes(candidate) && (!found || found.list === entry.tl)) {
-          found = found ?? { list: entry.tl, services: entry.t, certificates: [] };
+        if (sameName(listed.subject, candidate.subject) && keyBytes(listed) === keyBytes(candidate)) {
+          found = found ?? { list: entry.tl, services: [], certificates: [] };
+          found.services.push(...entry.t);
           found.certificates.push(listed);
         }
       } catch {

@@ -110,7 +110,7 @@ async function checkEntries(entries: readonly ZipEntry[], parse: ParseXml, fromF
   const claimed = new Set<string>();
   for (const source of [...manifestFiles, ...archiveManifests]) {
     try {
-      const named = signatureNamedIn(parseXmlBytes(files.get(source)!, parse).documentElement);
+      const named = signatureNamedIn(parseXmlBytes(files.get(source)!, parse).documentElement, files);
       // An archive manifest can only claim a token. Naming a signature file must not hide it.
       if (manifestFiles.includes(source) || /\.tst$/i.test(named)) claimed.add(named);
     } catch {
@@ -197,7 +197,7 @@ async function checkArchive(
     return { ...blank, standing: 'unreadable' };
   }
 
-  const token = files.get(signatureNamedIn(root));
+  const token = files.get(signatureNamedIn(root, files));
   if (!token) return { ...blank, standing: 'unreadable' };
 
   let stamp;

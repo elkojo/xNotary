@@ -29,12 +29,13 @@
   } from '../lib/document/certificate/read/directory';
   import { revocationOf, type RevocationAnswer } from '../lib/document/verify/asic/revocation';
   import { fetchCrlCopy } from '../lib/document/verify/crl-copy';
+  import { printable } from '../lib/document/verify/printable';
   import type { AttachedTimestamp, SignerFacts } from '../lib/document/verify/signer';
   import { checkAgainstList, confirmedTimeAuthority, factsOf, type ListStanding } from '../lib/document/verify/trust';
   import FindIssuers from './FindIssuers.svelte';
 
   interface Props {
-    signature: SignerFacts & { readonly timestamp: AttachedTimestamp | null; readonly timestamps?: readonly AttachedTimestamp[] };
+    signature: SignerFacts & { readonly timestamp: AttachedTimestamp | null; readonly timestamps: readonly AttachedTimestamp[] };
     /** The signer's own stated time, used only when nothing better dates the signature. */
     signerClock?: Date | null;
     /**
@@ -191,9 +192,8 @@
   /** Of however many it carries, one from a listed authority. Anybody can add others. */
   async function lookTimeAuthority(cache: RequestCache) {
     const source = siteDirectory(import.meta.env.BASE_URL, cache);
-    const stamps = signature.timestamps ?? (signature.timestamp ? [signature.timestamp] : []);
     let found: { list: string; stamp: AttachedTimestamp } | null = null;
-    for (const stamp of stamps) {
+    for (const stamp of signature.timestamps) {
       if (!stamp.certificate || stamp.standing !== 'holds') continue;
       try {
         const list = await confirmedTimeAuthority(stamp.certificate, stamp.time, source);
@@ -201,8 +201,9 @@
           found = { list, stamp };
           break;
         }
-      } catch {
-        // Not reached is not listed: nothing is claimed for it.
+      } catch (error) {
+        if (!(error instanceof DirectoryUnreachable)) throw error;
+        lookupFailed = true;
       }
     }
     timeAuthority = found;
@@ -214,8 +215,10 @@
   /** What dates this signature, and how far that can be taken. */
   const moment = $derived.by((): { time: Date; independent: boolean } | null => {
     if (timeAuthority) return { time: timeAuthority.stamp.time, independent: true };
-    if (signature.timestamp?.standing === 'holds') return { time: signature.timestamp.time, independent: false };
-    return signerClock ? { time: signerClock, independent: false } : null;
+    // An unlisted token may have been added by anyone, so it never displaces what was signed.
+    if (signerClock) return { time: signerClock, independent: false };
+    const stamp = signature.timestamps.find((candidate) => candidate.standing === 'holds');
+    return stamp ? { time: stamp.time, independent: false } : null;
   });
 
   const listed = $derived(found?.listed ?? null);
@@ -241,7 +244,8 @@
   const shownLevel = $derived.by(() => {
     const claims = signature.claims;
     if (!claims) return { qualified: false, onQualifiedDevice: false };
-    if (standing?.result === 'qualified') return { qualified: true, onQualifiedDevice: standing.onQualifiedDevice ?? claims.onQualifiedDevice };
+    // Null means the list did not settle it, and that is not an invitation to take the certificate's word.
+    if (standing?.result === 'qualified') return { qualified: true, onQualifiedDevice: standing.onQualifiedDevice === true };
     if (standing?.result === 'not-qualified') return { qualified: false, onQualifiedDevice: false };
     return { qualified: claims.qualified, onQualifiedDevice: claims.onQualifiedDevice };
   });
@@ -401,7 +405,7 @@
       </div>
     {:else if supplied?.links.length}
       <div class="notice ok">
-        <strong>{supplied.name} continues this chain.</strong>
+        <strong><span translate="no">{printable(supplied.name)}</span> continues this chain.</strong>
         <span class="outgoing-list">
           {#each supplied.links as link}
             <span>
@@ -441,8 +445,8 @@
 {/if}
 
 {#if !isTimestamp && signature.certificate && !validWhenUsed}
-  <div class="notice bad">
-    <strong>This certificate was not valid at that time.</strong>
+  <div class="notice" class:bad={moment?.independent} class:warn={!moment?.independent}>
+    <strong>{moment?.independent ? 'This certificate was not valid at that time.' : 'The time this signature states is outside its certificate’s dates.'}</strong>
     It was valid from {UTC(signature.certificate.notBefore.value)} to {UTC(signature.certificate.notAfter.value)}, and the
     signature is dated {moment ? UTC(moment.time) : ''}.
   </div>
@@ -466,8 +470,12 @@
       >
     </div>
   {:else if standing.result === 'not-qualified'}
-    <div class="notice bad">
-      <strong>{country(listed.list)}'s trusted list does not treat this certificate as qualified.</strong>
+    <div class="notice" class:bad={moment?.independent} class:warn={!moment?.independent}>
+      <strong>
+        {moment?.independent
+          ? `${country(listed.list)}'s trusted list does not treat this certificate as qualified.`
+          : `At the time this signature states, ${country(listed.list)}'s trusted list would not treat this certificate as qualified.`}
+      </strong>
       {standing.detail}<Info
         >Whatever the certificate says about itself, the list is what decides this.</Info
       >
@@ -512,7 +520,7 @@
           {#if refreshed}<span>{refreshed}</span>{/if}
         </span>
         {#if standing.result === 'qualified' && standing.onQualifiedDevice === null}
-          <span>The list does not settle whether the key is on a qualified device, so that part is only what the certificate says.</span>
+          <span>The list does not settle whether the key is on a qualified device, so that is not claimed here.</span>
         {/if}
         {#if listOverdue && listFacts}
           <span>This copy is out of date: the list named {day(listFacts.next)} for its next issue.</span>
@@ -562,16 +570,16 @@
     >
   </div>
 {:else if timeAuthority}
-  <div class="notice ok">
+  <div class="notice" class:ok={holds}>
     <strong>The time on this signature is not the signer's own.</strong>
-    {timeAuthority.stamp.signedBy ?? 'An authority'} dated it {UTC(timeAuthority.stamp.time)}, an authority on {country(timeAuthority.list)}'s trusted list.<Info
+    <span translate="no">{timeAuthority.stamp.signedBy ?? 'An authority'}</span> dated it {UTC(timeAuthority.stamp.time)}, an authority on {country(timeAuthority.list)}'s trusted list.<Info
       >So the time does not rest on the signer's computer. The list recorded that authority as granted at that
       time.</Info
     >
   </div>
-{:else if signature.timestamp}
+{:else if signature.timestamp && !lookupFailed && lookedUp}
   <div class="notice">
-    <strong>This signature carries a timestamp from {signature.timestamp.signedBy ?? 'an unnamed authority'}.</strong>
+    <strong>This signature carries a timestamp from <span translate="no">{signature.timestamp.signedBy ?? 'an unnamed authority'}</span>.</strong>
     That authority is not on a list this site could verify, so the time is not confirmed.<Info
       >The timestamp verifies against the certificate inside it, but anybody can make such a certificate and
       write any date. Whether that authority is worth believing is {judge}'s call.</Info
@@ -591,9 +599,9 @@
         Revoked {answer.revokedAt ? UTC(answer.revokedAt) : 'at a time it does not give'}{moment ? `, and the signature is dated ${UTC(moment.time)}` : ''}.
       </div>
     {:else if clearedByList}
-      <div class="notice ok">
+      <div class="notice" class:ok={holds}>
         <strong>The issuer's revocation list does not name this certificate.</strong>
-        {answer.from} issued that list {answer.at ? UTC(answer.at) : ''}, after the signature.<Info
+        <span translate="no">{answer.from}</span> issued that list {answer.at ? UTC(answer.at) : ''}, after the signature.<Info
           >It verifies against the same key that issued this certificate, so only the issuer could have written
           it, and a certificate revoked before then would be on it.</Info
         >

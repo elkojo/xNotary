@@ -34,7 +34,7 @@
  */
 import { Certificate } from 'pkijs';
 
-import { factsFor, readTimestampToken, timestampTokenFrom, type AttachedTimestamp } from '../signer';
+import { factsFor, worstTimestamp, readTimestampToken, timestampTokenFrom, type AttachedTimestamp } from '../signer';
 import { C14N_10, canonicalize, isCanonicalization } from './c14n';
 import { revocationOf, type EmbeddedRevocation } from './revocation';
 import { blankSignature, type ContainerSignature, type ContainerVerdict } from './types';
@@ -326,8 +326,6 @@ async function timestampsOf(properties: readonly Element[], signature: Element, 
 
   const found: AttachedTimestamp[] = [];
   for (const stamp of properties.filter((property) => property.localName === 'SignatureTimeStamp')) {
-    const token = descendantsNamed(stamp, 'EncapsulatedTimeStamp')[0];
-    if (!token) continue;
     const named = childNamed(stamp, 'CanonicalizationMethod', DS);
     const renderings: Array<[string, string[]]> = named
       ? [[named.getAttribute('Algorithm') ?? '', prefixListOf(named)]]
@@ -336,17 +334,20 @@ async function timestampsOf(properties: readonly Element[], signature: Element, 
           [signedWith?.getAttribute('Algorithm') ?? C14N_10, prefixListOf(signedWith)],
         ];
 
-    try {
-      const parsed = timestampTokenFrom(decodeBase64(token.textContent ?? ''));
-      let read: AttachedTimestamp | null = null;
-      for (const [algorithm, prefixes] of renderings) {
-        if (!isCanonicalization(algorithm)) continue;
-        read = await readTimestampToken(parsed, canonicalize(value, algorithm, prefixes));
-        if (read?.standing !== 'other-signature') break;
+    // All of them: junk placed in front must not hide a real one.
+    for (const token of descendantsNamed(stamp, 'EncapsulatedTimeStamp')) {
+      try {
+        const parsed = timestampTokenFrom(decodeBase64(token.textContent ?? ''));
+        let read: AttachedTimestamp | null = null;
+        for (const [algorithm, prefixes] of renderings) {
+          if (!isCanonicalization(algorithm)) continue;
+          read = await readTimestampToken(parsed, canonicalize(value, algorithm, prefixes));
+          if (read?.standing !== 'other-signature') break;
+        }
+        if (read) found.push(read);
+      } catch {
+        // Not a token. Nothing here dated it.
       }
-      if (read) found.push(read);
-    } catch {
-      // Not a token. Reporting no timestamp is right: nothing here dated it.
     }
   }
   return found;
@@ -428,20 +429,18 @@ async function archiveTimestampsOf(
   const found: AttachedTimestamp[] = [];
   for (const [position, stamp] of properties.entries()) {
     if (stamp.localName !== 'ArchiveTimeStamp') continue;
-    const token = descendantsNamed(stamp, 'EncapsulatedTimeStamp')[0];
-    if (!token) continue;
-
-    let parsed;
-    try {
-      parsed = timestampTokenFrom(decodeBase64(token.textContent ?? ''));
-    } catch {
-      continue;
-    }
-
     const whole = archiveInput(stamp, position, properties, signature, signedInfo, qualifying, files);
-    // Reassembly it could not do says nothing about the token, so nothing bad is implied.
-    const read = await readTimestampToken(parsed, whole ?? new Uint8Array(1));
-    if (read) found.push(whole ? read : { ...read, standing: 'cannot-check' });
+    for (const token of descendantsNamed(stamp, 'EncapsulatedTimeStamp')) {
+      let parsed;
+      try {
+        parsed = timestampTokenFrom(decodeBase64(token.textContent ?? ''));
+      } catch {
+        continue;
+      }
+      // Reassembly it could not do says nothing about the token, so nothing bad is implied.
+      const read = await readTimestampToken(parsed, whole ?? new Uint8Array(1));
+      if (read) found.push(whole ? read : { ...read, standing: 'cannot-check' });
+    }
   }
   return found;
 }
@@ -569,7 +568,7 @@ export async function checkXades(
     counterChanged,
     time: parsed && !Number.isNaN(parsed.getTime()) ? parsed : null,
     timestamps,
-    timestamp: timestamps.find((stamp) => stamp.standing !== 'holds') ?? timestamps[0] ?? null,
+    timestamp: worstTimestamp(timestamps),
     revocation: bound ? await revocationOf(holder, others, revocationIn(properties)) : null,
     archiveTimestamps: qualifying ? await archiveTimestampsOf(properties, signature, signedInfo, qualifying, files) : [],
     detail: '',

@@ -171,8 +171,18 @@ for (const { territory, url, signers } of pointers) {
     if (!outsideEu.includes(territory)) console.warn(`${territory}: signature did not verify (${check.why}) — certificates only, no status`);
   }
 
+  let services: ReturnType<typeof readQualifiedServices>;
+  try {
+    services = readQualifiedServices(parseList(xml));
+  } catch (error) {
+    missing.push(territory);
+    delete verified[territory];
+    console.warn(`${territory}: could not be read (${String(error).slice(0, 100)}) — keeping its previous entries`);
+    continue;
+  }
+
   let count = 0;
-  for (const { certificates: identifying, service, supplyPoints, kind } of readQualifiedServices(parseList(xml))) {
+  for (const { certificates: identifying, service, supplyPoints, kind } of services) {
     if (kind === 'tsa') {
       // Only ever from a verified list: on an unverified one a time authority would mean nothing.
       if (check.ok) {

@@ -81,9 +81,9 @@ export async function readListedFiles(
 }
 
 /** The signature file a manifest points to, by the name it gives. */
-export const signatureNamedIn = (root: Element): string => {
+export const signatureNamedIn = (root: Element, files: ReadonlyMap<string, Uint8Array>): string => {
   const reference = descendantsNamed(root, 'SigReference')[0]?.getAttribute('URI');
-  return reference ? decodedUri(reference) : '';
+  return reference ? (fileNamed(reference, files) ?? decodedUri(reference)) : '';
 };
 
 function parseSigned(bytes: Uint8Array): SignedData | null {
@@ -110,7 +110,7 @@ export async function checkManifest(
     return [{ ...blankSignature(source, 'CAdES'), verdict: 'unreadable', detail: 'Its list of signed files could not be read.' }];
   }
 
-  const signatureName = signatureNamedIn(root);
+  const signatureName = signatureNamedIn(root, files);
   const signatureFile = files.get(signatureName);
   if (!signatureFile) {
     return [

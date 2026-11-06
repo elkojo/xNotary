@@ -247,3 +247,27 @@ describe('one certificate on two lists', () => {
   });
 });
 
+describe('a time authority reissued over one key', () => {
+  it('gets the history and the dates of all its listed certificates, from one list only', async () => {
+    const keys = await makeSigner('Stamps Ltd');
+    const reissued = await certificateWithKeyId('Stamps Ltd', keys, new Uint8Array(20).fill(3));
+    const older = await certificateWithKeyId('Stamps Ltd', keys, new Uint8Array(20).fill(3));
+    const first = { n: ['A'], h: [{ s: 'granted', t: '2020-01-01T00:00:00Z' }] };
+    const second = { n: ['B'], h: [{ s: 'granted', t: '2021-01-01T00:00:00Z' }] };
+    const other = { n: ['C'], h: [{ s: 'withdrawn', t: '2021-01-01T00:00:00Z' }] };
+    const { shards } = await buildDirectory(
+      [
+        { der: older.der, tl: 'SK', timeServices: [first] },
+        { der: reissued.der, tl: 'SK', timeServices: [second] },
+        { der: reissued.der, tl: 'CZ', timeServices: [other] },
+      ],
+      'x',
+    );
+    const found = await listedTimeAuthority(reissued.certificate, (async (name: string) => shards[name] ?? null) as DirectorySource);
+    // Whichever list comes first, its whole history and nothing of the other's.
+    const names = found?.services.map((service) => service.n[0]).sort();
+    expect(names).toEqual(found?.list === 'SK' ? ['A', 'B'] : ['C']);
+    expect(found?.certificates).toHaveLength(found?.list === 'SK' ? 2 : 1);
+  });
+});
+

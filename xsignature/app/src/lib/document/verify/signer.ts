@@ -431,7 +431,3 @@ export async function embeddedTimestampsOf(signed: SignedData, index = 0): Promi
 /** The one to report when only one can be: any that does not hold, since that is the news. */
 export const worstTimestamp = (stamps: readonly AttachedTimestamp[]): AttachedTimestamp | null =>
   stamps.find((stamp) => stamp.standing !== 'holds') ?? stamps[0] ?? null;
-
-export async function embeddedTimestampOf(signed: SignedData, index = 0): Promise<AttachedTimestamp | null> {
-  return worstTimestamp(await embeddedTimestampsOf(signed, index));
-}

@@ -3,7 +3,7 @@ import { Attribute, ContentInfo, IssuerAndSerialNumber, SignedAndUnsignedAttribu
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { damaged, makeCades, makeSigner, makeTimestampToken, utf8, type Signer } from './asic/fixtures.test-helper';
-import { checkSigner, embeddedTimestampOf, readTimestampToken, signedDataFrom, signerCertificateOf, signerFactsOf } from './signer';
+import { checkSigner, embeddedTimestampsOf, readTimestampToken, worstTimestamp, signedDataFrom, signerCertificateOf, signerFactsOf } from './signer';
 
 const CONTENT = utf8('the signed bytes');
 
@@ -89,6 +89,8 @@ describe('how a signature holds up', () => {
 });
 
 describe('a timestamp inside a CMS signature', () => {
+  const embeddedTimestampOf = async (signed: SignedData, index = 0) => worstTimestamp(await embeddedTimestampsOf(signed, index));
+
   /** Attach a token built over this signature's value. */
   const stamped = async (make: (signatureValue: Uint8Array) => Promise<Uint8Array>): Promise<SignedData> => {
     const signed = parsed(await makeCades(CONTENT, signer));

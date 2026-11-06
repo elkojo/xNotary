@@ -22,7 +22,7 @@ export const sameBytes = (a: Uint8Array, b: Uint8Array): boolean =>
   a.length === b.length && a.every((byte, i) => byte === b[i]);
 
 export const digest = async (hash: string, bytes: Uint8Array): Promise<Uint8Array> =>
-  new Uint8Array(await crypto.subtle.digest(hash, bytes.slice().buffer as ArrayBuffer));
+  new Uint8Array(await crypto.subtle.digest(hash, bytes as BufferSource));
 
 /** Direct children by local name and, when given, namespace. */
 export function childrenNamed(parent: Element | Document, name: string, namespace?: string): Element[] {
