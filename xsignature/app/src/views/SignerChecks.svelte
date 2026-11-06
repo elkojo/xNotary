@@ -35,6 +35,7 @@
     type CarriedAnswer,
     type CarriedEvidence,
   } from '../lib/document/verify/asic/proven-answer';
+  import { levelIsConfirmed, listBacksSignature, reportedAnswer, revocationStanding } from '../lib/document/verify/asic/revocation-standing';
   import { fetchCrlCopy } from '../lib/document/verify/crl-copy';
   import { printable } from '../lib/document/verify/printable';
   import type { AttachedTimestamp, SignerFacts } from '../lib/document/verify/signer';
@@ -372,25 +373,24 @@
   }
 
   const listShortfall = $derived(listFile?.answer?.standing === 'holds' ? shortfallOf(listFile.answer, 'list') : null);
-  const clearedByList = $derived(listShortfall === '');
 
   /**
    * Why a proven carried answer of "not revoked" still settles nothing. Null means there is no such
    * answer; empty means it does settle it, by the same test as a list: made after a confirmed time.
    */
-  const carried = $derived(chooseCarried(provenAnswers ?? [], (answer) => shortfallOf(answer, 'answer') === ''));
-  // Once read again, that reading stands: it may have found the first one is about another key.
-  const shownAnswer = $derived(provenAnswers ? (carried?.answer ?? null) : (carriedRevocation ?? null));
+  const carried = $derived(
+    reportedAnswer(provenAnswers, chooseCarried(provenAnswers ?? [], (answer) => shortfallOf(answer, 'answer') === ''), carriedRevocation),
+  );
+  const shownAnswer = $derived(carried?.answer ?? null);
   const carriedProof = $derived(carried?.proof ?? null);
   const carriedShortfall = $derived(shownAnswer && carriedProof ? shortfallOf(shownAnswer, 'answer') : null);
-  const listSaysRevoked = $derived(listFile?.answer?.standing === 'holds' && listFile.answer.status === 'revoked');
-  const clearedByAnswer = $derived(carriedShortfall === '' && !listSaysRevoked);
-  const provenRevoked = $derived(!!carriedProof && shownAnswer?.status === 'revoked');
 
-  // An answer that is not proven settles nothing, either way: anyone can add one, including a forged
-  // "revoked" against somebody else's good signature. So the issuer's own list is read, unless a proven
-  // answer has already said what that list would be asked.
-  const offerRevocationList = $derived(!isTimestamp && !!signature.certificate && proofChecked && ((!clearedByAnswer && !provenRevoked) || listSaysRevoked));
+  const revocation = $derived(
+    revocationStanding({ listAnswer: listFile?.answer ?? null, listSettles: listShortfall === '', carried, carriedSettles: carriedShortfall === '' }),
+  );
+  const clearedByList = $derived(revocation.clearedByList);
+  const clearedByAnswer = $derived(revocation.clearedByAnswer);
+  const offerRevocationList = $derived(!isTimestamp && !!signature.certificate && proofChecked && revocation.listNeeded);
 
   $effect(() => {
     if (fetchTried || !offerRevocationList || !issuerCertificate) return;
@@ -398,19 +398,18 @@
     void fetchRevocationList();
   });
 
-  /** An answer says this certificate was revoked, which no green may sit beside. */
-  const knownRevoked = $derived(
-    listSaysRevoked ||
-      provenRevoked ||
-      // The issuer's own list outranks an answer anyone could have added.
-      (shownAnswer?.standing === 'holds' && shownAnswer.status === 'revoked' && !clearedByList),
+  const listBacksIt = $derived(
+    listBacksSignature({
+      holds,
+      qualified: standing?.result === 'qualified',
+      independentTime: moment?.independent === true,
+      validWhenUsed,
+      knownRevoked: revocation.knownRevoked,
+    }),
   );
-  const listBacksIt = $derived(holds && standing?.result === 'qualified' && moment?.independent === true && validWhenUsed && !knownRevoked);
-  /**
-   * Green only when all of it holds: the list backs this certificate, at a time an authority dated,
-   * the reader has confirmed this is the newest copy, and that copy has not outlived its list.
-   */
-  const levelConfirmed = $derived(listBacksIt && confirmedCurrent && !listOverdue && standing?.onQualifiedDevice !== null);
+  const levelConfirmed = $derived(
+    levelIsConfirmed({ listBacksIt, confirmedCurrent, listOverdue, deviceSettled: standing?.onQualifiedDevice !== null }),
+  );
 </script>
 
 {#if lookupFailed}
