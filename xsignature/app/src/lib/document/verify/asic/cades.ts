@@ -220,6 +220,7 @@ async function checkCms(
           timestamps: stamps,
           timestamp: worstTimestamp(stamps),
           revocation: facts.certificate ? await revocationOf(facts.certificate, certificatesOf(signed), revocationInCms(signed, index)) : null,
+          carriedEvidence: facts.certificate ? { embedded: revocationInCms(signed, index), certificates: certificatesOf(signed) } : null,
           unchecked,
         },
         listed,

@@ -46,15 +46,16 @@ const service = (type: string) => `<TSPService><ServiceInformation>
 const LIST_BODY = `<SchemeInformation><TSLSequenceNumber>7</TSLSequenceNumber></SchemeInformation><TrustServiceProviderList><TrustServiceProvider>
   <TSPInformation><TSPName><Name xml:lang="sk">Národná agentúra</Name><Name xml:lang="en">National Agency</Name></TSPName>
   <TSPTradeName><Name xml:lang="en">NASES</Name></TSPTradeName></TSPInformation>
-  <TSPServices>${service('CA/QC')}${service('TSA/QTST')}${service('Certstatus/OCSP/QC')}</TSPServices>
+  <TSPServices>${service('CA/QC')}${service('TSA/QTST')}${service('Certstatus/OCSP/QC')}${service('PKC')}</TSPServices>
 </TrustServiceProvider></TrustServiceProviderList>`;
 
 describe('reading a list', () => {
-  const [read, timeAuthority, ...others] = readQualifiedServices(parseList(`<TrustServiceStatusList xmlns="${T}">${LIST_BODY}</TrustServiceStatusList>`));
+  const [read, timeAuthority, responder, ...others] = readQualifiedServices(parseList(`<TrustServiceStatusList xmlns="${T}">${LIST_BODY}</TrustServiceStatusList>`));
 
-  it('keeps certificate services and time authorities, told apart, and no others', () => {
+  it('keeps certificate services, time authorities and OCSP responders, told apart, and no others', () => {
     expect(read.kind).toBe('ca');
     expect(timeAuthority.kind).toBe('tsa');
+    expect(responder.kind).toBe('ocsp');
     expect(others).toEqual([]);
   });
 

@@ -118,7 +118,7 @@ if (pointers.length - outsideEu.length < MIN_NATIONAL_LISTS) {
   throw new Error(`The EU's list names only ${pointers.length - outsideEu.length} national lists. Nothing was written.`);
 }
 
-const certificates: { der: Uint8Array; tl: string; services?: readonly ListedService[]; timeServices?: readonly ListedService[] }[] = [];
+const certificates: { der: Uint8Array; tl: string; services?: readonly ListedService[]; timeServices?: readonly ListedService[]; responderServices?: readonly ListedService[] }[] = [];
 const verified: Record<string, ListFacts> = {};
 const unverified: string[] = [];
 const crlSources = new Map<string, CrlSource>();
@@ -183,11 +183,15 @@ for (const { territory, url, signers } of pointers) {
 
   let count = 0;
   for (const { certificates: identifying, service, supplyPoints, kind } of services) {
-    if (kind === 'tsa') {
-      // Only ever from a verified list: on an unverified one a time authority would mean nothing.
+    if (kind !== 'ca') {
+      // Only ever from a verified list: on an unverified one these would mean nothing.
       if (check.ok) {
         for (const base64 of identifying) {
-          certificates.push({ der: Uint8Array.from(Buffer.from(base64, 'base64')), tl: territory, timeServices: [service] });
+          certificates.push({
+            der: Uint8Array.from(Buffer.from(base64, 'base64')),
+            tl: territory,
+            ...(kind === 'tsa' ? { timeServices: [service] } : { responderServices: [service] }),
+          });
         }
       }
       continue;
@@ -224,7 +228,7 @@ if (missing.length && existsSync(OUT)) {
     const shard = JSON.parse(readFileSync(`${OUT}${file}`, 'utf8')) as DirectoryShard;
     for (const entries of Object.values(shard.entries)) {
       for (const entry of entries) {
-        if (missing.includes(entry.tl)) certificates.push({ der: Uint8Array.from(Buffer.from(entry.c, 'base64')), tl: entry.tl, services: entry.s, timeServices: entry.t });
+        if (missing.includes(entry.tl)) certificates.push({ der: Uint8Array.from(Buffer.from(entry.c, 'base64')), tl: entry.tl, services: entry.s, timeServices: entry.t, responderServices: entry.o });
       }
     }
   }

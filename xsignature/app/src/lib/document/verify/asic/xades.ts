@@ -570,6 +570,7 @@ export async function checkXades(
     timestamps,
     timestamp: worstTimestamp(timestamps),
     revocation: bound ? await revocationOf(holder, others, revocationIn(properties)) : null,
+    carriedEvidence: bound ? { embedded: revocationIn(properties), certificates: others } : null,
     archiveTimestamps: qualifying ? await archiveTimestampsOf(properties, signature, signedInfo, qualifying, files) : [],
     detail: '',
   };

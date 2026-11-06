@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { ListedService, QualificationElement, ServiceState } from '../certificate/read/trusted-list';
 import { buildDirectory, type DirectorySource } from '../certificate/read/directory';
 import { makeSigner } from './asic/fixtures.test-helper';
-import { checkAgainstList, confirmedTimeAuthority, timeAuthorityGrantedAt, type CertificateFacts } from './trust';
+import { checkAgainstList, confirmedTimeAuthority, serviceGrantedAt, type CertificateFacts } from './trust';
 
 const SIGNED = new Date('2026-03-01T10:00:00Z');
 
@@ -81,8 +81,8 @@ describe('the status at the time', () => {
     const retyped = service({ s: 'retyped', t: '2026-01-01T00:00:00Z' }, state());
     expect(check([retyped]).result).toBe('not-qualified');
     expect(check([retyped], facts(), new Date('2025-06-01T00:00:00Z')).result).toBe('qualified');
-    expect(timeAuthorityGrantedAt([retyped], SIGNED)).toBe(false);
-    expect(timeAuthorityGrantedAt([retyped], new Date('2025-06-01T00:00:00Z'))).toBe(true);
+    expect(serviceGrantedAt([retyped], SIGNED)).toBe(false);
+    expect(serviceGrantedAt([retyped], new Date('2025-06-01T00:00:00Z'))).toBe(true);
   });
 
   it('does not guess at a status the rules do not recognise', () => {
