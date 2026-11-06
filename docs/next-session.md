@@ -1,6 +1,38 @@
 # Where things stand — handoff
 
-## Pick up here (2026-10-28): v0.9.1 to beta
+## Pick up here (2026-11-06): v0.10.0 to beta
+
+**v0.10.0 goes to beta only** (`beta.xnotary.digital`). Production stays on v0.8.1 until the owner
+says otherwise. **Before production: a lawyer checks the legal parts of the Czech** (owner's decision,
+2026-11-06). The owner approved the Czech as written, but no lawyer has read it. The owner also chose
+to release without an independent validator comparison and without testing Safari.
+
+### What changed since 0.9.1
+
+- **Check a signed file** (was Check a PDF): `.asice`, `.asics` and similar containers, zipped or as an
+  unpacked folder, with XAdES, CAdES and timestamp signatures. Signature level checked against
+  verified EU trusted lists, time authorities confirmed the same way, and the issuer found without clicks.
+- **Revocation:** site copies of the lists Hungary, Poland and Slovakia publish, collected at release.
+  An answer a signature carries counts when it provably came from the right party, and only with an
+  issuer from a verified list.
+- **Czech** is signed off, so a Czech browser starts in it.
+- **Release build:** fails on stale trusted lists or missing revocation copies.
+
+### Left for later
+
+- More revocation coverage waits for real files that need it: more frequent copies, or more countries.
+- A revocation dated after the signature still shows red, though the certificate was good when signed.
+- `id-pkix-ocsp-nocheck` and a delegated responder's own revocation are not checked.
+- A list the reader brings, for an issuer the file carries, can show a green revocation line. The
+  level box stays unconfirmed, since that issuer is on no list. It is the same self-vouching the proof
+  of carried answers now refuses, so consider treating it the same way.
+- Carried answers are parsed twice per signature.
+- xConvert's browser test failed once in CI on a download that had not appeared
+  (`e2e.mjs`, the ODT step), then passed on the same content. Worth a longer wait if it recurs.
+- Checking out any commit from `34e86a2` up to just before `0d5ff28` replaces `app/node_modules` and
+  `xsignature/app/node_modules` with dead links. Delete the link and run `npm ci`.
+
+## Earlier (2026-10-28): v0.9.1 to beta
 
 **v0.9.1 goes to beta only** (`beta.xnotary.digital`); production stays on v0.8.1 until the
 owner says otherwise. Beta served v0.8.2 before it. Tag `v0.9.1` builds the release and attaches
