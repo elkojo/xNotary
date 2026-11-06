@@ -33,7 +33,13 @@ export const parseList = (xml: string): Element => {
   return document.documentElement;
 };
 
-export async function listSignature(xml: string, allowed: ReadonlySet<string>): Promise<{ ok: boolean; why: string }> {
+/**
+ * On success, `signed` is the document the signature covers, as text: without the signature and
+ * without comments. Every reader of a list has to read that and nothing else. A `ds:Object` inside
+ * the signature, or an XML comment, is outside what was signed, and a provider added there would
+ * otherwise count as verified.
+ */
+export async function listSignature(xml: string, allowed: ReadonlySet<string>): Promise<{ ok: boolean; why: string; signed?: string }> {
   let root: Element;
   try {
     root = parseList(xml);
@@ -103,5 +109,5 @@ export async function listSignature(xml: string, allowed: ReadonlySet<string>): 
   for (const { algorithm, prefixes, hash, expected } of whole) {
     if (!sameBytes(await digest(hash, canonicalize(root, algorithm, prefixes)), expected)) return { ok: false, why: 'the document does not match' };
   }
-  return { ok: true, why: '' };
+  return { ok: true, why: '', signed: new TextDecoder().decode(canonicalize(root, whole[0].algorithm, whole[0].prefixes)) };
 }

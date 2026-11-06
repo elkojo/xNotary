@@ -41,6 +41,8 @@ export interface DirectoryEntry {
   readonly tl: string;
   /** What that list records about the services it identifies, when the list was verified. */
   readonly s?: readonly ListedService[];
+  /** The same, for a time authority. Never used to complete a chain's trust claim. */
+  readonly t?: readonly ListedService[];
 }
 
 /** What the site knows about one list, from `index.json`. */
@@ -141,13 +143,13 @@ function fromBase64(base64: string): ArrayBuffer {
  * Deterministic: the same certificates give the same files, whatever order they came in.
  */
 export async function buildDirectory(
-  certificates: readonly { readonly der: Uint8Array; readonly tl: string; readonly services?: readonly ListedService[] }[],
+  certificates: readonly { readonly der: Uint8Array; readonly tl: string; readonly services?: readonly ListedService[]; readonly timeServices?: readonly ListedService[] }[],
   asOf: string,
 ): Promise<{ shards: Record<string, DirectoryShard>; names: NameIndex }> {
-  const byKey = new Map<string, Map<string, { c: string; tl: string; s?: ListedService[] }>>();
+  const byKey = new Map<string, Map<string, { c: string; tl: string; s?: ListedService[]; t?: ListedService[] }>>();
   const names = new Map<string, Set<string>>();
 
-  for (const { der, tl, services } of certificates) {
+  for (const { der, tl, services, timeServices } of certificates) {
     let certificate: Certificate;
     try {
       certificate = Certificate.fromBER(der.slice().buffer as ArrayBuffer);
@@ -156,13 +158,19 @@ export async function buildDirectory(
     }
     const keyId = await keyIdOf(certificate);
     const c = toBase64(der);
-    const entries = byKey.get(keyId) ?? new Map<string, { c: string; tl: string; s?: ListedService[] }>();
+    const entries = byKey.get(keyId) ?? new Map<string, { c: string; tl: string; s?: ListedService[]; t?: ListedService[] }>();
     const entry = entries.get(c) ?? { c, tl };
     // One certificate can identify several services, and the rules weigh all of them.
     if (services?.length) {
       const known = new Set((entry.s ?? []).map((service) => JSON.stringify(service)));
       for (const service of services) {
         if (!known.has(JSON.stringify(service))) (entry.s ??= []).push(service);
+      }
+    }
+    if (timeServices?.length) {
+      const known = new Set((entry.t ?? []).map((service) => JSON.stringify(service)));
+      for (const service of timeServices) {
+        if (!known.has(JSON.stringify(service))) (entry.t ??= []).push(service);
       }
     }
     entries.set(c, entry);
@@ -274,4 +282,39 @@ async function servicesWithSameIdentity(
     }
   }
   return found;
+}
+
+/**
+ * Whether a certificate that made a timestamp belongs to a time authority on a verified list:
+ * by its own key, or through a certificate above it. Null when it does not.
+ *
+ * Without this a timestamp only shows that the certificate it carries made it, and anybody can make
+ * such a certificate and write any date into such a token.
+ */
+export async function listedTimeAuthority(
+  certificate: Certificate,
+  source: DirectorySource,
+): Promise<{ readonly list: string; readonly services: readonly ListedService[] } | null> {
+  const lookUp = async (candidate: Certificate) => {
+    const keyId = await keyIdOf(candidate);
+    const shard = (await source(shardOf(keyId))) as DirectoryShard | null;
+    for (const entry of shard?.entries[keyId] ?? []) {
+      if (!entry.t?.length) continue;
+      try {
+        if (sameName(Certificate.fromBER(fromBase64(entry.c)).subject, candidate.subject)) return { list: entry.tl, services: entry.t };
+      } catch {
+        // One unreadable entry does not spoil the others.
+      }
+    }
+    return null;
+  };
+
+  const own = await lookUp(certificate);
+  if (own) return own;
+  const above = await findIssuers(certificate, source);
+  for (const link of above?.chain ?? []) {
+    const listed = await lookUp(link);
+    if (listed) return listed;
+  }
+  return null;
 }

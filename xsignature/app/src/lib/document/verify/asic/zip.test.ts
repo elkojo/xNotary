@@ -1,8 +1,8 @@
-import { zipSync } from 'fflate';
+import { deflateSync, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 
 import { rawZip, utf8 } from './fixtures.test-helper';
-import { ContainerRefused, MAX_UNPACKED_BYTES, looksLikeZip, printable, readZip, savedName } from './zip';
+import { ContainerRefused, MAX_UNPACKED_BYTES, crc32, looksLikeZip, printable, readZip, savedName } from './zip';
 
 const entry = (name: string, text = 'hello') => ({ name, bytes: utf8(text) });
 
@@ -98,6 +98,48 @@ describe('what it refuses, because two programs could read it differently', () =
   it('a file cut off partway', () => {
     const whole = rawZip([entry('a.txt')]);
     refusal(whole.subarray(0, whole.length - 10));
+  });
+});
+
+describe('what would give two programs two different files', () => {
+  const refused = (zip: Uint8Array) => expect(() => readZip(zip)).toThrow(ContainerRefused);
+  const signed = utf8('the signed text');
+  const stream = deflateSync(utf8('the signed text, and then whatever else somebody added'));
+
+  it('a deflate stream longer than the size declared', () => {
+    // A fixed buffer would hash the signed prefix while another program unpacks all of it.
+    refused(rawZip([{ name: 'a.txt', bytes: stream, deflatedSize: signed.length, crc: crc32(signed) }]));
+  });
+
+  it('a deflate stream shorter than the size declared', () => {
+    refused(rawZip([{ name: 'a.txt', bytes: deflateSync(signed), deflatedSize: signed.length + 5 }]));
+  });
+
+  it('a stream behind a declared size of zero', () => {
+    refused(rawZip([{ name: 'a.txt', bytes: stream, deflatedSize: 0, crc: 0 }]));
+  });
+
+  it('reads a stream of exactly the declared size', () => {
+    const [entry] = readZip(rawZip([{ name: 'a.txt', bytes: deflateSync(signed), deflatedSize: signed.length, crc: crc32(signed) }]));
+    expect(text(entry.bytes)).toBe('the signed text');
+  });
+
+  it('a checksum that does not match', () => {
+    refused(rawZip([{ name: 'a.txt', bytes: signed, crc: 12345 }]));
+  });
+
+  it('a local header stating another size', () => {
+    refused(rawZip([{ name: 'a.txt', bytes: signed, localSize: 3 }]));
+  });
+
+  it('an entry the directory does not list', () => {
+    const hidden = rawZip([{ name: 'evil.exe', bytes: utf8('x') }]).subarray(0, 40);
+    refused(rawZip([{ name: 'a.txt', bytes: signed, hiddenAfter: hidden }, entry('b.txt')]));
+  });
+
+  it('a name with a dot in its path, which lands on the same file as one without', () => {
+    refused(rawZip([entry('a.txt'), entry('./a.txt')]));
+    refused(rawZip([entry('folder//a.txt')]));
   });
 });
 

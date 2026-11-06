@@ -23,6 +23,7 @@
   import {
     DirectoryUnreachable,
     findIssuers,
+    listedTimeAuthority,
     siteDirectory,
     type DirectoryIndex,
     type FoundIssuers,
@@ -30,14 +31,17 @@
   import { revocationOf, type RevocationAnswer } from '../lib/document/verify/asic/revocation';
   import { fetchCrlCopy } from '../lib/document/verify/crl-copy';
   import type { AttachedTimestamp, SignerFacts } from '../lib/document/verify/signer';
-  import { checkAgainstList, factsOf, type ListStanding } from '../lib/document/verify/trust';
+  import { checkAgainstList, factsOf, timeAuthorityGrantedAt, type ListStanding } from '../lib/document/verify/trust';
   import FindIssuers from './FindIssuers.svelte';
 
   interface Props {
     signature: SignerFacts & { readonly timestamp: AttachedTimestamp | null };
     /** The signer's own stated time, used only when nothing better dates the signature. */
     signerClock?: Date | null;
-    /** An answer the signature carried, which the screen shows itself. */
+    /**
+     * An answer the signature carried, which the screen shows itself. Null when it was looked for
+     * and there is none; left out where nothing looks, as for a PDF, so nothing is claimed.
+     */
     carriedRevocation?: RevocationAnswer | null;
     /** A timestamp rather than a signature of identity: no chain and no level to speak of. */
     isTimestamp: boolean;
@@ -51,7 +55,7 @@
     limits?: Snippet;
   }
 
-  let { signature, signerClock = null, carriedRevocation = null, isTimestamp, judge, goTo, children, limits }: Props = $props();
+  let { signature, signerClock = null, carriedRevocation = undefined, isTimestamp, judge, goTo, children, limits }: Props = $props();
 
   const UTC = (time: Date): string => `${time.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')} UTC`;
   const day = (text: string): string => text.slice(0, 10);
@@ -98,7 +102,7 @@
 
   /** Past any cache, so that "the newest copy" is true when it is said. */
   async function lookAndConfirm(cache: RequestCache) {
-    await look(cache);
+    await Promise.all([look(cache), lookTimeAuthority(cache)]);
     if (!lookupFailed && index) {
       confirmedCurrent = true;
       refreshed = 'This is the newest copy this site has.';
@@ -119,7 +123,7 @@
     refreshing = true;
     refreshed = '';
     try {
-      await look('reload');
+      await Promise.all([look('reload'), lookTimeAuthority('reload')]);
       if (lookupFailed) {
         confirmedCurrent = false;
         refreshed = '';
@@ -174,9 +178,29 @@
     supplied = { name: file.name, links: await checkLinks(leaf, ordered), first: ordered[0], error: '' };
   }
 
+  /**
+   * Whether the timestamp's authority is on a verified list, granted at the time it states.
+   *
+   * A token that verifies only shows the certificate inside it made it, and anybody can make one
+   * and write any date. So only a listed authority's time is independent, and everything that
+   * depends on when the signature was made depends on this.
+   */
+  let timeAuthority = $state<{ list: string } | null>(null);
+
+  async function lookTimeAuthority(cache: RequestCache) {
+    const stamp = signature.timestamp;
+    if (!stamp?.certificate || stamp.standing !== 'holds') return;
+    try {
+      const listedAuthority = await listedTimeAuthority(stamp.certificate, siteDirectory(import.meta.env.BASE_URL, cache));
+      timeAuthority = listedAuthority && timeAuthorityGrantedAt(listedAuthority.services, stamp.time) ? { list: listedAuthority.list } : null;
+    } catch {
+      timeAuthority = null;
+    }
+  }
+
   /** What dates this signature, and how far that can be taken. */
   const moment = $derived.by((): { time: Date; independent: boolean } | null => {
-    if (signature.timestamp?.standing === 'holds') return { time: signature.timestamp.time, independent: true };
+    if (signature.timestamp?.standing === 'holds') return { time: signature.timestamp.time, independent: timeAuthority !== null };
     return signerClock ? { time: signerClock, independent: false } : null;
   });
 
@@ -267,18 +291,28 @@
   }
 
   /**
-   * A list from the issuer, verified against the issuer's key, that does not name this
-   * certificate and was made after the signature. That is the one case in which "not revoked" is a
-   * finding: the issuer's key said so, and only the issuer holds it.
+   * Why a list that does not name this certificate still proves nothing here. Null when it does
+   * prove it: the issuer's key made it, only the issuer holds that key, and it was made after a
+   * time somebody independent confirmed.
    */
-  const clearedByList = $derived.by(() => {
+  const listShortfall = $derived.by((): string | null => {
     const answer = listFile?.answer;
-    if (!answer || answer.standing !== 'holds' || answer.status !== 'good' || !answer.at) return false;
-    return moment ? answer.at.getTime() >= moment.time.getTime() : false;
+    const leaf = signature.certificate;
+    if (!answer || !leaf || answer.standing !== 'holds' || answer.status !== 'good' || !answer.at) return null;
+    if (!moment?.independent) return 'Nothing independent dates this signature, so the list cannot speak for when it was made.';
+    if (answer.at.getTime() < moment.time.getTime()) return `The list is older than the signature: it was issued ${UTC(answer.at)}.`;
+    if (answer.at.getTime() > leaf.notAfter.value.getTime() && !answer.keepsExpired) {
+      return 'The list is from after this certificate expired, and an authority may drop expired certificates from its lists.';
+    }
+    return '';
   });
+  const clearedByList = $derived(listShortfall === '');
 
+  // Only a verified "revoked" settles it. A carried "not revoked" does not: anyone can add one, and
+  // it must not stop the issuer's own list from being read.
   const carriedSettled = $derived(carriedRevocation?.standing === 'holds' && carriedRevocation.status === 'revoked');
-  const offerRevocationList = $derived(!isTimestamp && !!signature.certificate && !carriedSettled && !(carriedRevocation?.standing === 'holds' && carriedRevocation.status === 'good'));
+  const offerRevocationList = $derived(!isTimestamp && !!signature.certificate && !carriedSettled);
+
   $effect(() => {
     if (fetchTried || !offerRevocationList || !issuerCertificate) return;
     fetchTried = true;
@@ -403,7 +437,7 @@
         {country(listed.list)}'s trusted list treats this certificate as qualified{moment?.independent ? ' at the time it was signed' : ''}.
       </strong>
       {#if !moment?.independent}
-        That time is the signer's own clock, so nothing confirms the list applied then.
+        Nothing independent confirms that time, so nothing confirms the list applied then.
       {/if}
       <Info
         >Its provider was recorded as granted when the certificate was issued and at that time, and the
@@ -505,12 +539,20 @@
       against. That says nothing either way about whether it holds.</Info
     >
   </div>
-{:else if signature.timestamp}
+{:else if signature.timestamp && timeAuthority}
   <div class="notice ok">
     <strong>The time on this signature is not the signer's own.</strong>
-    {signature.timestamp.signedBy ?? 'An authority'} dated it.<Info
-      >So the time does not rest on the signer's computer. Whether that authority is
-      worth believing is, like the signer's identity, {judge}'s call.</Info
+    {signature.timestamp.signedBy ?? 'An authority'} dated it, an authority on {country(timeAuthority.list)}'s trusted list.<Info
+      >So the time does not rest on the signer's computer. The list recorded that authority as granted at that
+      time.</Info
+    >
+  </div>
+{:else if signature.timestamp}
+  <div class="notice">
+    <strong>This signature carries a timestamp from {signature.timestamp.signedBy ?? 'an unnamed authority'}.</strong>
+    That authority is not on a list this site could verify, so the time is not confirmed.<Info
+      >The timestamp verifies against the certificate inside it, but anybody can make such a certificate and
+      write any date. Whether that authority is worth believing is {judge}'s call.</Info
     >
   </div>
 {/if}
@@ -536,8 +578,8 @@
       </div>
     {:else if answer.standing === 'holds' && answer.status === 'good'}
       <div class="notice warn">
-        <strong>That revocation list is older than the signature, or nothing dates the signature.</strong>
-        It cannot speak for the time this was signed{answer.at ? `: it was issued ${UTC(answer.at)}` : ''}. A newer one is needed.
+        <strong>The issuer's revocation list does not name this certificate, but that settles nothing here.</strong>
+        {listShortfall}
       </div>
     {:else if answer.standing === 'broken'}
       <div class="notice bad">
@@ -557,7 +599,7 @@
   {#if !clearedByList && listFile?.answer?.status !== 'revoked'}
     <div class="notice">
       <strong>{fetching ? 'Checking revocation…' : 'Revocation: not checked.'}</strong>
-      This signature carries no answer.<Info
+      {#if carriedRevocation === null}This signature carries no answer.{/if}<Info
         >No web page can ask an authority directly, so this site keeps copies of the revocation lists it can
         collect, as new as the site's last release. A copy is checked here against the key that issued this
         certificate. Nothing about you or the file is sent.</Info
@@ -597,7 +639,7 @@
   more is established, and the last of it never goes: nothing here can confirm a person.
 -->
 <div class="notice">
-  {#if listBacksIt && (clearedByList || (carriedRevocation?.standing === 'holds' && carriedRevocation.status === 'good'))}
+  {#if listBacksIt && clearedByList}
     <strong>What this does not confirm:</strong> the person, or that the signature is valid. <em translate="no">{signature.signedBy ?? 'That name'}</em> is
     what the listed authority put in the certificate, including any role in it.
   {:else if listBacksIt}

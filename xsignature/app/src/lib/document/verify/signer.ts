@@ -22,6 +22,7 @@ import {
   IssuerAndSerialNumber,
   SignedData,
   TSTInfo,
+  getCrypto,
 } from 'pkijs';
 
 import { checkLinks, orderChain, type ChainLink } from '../certificate/read/chain';
@@ -175,31 +176,63 @@ export type SignatureCheck =
   /** The check itself could not run, usually an algorithm a browser does not have. */
   | 'cannot-check';
 
-/** `SignedDataVerifyError.code`, for the failures that mean something to a reader. */
-const NO_CERTIFICATES = 2;
-const SIGNER_NOT_FOUND = 3;
-const DIGEST_MISMATCH = 15;
+const MESSAGE_DIGEST = '1.2.840.113549.1.9.4';
+const RSA_ENCRYPTION = '1.2.840.113549.1.1.1';
 
 /**
- * Run one SignerInfo's check and say what happened.
+ * Run one SignerInfo's check against `content`, and say what happened.
  *
- * For a timestamp token, `data` is what was stamped: the library compares the
- * token's imprint with it and reports a difference as a digest mismatch.
+ * Done here rather than by the library's `verify`, for three reasons found the hard way. It
+ * swaps `content` for any content embedded in the structure, so an attached signature over one
+ * document read as covering whatever file sat beside it. It compares the digest before the
+ * signature, so a forged digest attribute read as a changed file. And it reports unsupported
+ * algorithms with the same code as a digest mismatch.
+ *
+ * So: the signature value first, and only then whether it describes these bytes.
  */
 export async function checkSigner(
   signed: SignedData,
   index: number,
-  data: Uint8Array,
+  content: Uint8Array,
 ): Promise<SignatureCheck> {
+  const info = signed.signerInfos[index];
+  if (!info) return 'cannot-check';
+
+  const certificate = await signerCertificateOf(signed, index);
+  if (!certificate) return 'no-certificate';
+
+  const hash = hashForOid(info.digestAlgorithm.algorithmId);
+  if (!hash) return 'cannot-check';
+
+  let covered = content;
+  let stated: Uint8Array | null = null;
+  if (info.signedAttrs) {
+    const attribute = info.signedAttrs.attributes.find((candidate) => candidate.type === MESSAGE_DIGEST);
+    const value = attribute?.values[0] as asn1js.OctetString | undefined;
+    if (!value?.valueBlock?.valueHexView) return 'bad-signature';
+    stated = new Uint8Array(value.valueBlock.valueHexView);
+    covered = new Uint8Array(info.signedAttrs.encodedValue);
+  }
+
+  let holds: boolean;
   try {
-    const holds = await signed.verify({ signer: index, data: data.slice().buffer as ArrayBuffer });
-    return holds ? 'holds' : 'bad-signature';
-  } catch (error) {
-    const code = (error as { code?: number }).code;
-    if (code === NO_CERTIFICATES || code === SIGNER_NOT_FOUND) return 'no-certificate';
-    if (code === DIGEST_MISMATCH) return 'digest-mismatch';
+    holds = await getCrypto(true).verifyWithPublicKey(
+      covered.slice().buffer as ArrayBuffer,
+      info.signature,
+      certificate.subjectPublicKeyInfo,
+      info.signatureAlgorithm,
+      info.signatureAlgorithm.algorithmId === RSA_ENCRYPTION ? hash : undefined,
+    );
+  } catch {
     return 'cannot-check';
   }
+  if (!holds) return 'bad-signature';
+
+  if (stated) {
+    const actual = new Uint8Array(await crypto.subtle.digest(hash, content.slice().buffer as ArrayBuffer));
+    if (!equalBytes(actual, stated)) return 'digest-mismatch';
+  }
+  return 'holds';
 }
 
 /**
@@ -218,62 +251,60 @@ export type TimestampStanding = 'holds' | 'other-signature' | 'broken' | 'cannot
 export interface AttachedTimestamp {
   readonly time: Date;
   readonly signedBy: string | null;
+  /** The certificate that made it, for asking whether that authority is listed anywhere. */
+  readonly certificate: Certificate | null;
   readonly standing: TimestampStanding;
 }
 
-/**
- * What a token states, or null when it states nothing readable.
- *
- * Real tokens may hold their content as a constructed OCTET STRING, which is valid
- * BER and which the library's own token check cannot read: it would call such a
- * token a mismatch. So it is rewritten here as the primitive form, in memory, before
- * anything looks at it. Every reader of a token goes through this.
- */
-export function readTstInfo(token: SignedData): TSTInfo | null {
+/** A token's content, whichever way it encodes its OCTET STRING: real tokens use both. */
+const tokenContent = (token: SignedData): Uint8Array | null => {
   const eContent = token.encapContentInfo.eContent;
-  if (!eContent) return null;
+  return eContent ? new Uint8Array(eContent.getValue()) : null;
+};
+
+/** What a token states, or null when it states nothing readable. */
+export function readTstInfo(token: SignedData): TSTInfo | null {
+  const content = tokenContent(token);
+  if (!content) return null;
   try {
-    const content = eContent.getValue();
-    if (eContent.idBlock.isConstructed) {
-      token.encapContentInfo.eContent = new asn1js.OctetString({ valueHex: content.slice(0) });
-    }
-    return TSTInfo.fromBER(content);
+    return TSTInfo.fromBER(content.slice().buffer as ArrayBuffer);
   } catch {
     return null;
   }
 }
 
-/** Read a token and check it against the bytes it ought to have stamped. */
+/**
+ * Read a token and check it against the bytes it ought to have stamped.
+ *
+ * Its own signature first: until that holds, the imprint and the time inside are only what the
+ * file says. Holding means only that the certificate it carries made it. Whether that authority
+ * means anything is a separate question (`listedTimeAuthority` in the directory).
+ */
 export async function readTimestampToken(
   token: SignedData,
   stamped: Uint8Array,
 ): Promise<AttachedTimestamp | null> {
   const info = readTstInfo(token);
-  if (!info) return null;
+  const content = tokenContent(token);
+  if (!info || !content) return null;
 
   const certificate = await signerCertificateOf(token, 0);
   const described = {
     time: info.genTime,
     signedBy: certificate ? commonNameOf(certificate.subject.typesAndValues) : null,
+    certificate,
   };
+
+  const check = await checkSigner(token, 0, content);
+  if (check === 'no-certificate' || check === 'cannot-check') return { ...described, standing: 'cannot-check' };
+  if (check !== 'holds') return { ...described, standing: 'broken' };
 
   const hash = HASH_BY_OID[info.messageImprint.hashAlgorithm.algorithmId];
   if (!hash) return { ...described, standing: 'cannot-check' };
 
   const imprint = new Uint8Array(info.messageImprint.hashedMessage.valueBlock.valueHexView);
-  const expected = new Uint8Array(
-    await crypto.subtle.digest(hash, stamped.slice().buffer as ArrayBuffer),
-  );
-  if (!equalBytes(imprint, expected)) return { ...described, standing: 'other-signature' };
-
-  const check = await checkSigner(token, 0, stamped);
-  const standing: TimestampStanding =
-    check === 'holds'
-      ? 'holds'
-      : check === 'no-certificate' || check === 'cannot-check'
-        ? 'cannot-check'
-        : 'broken';
-  return { ...described, standing };
+  const expected = new Uint8Array(await crypto.subtle.digest(hash, stamped.slice().buffer as ArrayBuffer));
+  return { ...described, standing: equalBytes(imprint, expected) ? 'holds' : 'other-signature' };
 }
 
 /**

@@ -63,7 +63,9 @@ const HEADERS = {
   'accept-language': 'en',
 };
 
-const tag = (name: string) => new RegExp(`<(?:\\w+:)?${name}>([\\s\\S]*?)</(?:\\w+:)?${name}>`, 'g');
+// Attributes allowed: canonical XML, which is what a verified list is read from, declares namespaces
+// on the elements that use them.
+const tag = (name: string) => new RegExp(`<(?:\\w+:)?${name}(?:\\s[^>]*)?>([\\s\\S]*?)</(?:\\w+:)?${name}>`, 'g');
 const all = (xml: string, name: string) => [...xml.matchAll(tag(name))].map((m) => m[1].trim());
 const first = (xml: string, name: string) => all(xml, name)[0] ?? '';
 
@@ -80,15 +82,17 @@ async function get(url: string): Promise<string | null> {
   return null;
 }
 
-const lotl = await get(LOTL);
-if (!lotl) throw new Error(`Could not read ${LOTL}`);
+const lotlFetched = await get(LOTL);
+if (!lotlFetched) throw new Error(`Could not read ${LOTL}`);
 
 const anchor = JSON.parse(readFileSync(new URL('./lotl-anchor.json', import.meta.url), 'utf8')) as { certificates: string[]; officialJournal: string };
-const lotlCheck = await listSignature(lotl, new Set(anchor.certificates));
-if (!lotlCheck.ok) {
+const lotlCheck = await listSignature(lotlFetched, new Set(anchor.certificates));
+if (!lotlCheck.ok || !lotlCheck.signed) {
   throw new Error(`The EU's list did not verify against ${anchor.officialJournal}: ${lotlCheck.why}. Read the latest notice its SchemeInformationURI names, and update scripts/lotl-anchor.json by hand.`);
 }
 console.log('EU list: signature verified against the Official Journal.');
+// From here on, only what the signature covers.
+const lotl = lotlCheck.signed;
 
 const fingerprint = (base64: string): string => createHash('sha256').update(Buffer.from(base64.replace(/\s/g, ''), 'base64')).digest('hex');
 
@@ -105,7 +109,16 @@ const pointers = [
 ];
 const outsideEu = OTHER_LISTS.map((l) => l.territory);
 
-const certificates: { der: Uint8Array; tl: string; services?: readonly ListedService[] }[] = [];
+/**
+ * Stop rather than write a directory that has lost most of itself. A reader that finds nothing still
+ * "succeeds", and the weekly job would propose the result as a routine pull request.
+ */
+const MIN_NATIONAL_LISTS = 25;
+if (pointers.length - outsideEu.length < MIN_NATIONAL_LISTS) {
+  throw new Error(`The EU's list names only ${pointers.length - outsideEu.length} national lists. Nothing was written.`);
+}
+
+const certificates: { der: Uint8Array; tl: string; services?: readonly ListedService[]; timeServices?: readonly ListedService[] }[] = [];
 const verified: Record<string, ListFacts> = {};
 const unverified: string[] = [];
 const crlSources = new Map<string, CrlSource>();
@@ -114,20 +127,22 @@ const missing: string[] = [];
 const mirrored: string[] = [];
 
 for (const { territory, url, signers } of pointers) {
-  let xml = await get(url);
-  if (!xml && !outsideEu.includes(territory)) {
-    xml = await get(MIRROR(territory));
-    if (xml) {
+  let fetched = await get(url);
+  if (!fetched && !outsideEu.includes(territory)) {
+    fetched = await get(MIRROR(territory));
+    if (fetched) {
       mirrored.push(territory);
       console.warn(`${territory}: could not read ${url} — read the Commission's copy instead`);
     }
   }
-  if (!xml) {
+  if (!fetched) {
     missing.push(territory);
     console.warn(`${territory}: could not read ${url} or the Commission's copy — keeping its previous entries`);
     continue;
   }
-  const check = signers.size > 0 ? await listSignature(xml, signers) : { ok: false, why: 'no anchor' };
+  const check: { ok: boolean; why: string; signed?: string } = signers.size > 0 ? await listSignature(fetched, signers) : { ok: false, why: 'no anchor' };
+  // Verified: only what the signature covers. Otherwise it claims nothing and completes chains by arithmetic.
+  const xml = check.signed ?? fetched;
   if (check.ok) {
     verified[territory] = {
       issued: first(xml, 'ListIssueDateTime'),
@@ -140,7 +155,16 @@ for (const { territory, url, signers } of pointers) {
   }
 
   let count = 0;
-  for (const { certificates: identifying, service, supplyPoints } of readQualifiedServices(parseList(xml))) {
+  for (const { certificates: identifying, service, supplyPoints, kind } of readQualifiedServices(parseList(xml))) {
+    if (kind === 'tsa') {
+      // Only ever from a verified list: on an unverified one a time authority would mean nothing.
+      if (check.ok) {
+        for (const base64 of identifying) {
+          certificates.push({ der: Uint8Array.from(Buffer.from(base64, 'base64')), tl: territory, timeServices: [service] });
+        }
+      }
+      continue;
+    }
     // Only from a verified list, and only what looks like a list rather than an OCSP address.
     if (check.ok) {
       for (const url of supplyPoints.filter((point) => /^https?:\/\/\S*crl\S*$/i.test(point) && !/ocsp/i.test(point))) {
@@ -173,7 +197,7 @@ if (missing.length && existsSync(OUT)) {
     const shard = JSON.parse(readFileSync(`${OUT}${file}`, 'utf8')) as DirectoryShard;
     for (const entries of Object.values(shard.entries)) {
       for (const entry of entries) {
-        if (missing.includes(entry.tl)) certificates.push({ der: Uint8Array.from(Buffer.from(entry.c, 'base64')), tl: entry.tl, services: entry.s });
+        if (missing.includes(entry.tl)) certificates.push({ der: Uint8Array.from(Buffer.from(entry.c, 'base64')), tl: entry.tl, services: entry.s, timeServices: entry.t });
       }
     }
   }
@@ -181,6 +205,14 @@ if (missing.length && existsSync(OUT)) {
 
 const asOf = new Date().toISOString().slice(0, 10);
 const { shards, names } = await buildDirectory(certificates, asOf);
+
+const keptNow = Object.values(shards).reduce((n, shard) => n + Object.keys(shard.entries).length, 0);
+const verifiedNow = Object.keys(verified).length;
+if (verifiedNow < MIN_NATIONAL_LISTS) throw new Error(`Only ${verifiedNow} lists verified. Nothing was written.`);
+if (existsSync(`${OUT}names.json`)) {
+  const before = Object.values((JSON.parse(readFileSync(`${OUT}names.json`, 'utf8')) as { names: Record<string, string[]> }).names).flat().length;
+  if (keptNow < before * 0.7) throw new Error(`The directory would shrink from ${before} entries to ${keptNow}. Nothing was written.`);
+}
 
 // In place, removing only what is no longer wanted. Deleting the folder first leaves a running dev
 // server answering every shard with its HTML page until it is restarted.

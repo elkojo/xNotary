@@ -45,6 +45,13 @@ export interface RevocationAnswer {
   /** Who it names as answering. Not vouched for. */
   readonly from: string | null;
   /**
+   * A CRL states it keeps certificates after they expire (`ExpiredCertsOnCRL`).
+   *
+   * Without that, an authority may drop an expired certificate from later lists, so a list issued
+   * after the certificate expired proves nothing by leaving it out.
+   */
+  readonly keepsExpired: boolean;
+  /**
    * - `holds`: it verifies against the certificate it names as its source.
    * - `broken`: it does not, so it says nothing.
    * - `cannot-check`: that certificate is not here, it uses something a browser cannot
@@ -147,12 +154,14 @@ const UNREADABLE = (kind: RevocationAnswer['kind']): RevocationAnswer => ({
   revokedAt: null,
   at: null,
   from: null,
+  keepsExpired: false,
   standing: 'cannot-check',
 });
 
 /** The extensions a list may carry that change what its silence means. */
 const DELTA_CRL = '2.5.29.27';
 const ISSUING_DISTRIBUTION_POINT = '2.5.29.28';
+const EXPIRED_CERTS_ON_CRL = '2.5.29.60';
 
 async function readOcsp(
   der: Uint8Array,
@@ -172,6 +181,7 @@ async function readOcsp(
       ...statusOf(single),
       at: basic.tbsResponseData.producedAt,
       from: responder ? commonNameOf(responder.subject.typesAndValues) : null,
+      keepsExpired: false,
     };
     if (!responder) return { ...described, standing: 'cannot-check' };
 
@@ -209,6 +219,7 @@ async function readCrl(der: Uint8Array, certificate: Certificate, others: readon
     revokedAt: entry?.revocationDate.value ?? null,
     at: list.thisUpdate.value,
     from: commonNameOf(list.issuer.typesAndValues),
+    keepsExpired: list.crlExtensions?.extensions.some((extension) => extension.extnID === EXPIRED_CERTS_ON_CRL) ?? false,
   };
 
   if (scoped && !entry) return { ...described, status: 'unknown', standing: 'cannot-check' };

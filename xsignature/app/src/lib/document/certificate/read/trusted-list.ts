@@ -120,10 +120,12 @@ export interface ReadService {
   readonly service: ListedService;
   /** Where the service says it publishes things: its OCSP address, its revocation lists. */
   readonly supplyPoints: readonly string[];
+  /** A certificate-issuing service, or a time authority. */
+  readonly kind: 'ca' | 'tsa';
 }
 
 /**
- * Every qualified certificate-issuing service in a list.
+ * Every qualified certificate-issuing service and time authority in a list.
  *
  * The EU's lists name the type with ETSI's URI; Switzerland's and Ukraine's with their own
  * namespaces, so it is matched by its path.
@@ -138,7 +140,9 @@ export function readQualifiedServices(list: Element): ReadService[] {
 
     for (const entry of descendantsNamed(provider, 'TSPService')) {
       const current = childNamed(entry, 'ServiceInformation');
-      if (!current || !/\/TrstSvc\/Svctype\/CA\/QC$/.test(text(childNamed(current, 'ServiceTypeIdentifier')))) continue;
+      const type = current ? text(childNamed(current, 'ServiceTypeIdentifier')) : '';
+      const kind = /\/TrstSvc\/Svctype\/CA\/QC$/.test(type) ? 'ca' : /\/TrstSvc\/Svctype\/TSA\/QTST$/.test(type) ? 'tsa' : null;
+      if (!current || !kind) continue;
 
       const history = childNamed(entry, 'ServiceHistory');
       const states = [current, ...(history ? childrenNamed(history, 'ServiceHistoryInstance') : [])].map(readState);
@@ -147,6 +151,7 @@ export function readQualifiedServices(list: Element): ReadService[] {
         certificates: identity ? descendantsNamed(identity, 'X509Certificate').map((element) => text(element).replace(/\s/g, '')) : [],
         service: { n: [...new Set(names)], h: states },
         supplyPoints: descendantsNamed(current, 'ServiceSupplyPoint').map(text),
+        kind,
       });
     }
   }

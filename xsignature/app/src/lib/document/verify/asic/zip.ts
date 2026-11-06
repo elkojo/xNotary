@@ -13,7 +13,7 @@
  * inflate: `unzipSync` returns a map, where the second `report.pdf` has already
  * silently replaced the first.
  */
-import { inflateSync } from 'fflate';
+import { Inflate } from 'fflate';
 
 /** Why a file cannot be read as a container, in the app's own voice. */
 export class ContainerRefused extends Error {}
@@ -53,6 +53,21 @@ export function readZip(zip: Uint8Array): ZipEntry[] {
   }
 }
 
+const TWO_READINGS =
+  'This container is built so that programs could read it differently, so a signature here could not say which file it covers.';
+
+interface Listed {
+  readonly name: string;
+  readonly rawName: Uint8Array;
+  readonly size: number;
+  readonly compressedSize: number;
+  readonly offset: number;
+  readonly method: number;
+  readonly crc: number;
+  readonly flags: number;
+  readonly isDirectory: boolean;
+}
+
 function readEntries(zip: Uint8Array, view: DataView): ZipEntry[] {
   const end = findEnd(zip, view);
   const count = view.getUint16(end + 10, true);
@@ -61,10 +76,9 @@ function readEntries(zip: Uint8Array, view: DataView): ZipEntry[] {
     throw new ContainerRefused('This container is too large to check in a browser.');
   }
 
-  const listed: Array<{ name: string; size: number; compressedSize: number; offset: number; method: number; rawName: Uint8Array }> = [];
+  const listed: Listed[] = [];
   const seen = new Set<string>();
   let unpacked = 0;
-  let firstOffset = Number.POSITIVE_INFINITY;
   let position = directoryOffset;
 
   for (let i = 0; i < count; i++) {
@@ -72,20 +86,18 @@ function readEntries(zip: Uint8Array, view: DataView): ZipEntry[] {
 
     const flags = view.getUint16(position + 8, true);
     const method = view.getUint16(position + 10, true);
-    let compressedSize = view.getUint32(position + 20, true);
-    let size = view.getUint32(position + 24, true);
+    const crc = view.getUint32(position + 16, true);
     const nameLength = view.getUint16(position + 28, true);
     const extraLength = view.getUint16(position + 30, true);
     const commentLength = view.getUint16(position + 32, true);
-    let offset = view.getUint32(position + 42, true);
 
     const rawName = zip.subarray(position + 46, position + 46 + nameLength);
     const name = decodeName(rawName, (flags & UTF8_NAME_FLAG) !== 0);
-
-    const wide = readZip64(view, position + 46 + nameLength, extraLength, { size, compressedSize, offset });
-    size = wide.size;
-    compressedSize = wide.compressedSize;
-    offset = wide.offset;
+    const { size, compressedSize, offset } = readZip64(view, position + 46 + nameLength, extraLength, {
+      size: view.getUint32(position + 24, true),
+      compressedSize: view.getUint32(position + 20, true),
+      offset: view.getUint32(position + 42, true),
+    });
 
     position += 46 + nameLength + extraLength + commentLength;
 
@@ -101,26 +113,48 @@ function readEntries(zip: Uint8Array, view: DataView): ZipEntry[] {
       );
     }
     seen.add(key);
-    firstOffset = Math.min(firstOffset, offset);
 
-    if (name.endsWith('/')) continue;
-    if (method !== 0 && method !== 8) throw new ContainerRefused(DAMAGED);
-
-    unpacked += size;
-    if (unpacked > MAX_UNPACKED_BYTES) {
-      throw new ContainerRefused('This container unpacks to more than 512 MB, which is too large to check in a browser.');
+    const isDirectory = name.endsWith('/');
+    if (!isDirectory) {
+      if (method !== 0 && method !== 8) throw new ContainerRefused(DAMAGED);
+      unpacked += size;
+      if (unpacked > MAX_UNPACKED_BYTES) {
+        throw new ContainerRefused('This container unpacks to more than 512 MB, which is too large to check in a browser.');
+      }
     }
-    listed.push({ name, size, compressedSize, offset, method, rawName });
+    listed.push({ name, rawName, size, compressedSize, offset, method, crc, flags, isDirectory });
   }
 
-  // Every byte has to belong to the archive: the first entry starts the file, and
-  // nothing but the directory's own closing records sits before the end record.
+  // Every byte has to belong to the archive: the first entry starts the file, nothing but the
+  // directory's own closing records sits before the end record, and there is nothing between
+  // entries. A local entry the directory does not list is another file some programs will find.
   if (position !== end && view.getUint32(position, true) !== ZIP64_END) throw new ContainerRefused(DAMAGED);
-  if (count > 0 && firstOffset !== 0) {
+  const ordered = [...listed].sort((a, b) => a.offset - b.offset);
+  if (ordered.length > 0 && ordered[0].offset !== 0) {
     throw new ContainerRefused('Something has been placed in front of this container, so programs may disagree about what it is. It cannot be checked as it stands.');
   }
+  ordered.forEach((entry, index) => {
+    const nextStart = ordered[index + 1]?.offset ?? directoryOffset;
+    refuseGap(entryEnd(view, entry), nextStart, entry);
+  });
 
-  return listed.map((entry) => ({ name: entry.name, bytes: readEntry(zip, view, entry) }));
+  return listed.filter((entry) => !entry.isDirectory).map((entry) => ({ name: entry.name, bytes: readEntry(zip, view, entry) }));
+}
+
+const DATA_DESCRIPTOR_FLAG = 0x0008;
+/** With or without its optional signature, and with 32-bit or 64-bit sizes. */
+const DESCRIPTOR_LENGTHS = [12, 16, 20, 24];
+
+function entryEnd(view: DataView, entry: Listed): number {
+  if (view.getUint32(entry.offset, true) !== LOCAL_HEADER) throw new ContainerRefused(DAMAGED);
+  return entry.offset + 30 + view.getUint16(entry.offset + 26, true) + view.getUint16(entry.offset + 28, true) + entry.compressedSize;
+}
+
+function refuseGap(end: number, nextStart: number, entry: Listed): void {
+  const gap = nextStart - end;
+  if (gap === 0) return;
+  if (entry.flags & DATA_DESCRIPTOR_FLAG && DESCRIPTOR_LENGTHS.includes(gap)) return;
+  throw new ContainerRefused(TWO_READINGS);
 }
 
 /** The end record has to close the file exactly, its comment included. */
@@ -134,11 +168,7 @@ function findEnd(zip: Uint8Array, view: DataView): number {
   throw new ContainerRefused(DAMAGED);
 }
 
-function readEntry(
-  zip: Uint8Array,
-  view: DataView,
-  entry: { name: string; size: number; compressedSize: number; offset: number; method: number; rawName: Uint8Array },
-): Uint8Array {
+function readEntry(zip: Uint8Array, view: DataView, entry: Listed): Uint8Array {
   if (view.getUint32(entry.offset, true) !== LOCAL_HEADER) throw new ContainerRefused(DAMAGED);
 
   const nameLength = view.getUint16(entry.offset + 26, true);
@@ -150,18 +180,53 @@ function readEntry(
     );
   }
 
+  // Where the local header states sizes, they have to be the directory's.
+  if (!(entry.flags & DATA_DESCRIPTOR_FLAG)) {
+    const localCompressed = view.getUint32(entry.offset + 18, true);
+    const localSize = view.getUint32(entry.offset + 22, true);
+    const wide = localCompressed === NOT_IN_FIELD || localSize === NOT_IN_FIELD;
+    if (!wide && (localCompressed !== entry.compressedSize || localSize !== entry.size)) throw new ContainerRefused(TWO_READINGS);
+  }
+
   const start = entry.offset + 30 + nameLength + extraLength;
   const stored = zip.subarray(start, start + entry.compressedSize);
   if (stored.length !== entry.compressedSize) throw new ContainerRefused(DAMAGED);
-  if (entry.size === 0) return new Uint8Array(0);
-  if (entry.method === 0) {
-    if (entry.compressedSize !== entry.size) throw new ContainerRefused(DAMAGED);
-    return stored.slice();
-  }
 
-  const bytes = inflateSync(stored, { out: new Uint8Array(entry.size) });
-  if (bytes.length !== entry.size) throw new ContainerRefused(DAMAGED);
+  const bytes = entry.method === 0 ? stored.slice() : inflateExactly(stored, entry.size);
+  if (bytes.length !== entry.size) throw new ContainerRefused(TWO_READINGS);
+  if (crc32(bytes) !== entry.crc) throw new ContainerRefused(DAMAGED);
   return bytes;
+}
+
+/**
+ * Inflate no more than was declared, and notice if there was more.
+ *
+ * A fixed output buffer would silently drop the rest: the checker would hash a signed prefix while
+ * another program extracted the whole stream, and that is two readings of one file.
+ */
+function inflateExactly(stored: Uint8Array, size: number): Uint8Array {
+  const out = new Uint8Array(size);
+  let written = 0;
+  const inflater = new Inflate((chunk) => {
+    if (written + chunk.length > size) throw new ContainerRefused(TWO_READINGS);
+    out.set(chunk, written);
+    written += chunk.length;
+  });
+  inflater.push(stored, true);
+  if (written !== size) throw new ContainerRefused(TWO_READINGS);
+  return out;
+}
+
+const CRC_TABLE = Uint32Array.from({ length: 256 }, (_unused, index) => {
+  let value = index;
+  for (let bit = 0; bit < 8; bit++) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  return value >>> 0;
+});
+
+export function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 function readZip64(
@@ -197,7 +262,9 @@ function decodeName(raw: Uint8Array, flaggedUtf8: boolean): string {
 
 function refuseUnsafeName(name: string): void {
   const parts = name.split('/');
-  if (name.startsWith('/') || name.includes('\\') || parts.includes('..') || /^[A-Za-z]:/.test(name)) {
+  const inner = name.endsWith('/') ? parts.slice(0, -1) : parts;
+  const odd = inner.some((part) => part === '.' || part === '');
+  if (name.startsWith('/') || name.includes('\\') || parts.includes('..') || odd || /^[A-Za-z]:/.test(name)) {
     throw new ContainerRefused(
       `This container holds a file named “${printable(name)}”, which points outside the container, so it is not read here.`,
     );

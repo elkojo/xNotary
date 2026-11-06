@@ -1,5 +1,5 @@
 import * as asn1js from 'asn1js';
-import { Attribute, ContentInfo, OtherRevocationInfoFormat, SignedAndUnsignedAttributes, SignedData } from 'pkijs';
+import { Attribute, ContentInfo, EncapsulatedContentInfo, OtherRevocationInfoFormat, SignedAndUnsignedAttributes, SignedData } from 'pkijs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { C14N_10, C14N_11, C14N_EXCLUSIVE } from './c14n';
@@ -944,3 +944,51 @@ describe('a scoped revocation list', () => {
     expect(signatures[0].revocation).toMatchObject({ status: 'unknown', standing: 'cannot-check' });
   });
 });
+
+describe('one malformed signature among good ones', () => {
+  const twoFiles = async () => ({ 'META-INF/signatures0.xml': await makeXades(FILES, signer) });
+
+  it('does not lose the good one to a CMS with no signers', async () => {
+    const certificatesOnly = new SignedData({
+      version: 1,
+      encapContentInfo: new EncapsulatedContentInfo({ eContentType: '1.2.840.113549.1.7.1' }),
+      signerInfos: [],
+      certificates: [signer.certificate],
+    });
+    const p7s = new Uint8Array(new ContentInfo({ contentType: '1.2.840.113549.1.7.2', content: certificatesOnly.toSchema(true) }).toSchema().toBER(false));
+    const { signatures } = await check(container({ ...FILES, ...(await twoFiles()), 'META-INF/signature9.p7s': p7s }, 'application/vnd.bdoc-1.0'));
+    expect(signatures[0].verdict).toBe('intact');
+    expect(signatures).toHaveLength(2);
+    expect(signatures[1].verdict).not.toBe('intact');
+  });
+
+  it('does not lose the good one to invalid base64 in another', async () => {
+    const bad = (await makeXades(FILES, signer)).replace(/(<ds:SignatureValue[^>]*>)[^<]+/, '$1%%% not base64 %%%');
+    const { signatures } = await check(container({ ...FILES, ...(await twoFiles()), 'META-INF/signatures1.xml': bad }));
+    expect(signatures.map((signature) => signature.verdict)).toEqual(['intact', 'unreadable']);
+  });
+
+  it('reports a bad digest in a manifest as that one unreadable', async () => {
+    const manifest = new TextDecoder().decode(await makeManifest('META-INF/signature001.p7s', FILES)).replace(/(<ds:DigestValue>)[^<]+/, '$1%%%');
+    const { signatures } = await check(
+      container({ ...FILES, ...(await twoFiles()), 'META-INF/ASiCManifest.xml': manifest, 'META-INF/signature001.p7s': await makeCades(utf8(manifest), signer) }),
+    );
+    expect(signatures[0].verdict).toBe('intact');
+    expect(signatures[1].verdict).toBe('unreadable');
+  });
+});
+
+describe('a CMS over another document', () => {
+  it('does not cover the file beside it', async () => {
+    const p7m = new SignedData({ schema: ContentInfo.fromBER((await makeCades(utf8('what Alice signed'), signer)).slice().buffer as ArrayBuffer).content });
+    p7m.encapContentInfo.eContent = new asn1js.OctetString({ valueHex: utf8('what Alice signed').buffer as ArrayBuffer });
+    const bytes = new Uint8Array(new ContentInfo({ contentType: '1.2.840.113549.1.7.2', content: p7m.toSchema(true) }).toSchema().toBER(false));
+
+    const { signatures, files } = await check(container({ 'report.pdf': utf8('something Alice never saw'), 'META-INF/signature.p7s': bytes }, ASIC_S));
+    expect(signatures[0].verdict).toBe('altered');
+    expect(signatures[0].covers).toEqual([]);
+    expect(signatures[0].signedBy).toBeNull();
+    expect(files[0].coveredBy).toEqual([]);
+  });
+});
+

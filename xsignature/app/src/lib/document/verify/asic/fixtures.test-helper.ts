@@ -38,6 +38,7 @@ import {
 
 import { C14N_EXCLUSIVE, canonicalize } from './c14n';
 import type { ParseXml } from './types';
+import { crc32 } from './zip';
 
 const DS_NS = 'http://www.w3.org/2000/09/xmldsig#';
 const XADES_NS = 'http://uri.etsi.org/01903/v1.3.2#';
@@ -341,6 +342,14 @@ export interface RawEntry {
   readonly declaredSize?: number;
   /** Write the name in these bytes rather than as UTF-8. */
   readonly rawName?: Uint8Array;
+  /** `bytes` is a deflate stream; this is the size to declare it unpacks to. */
+  readonly deflatedSize?: number;
+  /** State this CRC rather than the true one. */
+  readonly crc?: number;
+  /** Bytes placed after this entry that the directory does not list. */
+  readonly hiddenAfter?: Uint8Array;
+  /** State this unpacked size in the local header only. */
+  readonly localSize?: number;
 }
 
 /**
@@ -360,27 +369,31 @@ export function rawZip(entries: readonly RawEntry[], options: { before?: Uint8Ar
     const local = entry.localName ? utf8(entry.localName) : central;
     const flags = entry.flags ?? (entry.rawName ? 0 : 0x0800);
 
+    const size = entry.deflatedSize ?? entry.bytes.length;
+    const method = entry.deflatedSize === undefined ? 0 : 8;
+    const crc = entry.crc ?? (entry.deflatedSize === undefined ? crc32(entry.bytes) : 0);
+
     u32(out, 0x04034b50);
     u16(out, 20);
     u16(out, flags);
-    u16(out, 0);
+    u16(out, method);
     u32(out, 0);
-    u32(out, 0);
+    u32(out, crc);
     u32(out, entry.bytes.length);
-    u32(out, entry.bytes.length);
+    u32(out, entry.localSize ?? size);
     u16(out, local.length);
     u16(out, 0);
-    out.push(...local, ...entry.bytes);
+    out.push(...local, ...entry.bytes, ...(entry.hiddenAfter ?? []));
 
     u32(directory, 0x02014b50);
     u16(directory, 20);
     u16(directory, 20);
     u16(directory, flags);
-    u16(directory, 0);
+    u16(directory, method);
     u32(directory, 0);
-    u32(directory, 0);
+    u32(directory, crc);
     u32(directory, entry.bytes.length);
-    u32(directory, entry.declaredSize ?? entry.bytes.length);
+    u32(directory, entry.declaredSize ?? size);
     u16(directory, central.length);
     u16(directory, 0);
     u16(directory, 0);

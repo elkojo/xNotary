@@ -113,9 +113,8 @@
   const titleOf = (index: number): string => {
     const signature = opened!.signatures[index];
     if (signature.counters !== null) return `Counter-signature on ${titleOf(signature.counters)}`;
-    return opened!.signatures.filter((other) => other.counters === null).length > 1
-      ? `${signatureTitle(signature)} ${index + 1}`
-      : signatureTitle(signature);
+    const top = opened!.signatures.filter((other) => other.counters === null);
+    return top.length > 1 ? `${signatureTitle(signature)} ${top.indexOf(signature) + 1}` : signatureTitle(signature);
   };
 
   const coveredByText = (file: ContainerFile): string =>

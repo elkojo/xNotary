@@ -45,13 +45,15 @@ const service = (type: string) => `<TSPService><ServiceInformation>
 const LIST_BODY = `<SchemeInformation><TSLSequenceNumber>7</TSLSequenceNumber></SchemeInformation><TrustServiceProviderList><TrustServiceProvider>
   <TSPInformation><TSPName><Name xml:lang="sk">Národná agentúra</Name><Name xml:lang="en">National Agency</Name></TSPName>
   <TSPTradeName><Name xml:lang="en">NASES</Name></TSPTradeName></TSPInformation>
-  <TSPServices>${service('CA/QC')}${service('TSA/QTST')}</TSPServices>
+  <TSPServices>${service('CA/QC')}${service('TSA/QTST')}${service('Certstatus/OCSP/QC')}</TSPServices>
 </TrustServiceProvider></TrustServiceProviderList>`;
 
 describe('reading a list', () => {
-  const [read, ...others] = readQualifiedServices(parseList(`<TrustServiceStatusList xmlns="${T}">${LIST_BODY}</TrustServiceStatusList>`));
+  const [read, timeAuthority, ...others] = readQualifiedServices(parseList(`<TrustServiceStatusList xmlns="${T}">${LIST_BODY}</TrustServiceStatusList>`));
 
-  it('keeps qualified certificate services and no others', () => {
+  it('keeps certificate services and time authorities, told apart, and no others', () => {
+    expect(read.kind).toBe('ca');
+    expect(timeAuthority.kind).toBe('tsa');
     expect(others).toEqual([]);
   });
 
@@ -101,7 +103,7 @@ describe('a list\'s signature', () => {
 
   it('holds when a good signature comes from an expected certificate', async () => {
     const signer = await makeSigner('List Operator');
-    expect(await listSignature(await signedList(signer), new Set([print(signer)]))).toEqual({ ok: true, why: '' });
+    expect(await listSignature(await signedList(signer), new Set([print(signer)]))).toMatchObject({ ok: true, why: '' });
   });
 
   it('fails when the certificate is not one it was told to expect', async () => {
@@ -123,6 +125,22 @@ describe('a list\'s signature', () => {
     const damaged = (await signedList(signer)).replace(/<ds:SignatureValue>(.)/, (_m, first) => `<ds:SignatureValue>${first === 'A' ? 'B' : 'A'}`);
     const result = await listSignature(damaged, new Set([print(signer)]));
     expect(result.why).toMatch(/signature value/);
+  });
+
+  it('hands back only what the signature covers, so nothing unsigned can count as verified', async () => {
+    const signer = await makeSigner('List Operator');
+    const injected = `<TrustServiceProvider><TSPInformation><TSPName><Name>Evil</Name></TSPName></TSPInformation><TSPServices>${service('CA/QC')}</TSPServices></TrustServiceProvider>`;
+    const list = (await signedList(signer))
+      // Inside the signature, past what the digest over the document sees.
+      .replace('</ds:Signature>', `<ds:Object>${injected}</ds:Object></ds:Signature>`)
+      .replace('<SchemeInformation>', `<!-- ${injected} --><SchemeInformation>`);
+
+    const result = await listSignature(list, new Set([print(signer)]));
+    expect(result.ok).toBe(true);
+    expect(result.signed).not.toContain('Evil');
+    const names = readQualifiedServices(parseList(result.signed!)).flatMap((read) => read.service.n);
+    expect(names).not.toContain('Evil');
+    expect(names).toContain('NASES');
   });
 
   it('fails when it is not signed', async () => {

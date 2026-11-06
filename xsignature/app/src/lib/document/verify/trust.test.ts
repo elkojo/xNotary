@@ -110,6 +110,11 @@ describe('qualifiers override what the certificate says', () => {
     expect(check([unread]).result).toBe('cannot-check');
   });
 
+  it('will not guess at a key usage bit it does not read', () => {
+    const unread = service(state({ q: [{ q: ['NotQualified'], c: { a: 'atLeastOne', k: [[['keyEncipherment', true]]] } }] }));
+    expect(check([unread]).result).toBe('cannot-check');
+  });
+
   it('evaluates key usage criteria', () => {
     const byKeyUsage = service(state({ q: [{ q: ['NotQualified'], c: { a: 'atLeastOne', k: [[['nonRepudiation', true]]] } }] }));
     expect(check([byKeyUsage]).result).toBe('not-qualified');

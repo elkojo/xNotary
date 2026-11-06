@@ -42,6 +42,7 @@ import {
   NO_SIGNER,
   checkSigner,
   embeddedTimestampOf,
+  readTimestampToken,
   readTstInfo,
   signedDataFrom,
   signerFactsOf,
@@ -217,7 +218,17 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
   // mean different things to the reader. Only a digest that does not match says
   // the file changed; the rest say something about the token.
   const noun = isTimestamp ? 'timestamp' : 'signature';
-  switch (await checkSigner(signed, 0, covered)) {
+  const stamp = isTimestamp ? await readTimestampToken(signed, covered) : null;
+  const outcome = isTimestamp
+    ? stamp?.standing === 'holds'
+      ? 'holds'
+      : stamp?.standing === 'other-signature'
+        ? 'digest-mismatch'
+        : stamp?.standing === 'broken'
+          ? 'bad-signature'
+          : 'cannot-check'
+    : await checkSigner(signed, 0, covered);
+  switch (outcome) {
     case 'holds':
       return { ...described, verdict: 'intact', detail: '' };
     case 'bad-signature':

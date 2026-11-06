@@ -90,8 +90,20 @@ async function checkEntries(entries: readonly ZipEntry[], parse: ParseXml, fromF
     }
   };
 
-  for (const source of signatureFiles) collect(await checkSignatureFile(source, files, dataFiles, parse));
-  for (const source of manifestFiles) collect(await checkManifest(source, files, dataFiles, parse));
+  // One malformed signature is that signature's problem. The others still get their answer.
+  const unreadable = (source: string): ContainerSignature[] => [
+    { ...blankSignature(source, /\.tst$/i.test(source) ? 'timestamp' : /\.xml$/i.test(source) ? 'XAdES' : 'CAdES'), verdict: 'unreadable', detail: 'Part of this signature could not be read.' },
+  ];
+  const guarded = async (source: string, check: () => Promise<ContainerSignature[]>) => {
+    try {
+      return await check();
+    } catch {
+      return unreadable(source);
+    }
+  };
+
+  for (const source of signatureFiles) collect(await guarded(source, () => checkSignatureFile(source, files, dataFiles, parse)));
+  for (const source of manifestFiles) collect(await guarded(source, () => checkManifest(source, files, dataFiles, parse)));
 
   // A CMS file no list points to. In ASiC-S that is the normal shape; in ASiC-E
   // nothing says what it signs, and it is reported rather than passed over.
@@ -114,7 +126,7 @@ async function checkEntries(entries: readonly ZipEntry[], parse: ParseXml, fromF
               detail: 'No list of files in this container points to it, so nothing says what it signs.',
             },
           ]
-        : await checkDetached(source, files, rootFiles),
+        : await guarded(source, () => checkDetached(source, files, rootFiles)),
     );
   }
 
@@ -182,7 +194,12 @@ async function checkArchive(
   }
   if (!stamp) return { ...blank, standing: 'unreadable' };
 
-  const listed = await readListedFiles(root, files, new Set(files.keys()));
+  let listed;
+  try {
+    listed = await readListedFiles(root, files, new Set(files.keys()));
+  } catch {
+    return { ...blank, standing: 'unreadable' };
+  }
   const signatureFiles = signatures.filter((signature) => signature.form !== 'timestamp').map((signature) => signature.source);
   return {
     source,
@@ -215,7 +232,12 @@ async function checkSignatureFile(
 
   const checked: ContainerSignature[] = [];
   const walk = async (element: Element, parent: Element | null, parentIndex: number | null): Promise<void> => {
-    const result = await checkXades(element, source, files, dataFiles, parent);
+    let result: ContainerSignature;
+    try {
+      result = await checkXades(element, source, files, dataFiles, parent);
+    } catch {
+      result = { ...blankSignature(source, 'XAdES'), verdict: 'unreadable', detail: 'Part of this signature could not be read.' };
+    }
     const index = checked.length;
     checked.push({ ...result, counters: parentIndex });
     for (const nested of counterSignatureElements(element)) await walk(nested, element, index);

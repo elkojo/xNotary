@@ -72,13 +72,11 @@ function matches(criteria: Criteria, certificate: CertificateFacts): CriteriaAns
       answers.push(false);
       continue;
     }
-    answers.push(
-      bits.every(([name, expected]) => {
-        if (name === 'digitalSignature') return certificate.keyUsage.digitalSignature === expected;
-        if (name === 'nonRepudiation') return certificate.keyUsage.nonRepudiation === expected;
-        return false;
-      }),
-    );
+    if (bits.some(([name]) => name !== 'digitalSignature' && name !== 'nonRepudiation')) {
+      answers.push('unknown');
+      continue;
+    }
+    answers.push(bits.every(([name, expected]) => certificate.keyUsage[name as 'digitalSignature' | 'nonRepudiation'] === expected));
   }
   for (const nested of criteria.n ?? []) answers.push(matches(nested, certificate));
   if (criteria.x) answers.push('unknown');
@@ -249,6 +247,10 @@ export function checkAgainstList(
   }
   return { result: 'not-qualified', onQualifiedDevice: null, detail: 'The list does not treat it as a qualified certificate.' };
 }
+
+/** Whether a time authority's service was granted at that moment, by its own history. */
+export const timeAuthorityGrantedAt = (services: readonly ListedService[], moment: Date): boolean =>
+  services.some((service) => stateAt(service, moment)?.s === 'granted');
 
 /** The certificate's own side of the question, from what the claims reader already parsed. */
 export function factsOf(certificate: Certificate, claims: CertificateClaims, types: readonly (1 | 2 | 3)[]): CertificateFacts {

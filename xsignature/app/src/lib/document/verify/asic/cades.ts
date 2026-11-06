@@ -214,6 +214,7 @@ async function checkCms(
  * this CMS produced, and the caller makes it absolute.
  */
 async function counterSignaturesOf(signed: SignedData, index: number, source: string, parent: number): Promise<ContainerSignature[]> {
+  if (!signed.signerInfos[index]) return [];
   const value = new Uint8Array(signed.signerInfos[index].signature.valueBlock.valueHexView);
   const certificates = certificatesOf(signed);
   const results: ContainerSignature[] = [];

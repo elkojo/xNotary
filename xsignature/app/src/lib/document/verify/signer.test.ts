@@ -3,7 +3,7 @@ import { Attribute, ContentInfo, IssuerAndSerialNumber, SignedAndUnsignedAttribu
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { damaged, makeCades, makeSigner, makeTimestampToken, utf8, type Signer } from './asic/fixtures.test-helper';
-import { checkSigner, embeddedTimestampOf, signedDataFrom, signerCertificateOf, signerFactsOf } from './signer';
+import { checkSigner, embeddedTimestampOf, readTimestampToken, signedDataFrom, signerCertificateOf, signerFactsOf } from './signer';
 
 const CONTENT = utf8('the signed bytes');
 
@@ -139,3 +139,47 @@ describe('a timestamp inside a CMS signature', () => {
     expect(await embeddedTimestampOf(parsed(await makeCades(CONTENT, signer)))).toBeNull();
   });
 });
+
+describe('what a signature is over', () => {
+  /** A CMS holding the content it signs, as a `.p7m` does. */
+  const attached = async (content: Uint8Array, by: Signer) => {
+    const signed = parsed(await makeCades(content, by));
+    signed.encapContentInfo.eContent = new asn1js.OctetString({ valueHex: content.slice().buffer as ArrayBuffer });
+    return reparsed(signed);
+  };
+
+  it('is the bytes given, not content hidden inside it', async () => {
+    // The library swaps in embedded content, so a signature over one document read as covering
+    // any file placed beside it.
+    const signed = await attached(CONTENT, signer);
+    expect(await checkSigner(signed, 0, utf8('an unrelated report'))).toBe('digest-mismatch');
+    expect(await checkSigner(signed, 0, CONTENT)).toBe('holds');
+  });
+});
+
+describe('the order of the checks', () => {
+  it('a damaged signature over other bytes is broken, not a changed file', async () => {
+    const damagedOne = parsed(damaged(await makeCades(CONTENT, signer)));
+    expect(await checkSigner(damagedOne, 0, utf8('other bytes'))).toBe('bad-signature');
+  });
+
+  it('an algorithm a browser does not have says nothing either way', async () => {
+    const signed = parsed(await makeCades(CONTENT, signer));
+    signed.signerInfos[0].signatureAlgorithm.algorithmId = '1.3.101.112';
+    expect(await checkSigner(signed, 0, CONTENT)).toBe('cannot-check');
+    expect(await checkSigner(signed, 0, utf8('other bytes'))).toBe('cannot-check');
+  });
+
+  it('a digest this browser cannot compute says nothing either', async () => {
+    const signed = parsed(await makeCades(CONTENT, signer));
+    signed.signerInfos[0].digestAlgorithm.algorithmId = '2.16.840.1.101.3.4.2.4';
+    expect(await checkSigner(signed, 0, CONTENT)).toBe('cannot-check');
+  });
+
+  it('a token that does not verify is broken, even when its imprint describes something else', async () => {
+    const token = damaged(await makeTimestampToken(utf8('elsewhere'), ca));
+    const read = await readTimestampToken(signedDataFrom(token), CONTENT);
+    expect(read?.standing).toBe('broken');
+  });
+});
+

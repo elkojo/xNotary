@@ -1,7 +1,7 @@
 import { Certificate } from 'pkijs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { authorityKeyIdOf, buildDirectory, DirectoryUnreachable, findIssuers, keyIdOf, siteDirectory, type DirectorySource } from './directory';
+import { authorityKeyIdOf, buildDirectory, DirectoryUnreachable, findIssuers, keyIdOf, listedTimeAuthority, siteDirectory, type DirectorySource } from './directory';
 import { makeChain, type GeneratedChain } from './fixtures/make-keys';
 
 const parse = (der: Uint8Array) => Certificate.fromBER(der.slice().buffer as ArrayBuffer);
@@ -165,3 +165,32 @@ describe('the directory as this site serves it', () => {
     restore();
   });
 });
+
+describe('a time authority', () => {
+  const service = { n: ['Stamps Ltd'], h: [{ s: 'granted', t: '2020-01-01T00:00:00Z' }] };
+  const directoryOf = async (der: Uint8Array, entry: { services?: typeof service[]; timeServices?: typeof service[] }) => {
+    const { shards } = await buildDirectory([{ der, tl: 'SK', ...entry }], '2026-11-05');
+    return (async (name: string) => shards[name] ?? null) as DirectorySource;
+  };
+
+  it('is found when the list names its certificate as one', async () => {
+    const { rootDer } = await makeChain();
+    const certificate = Certificate.fromBER(rootDer.slice().buffer as ArrayBuffer);
+    const found = await listedTimeAuthority(certificate, await directoryOf(rootDer, { timeServices: [service] }));
+    expect(found?.list).toBe('SK');
+  });
+
+  it('is not found from a certificate-issuing entry for the same certificate', async () => {
+    const { rootDer } = await makeChain();
+    const certificate = Certificate.fromBER(rootDer.slice().buffer as ArrayBuffer);
+    expect(await listedTimeAuthority(certificate, await directoryOf(rootDer, { services: [service] }))).toBeNull();
+  });
+
+  it('is not found when nothing lists it, which is what a self-made authority gets', async () => {
+    const { rootDer } = await makeChain();
+    const stranger = await makeChain();
+    const certificate = Certificate.fromBER(stranger.rootDer.slice().buffer as ArrayBuffer);
+    expect(await listedTimeAuthority(certificate, await directoryOf(rootDer, { timeServices: [service] }))).toBeNull();
+  });
+});
+
