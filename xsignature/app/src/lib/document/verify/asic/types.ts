@@ -38,6 +38,11 @@ export interface ContainerSignature extends SignerFacts {
    */
   readonly time: Date | null;
   readonly timestamp: AttachedTimestamp | null;
+  /**
+   * Every signature timestamp, when there may be several. They sit in unsigned properties, so anyone
+   * can add one; the screen prefers one from a listed authority and never lets another displace it.
+   */
+  readonly timestamps: readonly AttachedTimestamp[];
   /** Files outside `META-INF/` this signature covers and that still match. */
   readonly covers: readonly string[];
   /** Files it signed whose bytes no longer match. */
@@ -121,6 +126,7 @@ export const blankSignature = (source: string, form: ContainerSignature['form'])
   certificateCount: 0,
   time: null,
   timestamp: null,
+  timestamps: [],
   covers: [],
   changed: [],
   missing: [],

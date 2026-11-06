@@ -203,8 +203,14 @@ function readEntry(zip: Uint8Array, view: DataView, entry: Listed): Uint8Array {
     );
   }
 
-  // Where the local header states sizes, they have to be the directory's.
+  // Everything the local header states has to be the directory's, since a program that walks local
+  // headers acts on these. A different method alone turns the same bytes into a different file.
+  const localFlags = view.getUint16(entry.offset + 6, true);
+  if (view.getUint16(entry.offset + 8, true) !== entry.method || (localFlags & DATA_DESCRIPTOR_FLAG) !== (entry.flags & DATA_DESCRIPTOR_FLAG)) {
+    throw new ContainerRefused(TWO_READINGS);
+  }
   if (!(entry.flags & DATA_DESCRIPTOR_FLAG)) {
+    if (view.getUint32(entry.offset + 14, true) !== entry.crc) throw new ContainerRefused(TWO_READINGS);
     const localCompressed = view.getUint32(entry.offset + 18, true);
     const localSize = view.getUint32(entry.offset + 22, true);
     const wide = localCompressed === NOT_IN_FIELD || localSize === NOT_IN_FIELD;

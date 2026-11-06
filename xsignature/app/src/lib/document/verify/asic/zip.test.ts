@@ -128,6 +128,14 @@ describe('what would give two programs two different files', () => {
     refused(rawZip([{ name: 'a.txt', bytes: signed, crc: 12345 }]));
   });
 
+  it('a local header stating another method, which makes the same bytes a different file', () => {
+    refused(rawZip([{ name: 'a.txt', bytes: signed, localMethod: 8 }]));
+  });
+
+  it('a local header stating another checksum', () => {
+    refused(rawZip([{ name: 'a.txt', bytes: signed, localCrc: 12345 }]));
+  });
+
   it('a local header stating another size', () => {
     refused(rawZip([{ name: 'a.txt', bytes: signed, localSize: 3 }]));
   });

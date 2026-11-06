@@ -284,6 +284,15 @@ async function servicesWithSameIdentity(
   return found;
 }
 
+const EXTENDED_KEY_USAGE = '2.5.29.37';
+const TIME_STAMPING = '1.3.6.1.5.5.7.3.8';
+
+function isForTimeStamping(certificate: Certificate): boolean {
+  const usage = certificate.extensions?.find((candidate) => candidate.extnID === EXTENDED_KEY_USAGE);
+  const purposes = (usage?.parsedValue as { keyPurposes?: string[] } | undefined)?.keyPurposes;
+  return usage?.critical === true && !!purposes?.includes(TIME_STAMPING);
+}
+
 /**
  * Whether a certificate that made a timestamp belongs to a time authority on a verified list:
  * by its own key, or through a certificate above it. Null when it does not.
@@ -295,13 +304,17 @@ export async function listedTimeAuthority(
   certificate: Certificate,
   source: DirectorySource,
 ): Promise<{ readonly list: string; readonly services: readonly ListedService[] } | null> {
+  const keyBytes = (holder: Certificate) => hex(holder.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHexView);
   const lookUp = async (candidate: Certificate) => {
     const keyId = await keyIdOf(candidate);
     const shard = (await source(shardOf(keyId))) as DirectoryShard | null;
     for (const entry of shard?.entries[keyId] ?? []) {
       if (!entry.t?.length) continue;
       try {
-        if (sameName(Certificate.fromBER(fromBase64(entry.c)).subject, candidate.subject)) return { list: entry.tl, services: entry.t };
+        // The key itself, not what the certificate says about it: a key identifier and a name can
+        // be copied into a self-made certificate by anybody.
+        const listed = Certificate.fromBER(fromBase64(entry.c));
+        if (sameName(listed.subject, candidate.subject) && keyBytes(listed) === keyBytes(candidate)) return { list: entry.tl, services: entry.t };
       } catch {
         // One unreadable entry does not spoil the others.
       }
@@ -311,6 +324,9 @@ export async function listedTimeAuthority(
 
   const own = await lookUp(certificate);
   if (own) return own;
+  // Through a certificate above it, only if it is a time-stamping certificate at all: such a service's
+  // CA may issue other certificates too, and their holders are not time authorities.
+  if (!isForTimeStamping(certificate)) return null;
   const above = await findIssuers(certificate, source);
   for (const link of above?.chain ?? []) {
     const listed = await lookUp(link);

@@ -21,6 +21,7 @@ import {
   ContentInfo,
   IssuerAndSerialNumber,
   SignedData,
+  type SignerInfo,
   TSTInfo,
   getCrypto,
 } from 'pkijs';
@@ -180,6 +181,22 @@ const MESSAGE_DIGEST = '1.2.840.113549.1.9.4';
 const RSA_ENCRYPTION = '1.2.840.113549.1.1.1';
 
 /**
+ * Whether a SignerInfo's signature value verifies over `covered`. Throws on an algorithm it cannot run.
+ *
+ * The digest algorithm goes along only for plain rsaEncryption, which names none of its own.
+ * Otherwise the signature algorithm says which hash it used, and may differ from the digest's.
+ */
+export function signatureValueHolds(info: SignerInfo, covered: Uint8Array, certificate: Certificate, hash: string): Promise<boolean> {
+  return getCrypto(true).verifyWithPublicKey(
+    covered.slice().buffer as ArrayBuffer,
+    info.signature,
+    certificate.subjectPublicKeyInfo,
+    info.signatureAlgorithm,
+    info.signatureAlgorithm.algorithmId === RSA_ENCRYPTION ? hash : undefined,
+  );
+}
+
+/**
  * Run one SignerInfo's check against `content`, and say what happened.
  *
  * Done here rather than by the library's `verify`, for three reasons found the hard way. It
@@ -216,13 +233,7 @@ export async function checkSigner(
 
   let holds: boolean;
   try {
-    holds = await getCrypto(true).verifyWithPublicKey(
-      covered.slice().buffer as ArrayBuffer,
-      info.signature,
-      certificate.subjectPublicKeyInfo,
-      info.signatureAlgorithm,
-      info.signatureAlgorithm.algorithmId === RSA_ENCRYPTION ? hash : undefined,
-    );
+    holds = await signatureValueHolds(info, covered, certificate, hash);
   } catch {
     return 'cannot-check';
   }

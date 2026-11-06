@@ -117,7 +117,10 @@ async function checkEntries(entries: readonly ZipEntry[], parse: ParseXml, fromF
       // An unreadable list claims nothing. It is reported where it is checked.
     }
   }
-  const rootFiles = dataNames.filter((name) => !name.includes('/'));
+  // A file manager leaves its own files in a folder. They are still listed, and they do not make
+  // the one signed file ambiguous.
+  const added = fromFolder ? /^(\.DS_Store|Thumbs\.db|desktop\.ini)$/i : /^$/;
+  const rootFiles = dataNames.filter((name) => !name.includes('/') && !added.test(name));
   for (const source of cmsFiles.filter((name) => !claimed.has(name))) {
     collect(
       mediaType === ASIC_E

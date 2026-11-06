@@ -9,7 +9,7 @@
  * signature has been shown to hold. As in `xades.ts`, a broken signature says
  * nothing about the files, and names nobody.
  */
-import { Certificate, SignedData, SignerInfo, getCrypto } from 'pkijs';
+import { Certificate, SignedData, SignerInfo } from 'pkijs';
 
 import {
   certificateForSid,
@@ -19,6 +19,7 @@ import {
   hashForOid,
   readTimestampToken,
   readTstInfo,
+  signatureValueHolds,
   signedDataFrom,
   signerFactsOf,
 } from '../signer';
@@ -253,13 +254,7 @@ async function counterSignaturesOf(signed: SignedData, index: number, source: st
         }
 
         const signedBytes = counter.signedAttrs ? new Uint8Array(counter.signedAttrs.encodedValue) : value;
-        const holds = await getCrypto(true).verifyWithPublicKey(
-          signedBytes.slice().buffer as ArrayBuffer,
-          counter.signature,
-          certificate.subjectPublicKeyInfo,
-          counter.signatureAlgorithm,
-          hash,
-        );
+        const holds = await signatureValueHolds(counter, signedBytes, certificate, hash);
         // The value first, as everywhere: until it holds, the digest beside it is text.
         if (!holds) {
           results.push({ ...blank, verdict: 'broken', detail: 'It does not check out against the certificate it names.' });

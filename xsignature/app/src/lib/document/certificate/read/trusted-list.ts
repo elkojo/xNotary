@@ -114,6 +114,9 @@ function readState(element: Element): ServiceState {
   };
 }
 
+/** The service was another type from this moment: not any status the rules know. */
+export const RETYPED = 'retyped';
+
 const KINDS: ReadonlyArray<readonly ['ca' | 'tsa', RegExp]> = [
   ['ca', /\/TrstSvc\/Svctype\/CA\/QC$/],
   ['tsa', /\/TrstSvc\/Svctype\/TSA\/QTST$/],
@@ -163,7 +166,12 @@ export function readQualifiedServices(list: Element): ReadService[] {
               }),
             ),
           ],
-          service: { n: [...new Set(names)], h: matching.map(readState) },
+          // Every state, in order: one of another type is where this kind stopped, and dropping it
+          // would leave the last matching state applying forever.
+          service: {
+            n: [...new Set(names)],
+            h: instances.map((instance) => (matching.includes(instance) ? readState(instance) : { s: RETYPED, t: text(childNamed(instance, 'StatusStartingTime')) })),
+          },
           supplyPoints: descendantsNamed(current, 'ServiceSupplyPoint').map(text),
           kind,
         });

@@ -35,7 +35,7 @@
   import FindIssuers from './FindIssuers.svelte';
 
   interface Props {
-    signature: SignerFacts & { readonly timestamp: AttachedTimestamp | null };
+    signature: SignerFacts & { readonly timestamp: AttachedTimestamp | null; readonly timestamps?: readonly AttachedTimestamp[] };
     /** The signer's own stated time, used only when nothing better dates the signature. */
     signerClock?: Date | null;
     /**
@@ -185,22 +185,35 @@
    * and write any date. So only a listed authority's time is independent, and everything that
    * depends on when the signature was made depends on this.
    */
-  let timeAuthority = $state<{ list: string } | null>(null);
+  let timeAuthority = $state<{ list: string; stamp: AttachedTimestamp } | null>(null);
 
+  /** Of however many it carries, one from a listed authority. Anybody can add others. */
   async function lookTimeAuthority(cache: RequestCache) {
-    const stamp = signature.timestamp;
-    if (!stamp?.certificate || stamp.standing !== 'holds') return;
-    try {
-      const listedAuthority = await listedTimeAuthority(stamp.certificate, siteDirectory(import.meta.env.BASE_URL, cache));
-      timeAuthority = listedAuthority && timeAuthorityGrantedAt(listedAuthority.services, stamp.time) ? { list: listedAuthority.list } : null;
-    } catch {
-      timeAuthority = null;
+    const source = siteDirectory(import.meta.env.BASE_URL, cache);
+    const stamps = signature.timestamps ?? (signature.timestamp ? [signature.timestamp] : []);
+    let found: { list: string; stamp: AttachedTimestamp } | null = null;
+    for (const stamp of stamps) {
+      if (!stamp.certificate || stamp.standing !== 'holds') continue;
+      try {
+        const listedAuthority = await listedTimeAuthority(stamp.certificate, source);
+        if (listedAuthority && timeAuthorityGrantedAt(listedAuthority.services, stamp.time)) {
+          found = { list: listedAuthority.list, stamp };
+          break;
+        }
+      } catch {
+        // Not reached is not listed: nothing is claimed for it.
+      }
     }
+    timeAuthority = found;
   }
+
+  /** The timestamp this screen goes by: a listed authority's if there is one. */
+  const stampShown = $derived(timeAuthority?.stamp ?? signature.timestamp);
 
   /** What dates this signature, and how far that can be taken. */
   const moment = $derived.by((): { time: Date; independent: boolean } | null => {
-    if (signature.timestamp?.standing === 'holds') return { time: signature.timestamp.time, independent: timeAuthority !== null };
+    if (timeAuthority) return { time: timeAuthority.stamp.time, independent: true };
+    if (signature.timestamp?.standing === 'holds') return { time: signature.timestamp.time, independent: false };
     return signerClock ? { time: signerClock, independent: false } : null;
   });
 
@@ -319,7 +332,12 @@
     void fetchRevocationList();
   });
 
-  const listBacksIt = $derived(standing?.result === 'qualified' && moment?.independent === true && validWhenUsed);
+  /** A verified answer says this certificate was revoked, which no green may sit beside. */
+  const knownRevoked = $derived(
+    (listFile?.answer?.standing === 'holds' && listFile.answer.status === 'revoked') ||
+      (carriedRevocation?.standing === 'holds' && carriedRevocation.status === 'revoked'),
+  );
+  const listBacksIt = $derived(standing?.result === 'qualified' && moment?.independent === true && validWhenUsed && !knownRevoked);
   /**
    * Green only when all of it holds: the list backs this certificate, at a time an authority dated,
    * the reader has confirmed this is the newest copy, and that copy has not outlived its list.
@@ -523,18 +541,18 @@
   A token attached to a signature it does not describe, or one nobody really signed,
   would read as corroboration and be none, which is worth saying loudly.
 -->
-{#if signature.timestamp?.standing === 'other-signature'}
+{#if stampShown?.standing === 'other-signature'}
   <div class="notice bad">
     <strong>The timestamp inside this signature is not for this signature.</strong>
     It attests to some other signature. Treat the time above as meaning nothing.
   </div>
-{:else if signature.timestamp?.standing === 'broken'}
+{:else if stampShown?.standing === 'broken'}
   <div class="notice bad">
     <strong>The timestamp inside this signature does not hold up.</strong>
     It does not check out against its own certificate, so anyone could have written that time.
     Treat it as meaning nothing.
   </div>
-{:else if signature.timestamp?.standing === 'cannot-check'}
+{:else if stampShown?.standing === 'cannot-check'}
   <div class="notice warn">
     <strong>The timestamp inside this signature could not be checked.</strong>
     Treat the time above as unconfirmed.<Info
@@ -542,10 +560,10 @@
       against. That says nothing either way about whether it holds.</Info
     >
   </div>
-{:else if signature.timestamp && timeAuthority}
+{:else if timeAuthority}
   <div class="notice ok">
     <strong>The time on this signature is not the signer's own.</strong>
-    {signature.timestamp.signedBy ?? 'An authority'} dated it, an authority on {country(timeAuthority.list)}'s trusted list.<Info
+    {timeAuthority.stamp.signedBy ?? 'An authority'} dated it {UTC(timeAuthority.stamp.time)}, an authority on {country(timeAuthority.list)}'s trusted list.<Info
       >So the time does not rest on the signer's computer. The list recorded that authority as granted at that
       time.</Info
     >

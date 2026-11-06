@@ -21,7 +21,7 @@
  */
 import type { Certificate } from 'pkijs';
 
-import type { Criteria, ListedService, ServiceState } from '../certificate/read/trusted-list';
+import { RETYPED, type Criteria, type ListedService, type ServiceState } from '../certificate/read/trusted-list';
 import type { CertificateClaims } from './claims';
 
 /** Directive 1999/93/EC ended here. PRO-4.4.4-07. */
@@ -231,7 +231,9 @@ export function checkAgainstList(
 
   const answers: Array<{ esig: MomentAnswer; eseal: MomentAnswer }> = [];
   for (const when of [moment, certificate.notBefore]) {
-    const states = services.map((service) => stateAt(service, when)).filter((state): state is ServiceState => state !== null);
+    const states = services
+      .map((service) => stateAt(service, when))
+      .filter((state): state is ServiceState => state !== null && state.s !== RETYPED);
     if (states.length === 0) {
       return { result: 'not-qualified', onQualifiedDevice: null, detail: 'The provider was not on the list at that time.' };
     }

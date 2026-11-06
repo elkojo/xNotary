@@ -71,7 +71,7 @@ describe('reading a list', () => {
       </ServiceHistory></TSPService></TSPServices></TrustServiceProvider></TrustServiceProviderList></TrustServiceStatusList>`;
     const [only] = readQualifiedServices(parseList(rekeyed));
     expect(only.certificates).toEqual(['TkVX', 'T0xE']);
-    expect(only.service.h.map((state) => state.t)).toEqual(['2024-01-01T00:00:00Z', '2020-01-01T00:00:00Z']);
+    expect(only.service.h.map((state) => state.s)).toEqual(['granted', 'granted', 'retyped']);
   });
 
   it('keeps the provider\'s names, trade name included', () => {

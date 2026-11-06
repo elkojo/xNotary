@@ -63,8 +63,12 @@
 
   const found = $derived(checked?.length ?? opened?.signatures.length ?? null);
 
+  /** Which opening is current, so that a slow earlier check cannot land on a later file. */
+  let opening = 0;
+
   async function take(file: File | undefined) {
     if (!file) return;
+    const mine = ++opening;
     fileName = file.name;
     checked = null;
     opened = null;
@@ -73,38 +77,44 @@
 
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
+      if (mine !== opening) return;
       fileSize = bytes.length;
       // By content, not by name: real containers arrive called `.zip`.
       if (looksLikePdf(bytes)) {
-        checked = await checkSignatures(bytes);
+        const result = await checkSignatures(bytes);
+        if (mine === opening) checked = result;
       } else if (looksLikeZip(bytes)) {
-        opened = await checkContainer(bytes);
+        const result = await checkContainer(bytes);
+        if (mine === opening) opened = result;
       } else {
         error = 'This is neither a PDF nor a signature container, so it cannot carry a signature of this kind.';
       }
     } catch (failure) {
+      if (mine !== opening) return;
       error =
         failure instanceof ContainerRefused
           ? failure.message
           : 'This file could not be read. It may be damaged, or only partly downloaded.';
     } finally {
-      checking = false;
+      if (mine === opening) checking = false;
     }
   }
 
   /** What a file manager leaves when it unpacks a container, dropped rather than picked. */
   async function takeFolder(folder: FileSystemDirectoryEntry) {
+    const mine = ++opening;
     fileName = folder.name;
     checked = null;
     opened = null;
     error = '';
     checking = true;
     try {
-      opened = await checkUnpacked(await readFolder(folder));
+      const result = await checkUnpacked(await readFolder(folder));
+      if (mine === opening) opened = result;
     } catch (failure) {
-      error = failure instanceof ContainerRefused ? failure.message : 'This folder could not be read.';
+      if (mine === opening) error = failure instanceof ContainerRefused ? failure.message : 'This folder could not be read.';
     } finally {
-      checking = false;
+      if (mine === opening) checking = false;
     }
   }
 
@@ -120,6 +130,8 @@
   }
 
   function clear() {
+    opening += 1;
+    checking = false;
     checked = null;
     opened = null;
     error = '';
@@ -448,7 +460,8 @@
                 {#if signature.signedBy}
                   <div><span>Signed by</span><strong translate="no">{signature.signedBy}</strong></div>
                 {/if}
-                {#if signature.timestamp}
+                <!-- Several tokens: the check below says which one counts. Anybody can add one. -->
+                {#if signature.timestamp && signature.timestamps.length <= 1}
                   <div>
                     <span>Timestamped</span>
                     <strong>

@@ -103,6 +103,21 @@ export async function certificateFor(
   };
 }
 
+/** A certificate for `name` signed by another certificate's key. */
+export async function certificateIssuedBy(name: string, keys: Signer, issuer: Signer, serial = 5): Promise<Signer> {
+  const certificate = new Certificate();
+  certificate.version = 2;
+  certificate.serialNumber = new asn1js.Integer({ value: serial });
+  certificate.issuer = issuer.certificate.subject;
+  certificate.subject.typesAndValues.push(new AttributeTypeAndValue({ type: '2.5.4.3', value: new asn1js.Utf8String({ value: name }) }));
+  certificate.notBefore.value = new Date(Date.UTC(2020, 0, 1));
+  certificate.notAfter.value = new Date(Date.UTC(2039, 0, 1));
+  await certificate.subjectPublicKeyInfo.importKey(keys.publicKey);
+  await certificate.sign(issuer.privateKey, 'SHA-256');
+  const der = new Uint8Array(certificate.toSchema().toBER(false));
+  return { ...keys, certificate: Certificate.fromBER(der.slice().buffer as ArrayBuffer), der };
+}
+
 export async function makeSigner(name = 'Řehoř Čížek', kind: 'RSA' | 'EC' = 'RSA'): Promise<Signer> {
   const keys = (await crypto.subtle.generateKey(
     kind === 'RSA'
@@ -350,6 +365,8 @@ export interface RawEntry {
   readonly hiddenAfter?: Uint8Array;
   /** State this unpacked size in the local header only. */
   readonly localSize?: number;
+  readonly localMethod?: number;
+  readonly localCrc?: number;
 }
 
 /**
@@ -376,9 +393,9 @@ export function rawZip(entries: readonly RawEntry[], options: { before?: Uint8Ar
     u32(out, 0x04034b50);
     u16(out, 20);
     u16(out, flags);
-    u16(out, method);
+    u16(out, entry.localMethod ?? method);
     u32(out, 0);
-    u32(out, crc);
+    u32(out, entry.localCrc ?? crc);
     u32(out, entry.bytes.length);
     u32(out, entry.localSize ?? size);
     u16(out, local.length);
@@ -513,7 +530,7 @@ export async function makeLargeCrl(issuer: Signer, serials: readonly number[], t
 }
 
 /** A counter-signature `SignerInfo` over a CMS signature's value, attached to it. */
-export async function addCounterSignature(der: Uint8Array, counter: Signer): Promise<Uint8Array> {
+export async function addCounterSignature(der: Uint8Array, counter: Signer, options: { signatureAlgorithm?: 'SHA-384' } = {}): Promise<Uint8Array> {
   const signed = new SignedData({ schema: ContentInfo.fromBER(buffer(der)).content });
   const parent = signed.signerInfos[0];
   const value = new Uint8Array(parent.signature.valueBlock.valueHexView);
@@ -523,7 +540,11 @@ export async function addCounterSignature(der: Uint8Array, counter: Signer): Pro
     new Attribute({ type: '1.2.840.113549.1.9.5', values: [new asn1js.UTCTime({ valueDate: new Date(Date.UTC(2026, 10, 5, 10, 1, 0)) })] }),
   ];
   const encoded = new asn1js.Set({ value: attributes.map((attribute) => attribute.toSchema()) }).toBER(false);
-  const signature = await crypto.subtle.sign({ name: 'RSASSA-PKCS1-v1_5' }, counter.privateKey, encoded);
+  // The digest stays SHA-256 while the signature uses its own, which is legal and which the algorithm names.
+  const signingKey = options.signatureAlgorithm
+    ? await crypto.subtle.importKey('pkcs8', await crypto.subtle.exportKey('pkcs8', counter.privateKey), { name: 'RSASSA-PKCS1-v1_5', hash: options.signatureAlgorithm }, false, ['sign'])
+    : counter.privateKey;
+  const signature = await crypto.subtle.sign({ name: 'RSASSA-PKCS1-v1_5' }, signingKey, encoded);
 
   parent.unsignedAttrs = new SignedAndUnsignedAttributes({
     type: 1,
@@ -536,7 +557,7 @@ export async function addCounterSignature(der: Uint8Array, counter: Signer): Pro
             sid: new IssuerAndSerialNumber({ issuer: counter.certificate.issuer, serialNumber: counter.certificate.serialNumber }),
             digestAlgorithm: new AlgorithmIdentifier({ algorithmId: '2.16.840.1.101.3.4.2.1', algorithmParams: new asn1js.Null() }),
             signedAttrs: new SignedAndUnsignedAttributes({ type: 0, attributes }),
-            signatureAlgorithm: new AlgorithmIdentifier({ algorithmId: '1.2.840.113549.1.1.1', algorithmParams: new asn1js.Null() }),
+            signatureAlgorithm: new AlgorithmIdentifier({ algorithmId: options.signatureAlgorithm ? '1.2.840.113549.1.1.12' : '1.2.840.113549.1.1.1', algorithmParams: new asn1js.Null() }),
             signature: new asn1js.OctetString({ valueHex: signature }),
           }).toSchema(),
         ],

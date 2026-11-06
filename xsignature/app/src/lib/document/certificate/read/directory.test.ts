@@ -1,8 +1,10 @@
-import { Certificate } from 'pkijs';
+import * as asn1js from 'asn1js';
+import { AttributeTypeAndValue, Certificate, Extension } from 'pkijs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { authorityKeyIdOf, buildDirectory, DirectoryUnreachable, findIssuers, keyIdOf, listedTimeAuthority, siteDirectory, type DirectorySource } from './directory';
 import { makeChain, type GeneratedChain } from './fixtures/make-keys';
+import { makeSigner, type Signer } from '../../verify/asic/fixtures.test-helper';
 
 const parse = (der: Uint8Array) => Certificate.fromBER(der.slice().buffer as ArrayBuffer);
 const nameOf = (c: Certificate) =>
@@ -166,6 +168,25 @@ describe('the directory as this site serves it', () => {
   });
 });
 
+/** A certificate stating a chosen subject key identifier, as anybody can make. */
+async function certificateWithKeyId(name: string, keys: Signer, keyId: Uint8Array): Promise<Signer> {
+  const certificate = new Certificate();
+  certificate.version = 2;
+  certificate.serialNumber = new asn1js.Integer({ value: 3 });
+  const dn = () => new AttributeTypeAndValue({ type: '2.5.4.3', value: new asn1js.Utf8String({ value: name }) });
+  certificate.issuer.typesAndValues.push(dn());
+  certificate.subject.typesAndValues.push(dn());
+  certificate.notBefore.value = new Date(Date.UTC(2020, 0, 1));
+  certificate.notAfter.value = new Date(Date.UTC(2039, 0, 1));
+  certificate.extensions = [
+    new Extension({ extnID: '2.5.29.14', extnValue: new asn1js.OctetString({ valueHex: keyId.slice().buffer as ArrayBuffer }).toBER(false), parsedValue: new asn1js.OctetString({ valueHex: keyId.slice().buffer as ArrayBuffer }) }),
+  ];
+  await certificate.subjectPublicKeyInfo.importKey(keys.publicKey);
+  await certificate.sign(keys.privateKey, 'SHA-256');
+  const der = new Uint8Array(certificate.toSchema().toBER(false));
+  return { ...keys, certificate: Certificate.fromBER(der.slice().buffer as ArrayBuffer), der };
+}
+
 describe('a time authority', () => {
   const service = { n: ['Stamps Ltd'], h: [{ s: 'granted', t: '2020-01-01T00:00:00Z' }] };
   const directoryOf = async (der: Uint8Array, entry: { services?: typeof service[]; timeServices?: typeof service[] }) => {
@@ -178,6 +199,18 @@ describe('a time authority', () => {
     const certificate = Certificate.fromBER(rootDer.slice().buffer as ArrayBuffer);
     const found = await listedTimeAuthority(certificate, await directoryOf(rootDer, { timeServices: [service] }));
     expect(found?.list).toBe('SK');
+  });
+
+  it('is not found for a self-made certificate copying a listed one\'s name and key identifier', async () => {
+    // A real attack on comparing what a certificate says about itself.
+    const genuine = await makeSigner('Stamps Ltd');
+    const impostor = await makeSigner('Stamps Ltd');
+    const listed = await certificateWithKeyId('Stamps Ltd', genuine, new Uint8Array(20).fill(7));
+    const copy = await certificateWithKeyId('Stamps Ltd', impostor, new Uint8Array(20).fill(7));
+    const source = await directoryOf(listed.der, { timeServices: [service] });
+
+    expect(await listedTimeAuthority(listed.certificate, source)).not.toBeNull();
+    expect(await listedTimeAuthority(copy.certificate, source)).toBeNull();
   });
 
   it('is not found from a certificate-issuing entry for the same certificate', async () => {
@@ -193,4 +226,3 @@ describe('a time authority', () => {
     expect(await listedTimeAuthority(certificate, await directoryOf(rootDer, { timeServices: [service] }))).toBeNull();
   });
 });
-

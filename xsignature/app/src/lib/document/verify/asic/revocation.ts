@@ -100,7 +100,7 @@ function basicResponseFrom(der: Uint8Array): BasicOCSPResponse | null {
 }
 
 /** Whether a single response's CertID is this certificate's, on all the evidence available. */
-async function isAbout(single: SingleResponse, certificate: Certificate, issuer: Certificate | undefined): Promise<boolean> {
+async function isAbout(single: SingleResponse, certificate: Certificate, issuers: readonly Certificate[]): Promise<boolean> {
   if (!single.certID.serialNumber.isEqual(certificate.serialNumber)) return false;
 
   const hash = hashForOid(single.certID.hashAlgorithm.algorithmId);
@@ -109,13 +109,15 @@ async function isAbout(single: SingleResponse, certificate: Certificate, issuer:
   const nameHash = new Uint8Array(single.certID.issuerNameHash.valueBlock.valueHexView);
   if (!sameBytes(await hashOf(hash, encodedName(certificate.issuer)), nameHash)) return false;
 
-  // The issuer's key is the stronger half, when its certificate is here to compare.
-  if (issuer) {
+  // The issuer's key is the stronger half, when its certificate is here to compare. A CA that was
+  // re-keyed has several certificates of one name, and only the right one can match.
+  if (issuers.length === 0) return true;
+  const keyHash = new Uint8Array(single.certID.issuerKeyHash.valueBlock.valueHexView);
+  for (const issuer of issuers) {
     const key = new Uint8Array(issuer.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHexView);
-    const keyHash = new Uint8Array(single.certID.issuerKeyHash.valueBlock.valueHexView);
-    if (!sameBytes(await hashOf(hash, key), keyHash)) return false;
+    if (sameBytes(await hashOf(hash, key), keyHash)) return true;
   }
-  return true;
+  return false;
 }
 
 function statusOf(single: SingleResponse): { status: RevocationStatus; revokedAt: Date | null } {
@@ -166,14 +168,14 @@ const EXPIRED_CERTS_ON_CRL = '2.5.29.60';
 async function readOcsp(
   der: Uint8Array,
   certificate: Certificate,
-  issuer: Certificate | undefined,
+  issuers: readonly Certificate[],
   others: readonly Certificate[],
 ): Promise<RevocationAnswer | null> {
   const basic = basicResponseFrom(der);
   if (!basic) return UNREADABLE('OCSP');
 
   for (const single of basic.tbsResponseData.responses) {
-    if (!(await isAbout(single, certificate, issuer))) continue;
+    if (!(await isAbout(single, certificate, issuers))) continue;
 
     const responder = await responderOf(basic, others);
     const described = {
@@ -223,13 +225,19 @@ async function readCrl(der: Uint8Array, certificate: Certificate, others: readon
   };
 
   if (scoped && !entry) return { ...described, status: 'unknown', standing: 'cannot-check' };
-  const signer = others.find((candidate) => candidate.subject.isEqual(list.issuer));
-  if (!signer) return { ...described, standing: 'cannot-check' };
-  try {
-    return { ...described, standing: (await list.verify({ issuerCertificate: signer })) ? 'holds' : 'broken' };
-  } catch {
-    return { ...described, standing: 'cannot-check' };
+  const signers = others.filter((candidate) => candidate.subject.isEqual(list.issuer));
+  if (signers.length === 0) return { ...described, standing: 'cannot-check' };
+
+  let ran = false;
+  for (const signer of signers) {
+    try {
+      if (await list.verify({ issuerCertificate: signer })) return { ...described, standing: 'holds' };
+      ran = true;
+    } catch {
+      // Another certificate of this name may be the one.
+    }
   }
+  return { ...described, standing: ran ? 'broken' : 'cannot-check' };
 }
 
 /** Worst first: a verified "revoked" outranks everything, and nothing outranks being wrong about it. */
@@ -249,13 +257,11 @@ export async function revocationOf(
   others: readonly Certificate[],
   embedded: EmbeddedRevocation,
 ): Promise<RevocationAnswer | null> {
-  const issuer = others.find(
-    (candidate) => candidate !== certificate && candidate.subject.isEqual(certificate.issuer),
-  );
+  const issuers = others.filter((candidate) => candidate !== certificate && candidate.subject.isEqual(certificate.issuer));
 
   const answers: RevocationAnswer[] = [];
   for (const der of embedded.ocsp) {
-    const answer = await readOcsp(der, certificate, issuer, others);
+    const answer = await readOcsp(der, certificate, issuers, others);
     if (answer) answers.push(answer);
   }
   for (const der of embedded.crl) {

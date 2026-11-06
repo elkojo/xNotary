@@ -319,12 +319,12 @@ function revocationIn(properties: readonly Element[]): EmbeddedRevocation {
  * `SignatureValue` holds the same value, so either way the token attests to this
  * signature. A token that does name a method is held to it.
  */
-async function timestampOf(properties: readonly Element[], signature: Element, signedInfo: Element): Promise<AttachedTimestamp | null> {
+async function timestampsOf(properties: readonly Element[], signature: Element, signedInfo: Element): Promise<AttachedTimestamp[]> {
   const value = childNamed(signature, 'SignatureValue', DS);
-  if (!value) return null;
+  if (!value) return [];
   const signedWith = childNamed(signedInfo, 'CanonicalizationMethod', DS);
 
-  let chosen: AttachedTimestamp | null = null;
+  const found: AttachedTimestamp[] = [];
   for (const stamp of properties.filter((property) => property.localName === 'SignatureTimeStamp')) {
     const token = descendantsNamed(stamp, 'EncapsulatedTimeStamp')[0];
     if (!token) continue;
@@ -344,12 +344,12 @@ async function timestampOf(properties: readonly Element[], signature: Element, s
         read = await readTimestampToken(parsed, canonicalize(value, algorithm, prefixes));
         if (read?.standing !== 'other-signature') break;
       }
-      if (read && (!chosen || chosen.standing === 'holds')) chosen = read;
+      if (read) found.push(read);
     } catch {
       // Not a token. Reporting no timestamp is right: nothing here dated it.
     }
   }
-  return chosen;
+  return found;
 }
 
 /** The bytes a reference stands for, after its transforms, for an archive timestamp. */
@@ -557,6 +557,7 @@ export async function checkXades(
   const details = signedProperties?.status === 'match' ? signedProperties.target! : null;
   const stated = details ? descendantsNamed(details, 'SigningTime')[0]?.textContent?.trim() : undefined;
   const parsed = stated ? new Date(stated) : null;
+  const timestamps = await timestampsOf(properties, signature, signedInfo);
   const report = {
     ...withFacts,
     covers,
@@ -565,7 +566,8 @@ export async function checkXades(
     detailsChanged,
     counterChanged,
     time: parsed && !Number.isNaN(parsed.getTime()) ? parsed : null,
-    timestamp: await timestampOf(properties, signature, signedInfo),
+    timestamps,
+    timestamp: timestamps.find((stamp) => stamp.standing !== 'holds') ?? timestamps[0] ?? null,
     revocation: bound ? await revocationOf(holder, others, revocationIn(properties)) : null,
     archiveTimestamps: qualifying ? await archiveTimestampsOf(properties, signature, signedInfo, qualifying, files) : [],
     detail: '',

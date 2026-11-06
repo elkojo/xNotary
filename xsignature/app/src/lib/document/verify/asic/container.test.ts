@@ -3,12 +3,14 @@ import { Attribute, ContentInfo, EncapsulatedContentInfo, OtherRevocationInfoFor
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { C14N_10, C14N_11, C14N_EXCLUSIVE } from './c14n';
-import { checkContainer } from './container';
+import { checkContainer, checkUnpacked } from './container';
+import { revocationOf } from './revocation';
 import {
   addCounterSignature,
   ASIC_E,
   ASIC_S,
   certificateFor,
+  certificateIssuedBy,
   counterSignatureXml,
   container,
   damaged,
@@ -1030,6 +1032,50 @@ describe('findings from review', () => {
   it('never explains a changed data file by a renewal', async () => {
     const { archives } = await check(container(await renewalParts({ [NAME]: utf8('the document as it was') })));
     expect(archives.find((archive) => archive.source === older)?.renewedBy).toBeNull();
+  });
+});
+
+describe('findings from the third review', () => {
+  it('uses the hash the signature algorithm names for a counter-signature', async () => {
+    const p7s = await addCounterSignature(await makeCades(CONTENT, signer), authority, { signatureAlgorithm: 'SHA-384' });
+    const { signatures } = await check(container({ ...FILES, 'META-INF/signature.p7s': p7s }, ASIC_S));
+    expect(signatures[1].verdict).toBe('intact');
+  });
+
+  it('finds the right certificate when a re-keyed authority has two of one name', async () => {
+    const old = await makeSigner('Same Authority');
+    const current = await makeSigner('Same Authority');
+    const crl = await makeCrl(current);
+    const leaf = await certificateIssuedBy('Signer', signer, current);
+    const answer = await revocationOf(leaf.certificate, [old.certificate, current.certificate], { ocsp: [], crl: [crl] });
+    expect(answer).toMatchObject({ standing: 'holds', status: 'good' });
+
+    const ocsp = await makeOcsp(leaf, authority, { issuer: current });
+    const fromOcsp = await revocationOf(leaf.certificate, [old.certificate, current.certificate], { ocsp: [ocsp], crl: [] });
+    expect(fromOcsp).toMatchObject({ kind: 'OCSP', standing: 'holds' });
+  });
+
+  it('is not confused by what a file manager added to a folder', async () => {
+    const parts = [
+      { name: 'report.pdf', bytes: CONTENT },
+      { name: '.DS_Store', bytes: utf8('x') },
+      { name: 'META-INF/signature.p7s', bytes: await makeCades(CONTENT, signer) },
+    ];
+    const { signatures, files } = await checkUnpacked(parts, parseXml);
+    expect(signatures[0].verdict).toBe('intact');
+    expect(files.map((file) => file.name)).toContain('.DS_Store');
+  });
+
+  it('keeps every timestamp, so that an added one cannot displace a real one', async () => {
+    const xml = await makeXades(FILES, signer, {
+      unsigned: async (value) => {
+        const real = signatureTimestampXml(await makeTimestampToken(value, authority)).replace(/<\/?xades:Unsigned\w+>/g, '');
+        const added = signatureTimestampXml(await makeTimestampToken(value, await makeSigner('Self Made'), { at: new Date(Date.UTC(1999, 0, 1)) })).replace(/<\/?xades:Unsigned\w+>/g, '');
+        return unsignedXml(real + added);
+      },
+    });
+    const { signatures } = await check(container({ ...FILES, [SIGNATURES]: xml }));
+    expect(signatures[0].timestamps.map((stamp) => stamp.signedBy)).toEqual(['Test Authority', 'Self Made']);
   });
 });
 
