@@ -16,7 +16,7 @@ export type Lang = 'en' | 'cs';
 
 export const LANGUAGES: Readonly<Record<Lang, { readonly name: string; readonly short: string; readonly reviewed: boolean }>> = {
   en: { name: 'English', short: 'EN', reviewed: true },
-  cs: { name: 'Čeština', short: 'CS', reviewed: false },
+  cs: { name: 'Čeština', short: 'CS', reviewed: true },
 };
 
 const KEY = 'site.lang';
