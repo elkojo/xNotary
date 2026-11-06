@@ -209,7 +209,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
       'Podepište programem, který jste dostali ke kartě, nebo který poskytuje vaše certifikační autorita.',
       'Co podepsaný soubor tvrdí, pak můžete zkontrolovat zde.',
     ],
-    go: ['Zkontrolovat podepsané PDF'],
+    go: ['Zkontrolovat podepsaný soubor'],
   },
   'sign-nocert': {
     title: 'Nejdřív si pořiďte certifikát',
@@ -293,9 +293,9 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   },
   'check-pdf': {
     title: 'Podívejte se, co tvrdí podpisy v něm',
-    lead: '„Zkontrolovat PDF“ přečte každý podpis a zjistí, zda se soubor od podpisu změnil.',
+    lead: '„Zkontrolovat podepsaný soubor“ přečte každý podpis a zjistí, zda se soubor od podpisu změnil.',
     steps: ['Zda si certifikát podepisujícího zaslouží důvěru, posoudí váš prohlížeč PDF podle důvěryhodného seznamu právního rámce, ve kterém byl vydán.'],
-    go: ['Zkontrolovat podepsané PDF'],
+    go: ['Zkontrolovat podepsaný soubor'],
   },
 
   // --- Ověřená kopie --------------------------------------------------------------------

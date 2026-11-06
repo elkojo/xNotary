@@ -20,6 +20,8 @@
  */
 import { Certificate, ContentInfo, SignedData } from 'pkijs';
 
+import { printable } from '../../verify/printable';
+
 /** How a file offering certificates might be shaped. */
 const PEM_BLOCK = /-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/g;
 
@@ -162,5 +164,5 @@ function nameOf(certificate: Certificate): string {
   const parts = certificate.subject.typesAndValues;
   const commonName = parts.find((part) => part.type === '2.5.4.3');
   const chosen = commonName ?? parts[parts.length - 1];
-  return (chosen?.value.valueBlock.value as string) ?? '';
+  return printable((chosen?.value.valueBlock.value as string) ?? '');
 }

@@ -354,7 +354,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
       'Sign with the software that came with your card, or that your certificate authority provides.',
       'You can then check what the signed file claims here.',
     ],
-    go: [{ service: 'xsignature', page: 'check', label: 'Check a signed PDF' }],
+    go: [{ service: 'xsignature', page: 'check', label: 'Check a signed file' }],
   },
   'sign-nocert': {
     kind: 'outcome',
@@ -483,9 +483,9 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     journey: 'check',
     light: 'online',
     title: 'See what the signatures in it claim',
-    lead: 'Check a PDF reads each signature, and whether the file has changed since it was signed.',
+    lead: 'Check a signed file reads each signature, and whether the file has changed since it was signed.',
     steps: ["Whether the signer's certificate deserves trust is for your PDF reader to say, against the trust list of the framework it was issued under."],
-    go: [{ service: 'xsignature', page: 'check', label: 'Check a signed PDF' }],
+    go: [{ service: 'xsignature', page: 'check', label: 'Check a signed file' }],
   },
 
   // --- Certified copy ------------------------------------------------------------------

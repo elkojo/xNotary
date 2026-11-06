@@ -125,8 +125,8 @@ export const TASKS: ReadonlyArray<{
     cs: { title: 'Ověřit důkaz xNotary', description: 'Porovnejte dokument s jeho certifikátem xNotary.' },
   },
   {
-    service: 'xsignature', page: 'check', title: 'Check a signed PDF', description: 'See what a signed or timestamped PDF claims.',
-    cs: { title: 'Zkontrolovat podepsané PDF', description: 'Co tvrdí podepsané PDF, nebo PDF s časovým razítkem.' },
+    service: 'xsignature', page: 'check', title: 'Check a signed file', description: 'See what a signed PDF or a signature container claims.',
+    cs: { title: 'Zkontrolovat podepsaný soubor', description: 'Co tvrdí podepsané PDF nebo podpisový kontejner.' },
   },
 ];
 
@@ -139,7 +139,7 @@ export const TABS_CS: Readonly<Record<string, string>> = {
   Help: 'Nápověda',
   'Signature image': 'Obrázek podpisu',
   'Sign a document': 'Podepsat dokument',
-  'Check a PDF': 'Zkontrolovat PDF',
+  'Check a signed file': 'Zkontrolovat podepsaný soubor',
   Convert: 'Převést',
 };
 

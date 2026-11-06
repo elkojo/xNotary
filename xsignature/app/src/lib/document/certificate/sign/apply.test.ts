@@ -271,7 +271,7 @@ describe('a signature that carries its own timestamp', () => {
     });
 
     const [checked] = await checkSignatures(signed.bytes);
-    expect(checked.timestamp!.coversSignature).toBe(false);
+    expect(checked.timestamp!.standing).toBe('other-signature');
   });
 
   it('carries no timestamp when none was asked for', async () => {

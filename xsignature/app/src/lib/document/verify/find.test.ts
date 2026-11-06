@@ -10,8 +10,7 @@ import { findSignatures, parsePdfDate } from './find';
  * hand it exactly the bytes it cares about: a signature dictionary with a
  * `/ByteRange` naming a hole, and a hex string sitting in that hole.
  */
-function fileWith(entries: string): Uint8Array {
-  const token = 'aabbccdd';
+function fileWith(entries: string, token = 'aabbccdd'): Uint8Array {
   const tail = '> >>\nendobj\n%%EOF\n';
 
   // Written at a fixed width and overwritten in place afterwards, exactly as
@@ -130,5 +129,18 @@ describe('findSignatures, on the time a signature claims', () => {
   it('reports nothing when the dictionary states no time', () => {
     const found = findSignatures(fileWith('/SubFilter /ETSI.CAdES.detached'));
     expect(found[0].signingTime).toBeNull();
+  });
+});
+
+describe('the token in the hole', () => {
+  it('keeps a trailing zero byte, which is as likely as any other last byte', () => {
+    // Stripping trailing zeros as if they were padding truncated about one valid signature in
+    // 256: the structure then claimed more bytes than it had, and read as unreadable.
+    const [found] = findSignatures(fileWith('', '300302010000000000'));
+    expect([...found.token.slice(0, 5)]).toEqual([0x30, 0x03, 0x02, 0x01, 0x00]);
+  });
+
+  it('skips a hole nothing was ever written into', () => {
+    expect(findSignatures(fileWith('', '00000000'))).toEqual([]);
   });
 });

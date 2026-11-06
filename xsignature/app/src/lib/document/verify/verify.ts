@@ -32,12 +32,24 @@
  * interesting failure — a document altered after signing — is caught by (1)
  * regardless.
  */
-import { AttributeTypeAndValue, Certificate, ContentInfo, SignedData, TSTInfo } from 'pkijs';
+import type { Certificate, SignedData } from 'pkijs';
 
-import { checkLinks, orderChain, type ChainLink } from '../certificate/read/chain';
+import type { ChainLink } from '../certificate/read/chain';
 import { digestedBytes } from '../timestamp/byte-range';
-import { claimsOf, type CertificateClaims } from './claims';
+import type { CertificateClaims } from './claims';
 import { findSignatures, isDocumentTimestamp, type FoundSignature } from './find';
+import {
+  NO_SIGNER,
+  checkSigner,
+  embeddedTimestampsOf,
+  worstTimestamp,
+  readTimestampToken,
+  readTstInfo,
+  signedDataFrom,
+  signerFactsOf,
+  signingCertificateBinding,
+  type AttachedTimestamp,
+} from './signer';
 
 export type Verdict =
   /** Covers this file, and its own signature checks out. */
@@ -112,20 +124,20 @@ export interface CheckedSignature {
    * certificates hang together, not that the one at the top is worth believing.
    */
   readonly chain: readonly ChainLink[];
+  /** Those certificates themselves, issuer first. */
+  readonly issuers: readonly Certificate[];
   /**
    * A timestamp carried *inside* this signature, when it has one.
    *
    * This is what makes a signature PAdES-B-T, and it is a stronger statement
    * than the signer's own clock beside it: an authority saw the signature and
-   * said when. `coversSignature` is checked here rather than assumed — a token
-   * attached to a signature it does not describe would otherwise look like
-   * corroboration and be none.
+   * said when. Its `standing` is checked rather than assumed — a token attached
+   * to a signature it does not describe, or one nobody really signed, would
+   * otherwise look like corroboration and be none.
    */
-  readonly timestamp: {
-    readonly time: Date;
-    readonly signedBy: string | null;
-    readonly coversSignature: boolean;
-  } | null;
+  readonly timestamp: AttachedTimestamp | null;
+  /** Every one it carries: anyone can add one, so the screen looks for a listed authority's. */
+  readonly timestamps: readonly AttachedTimestamp[];
   readonly coversToEndOfFile: boolean;
   /** How much of the file this one covers, in bytes. */
   readonly covers: number;
@@ -155,21 +167,17 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
 
   let signed: SignedData;
   try {
-    const content = ContentInfo.fromBER(signature.token as unknown as ArrayBuffer);
-    signed = new SignedData({ schema: content.content });
+    signed = signedDataFrom(signature.token);
   } catch {
     return {
       ...shared,
       verdict: 'unreadable',
+      ...NO_SIGNER,
       time: null,
-      signedBy: null,
-      issuedBy: null,
-      certificate: null,
       policy: null,
       certificateCount: 0,
-      claims: null,
-      chain: [],
       timestamp: null,
+      timestamps: [],
       detail: 'The token in this file could not be read.',
     };
   }
@@ -182,24 +190,21 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
   let policy: string | null = null;
   if (isTimestamp) {
     try {
-      const eContent = signed.encapContentInfo.eContent;
-      if (!eContent) throw new Error('no content');
-      const info = TSTInfo.fromBER(eContent.valueBlock.valueHexView as unknown as ArrayBuffer);
+      const info = readTstInfo(signed);
+      if (!info) throw new Error('no content');
       time = info.genTime;
       policy = info.policy ?? null;
     } catch {
       return {
         ...shared,
         verdict: 'unreadable',
+        ...(await signerFactsOf(signed)),
         time: null,
-        signedBy: subjectOf(signed),
-        issuedBy: issuerOf(signed),
-        certificate: signerCertificateOf(signed),
         policy: null,
-        certificateCount: signed.certificates?.length ?? 0,
-        claims: claimsOfSigner(signed),
         chain: [],
+        issuers: [],
         timestamp: null,
+        timestamps: [],
         detail: 'The token in this file could not be read as a timestamp.',
       };
     }
@@ -207,144 +212,79 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
     time = signature.signingTime;
   }
 
+  const timestamps = await embeddedTimestampsOf(signed);
   const described = {
     ...shared,
+    ...(await signerFactsOf(signed)),
     time,
-    signedBy: subjectOf(signed),
-    issuedBy: issuerOf(signed),
-    certificate: signerCertificateOf(signed),
     policy,
-    certificateCount: signed.certificates?.length ?? 0,
-    claims: claimsOfSigner(signed),
-    chain: await chainOf(signed),
-    timestamp: await embeddedTimestampOf(signed),
+    timestamp: worstTimestamp(timestamps),
+    timestamps,
   };
 
-  // The library checks the digest and the signature together: a mismatch on the
-  // first throws, a bad signature returns false. The two mean different things
-  // to the reader, so they are reported differently.
-  try {
-    const ok = await signed.verify({ signer: 0, data: covered.slice().buffer as ArrayBuffer });
-    return ok
-      ? { ...described, verdict: 'intact', detail: '' }
-      : {
-          ...described,
-          verdict: 'broken',
-          detail: isTimestamp
-            ? 'The timestamp covers this file, but its own signature does not check out against the certificate inside it.'
-            : 'The signature covers this file, but does not check out against the certificate inside it.',
-        };
-  } catch {
+  // The library reports these different failures in different ways, and they
+  // mean different things to the reader. Only a digest that does not match says
+  // the file changed; the rest say something about the token.
+  const noun = isTimestamp ? 'timestamp' : 'signature';
+  // Until the value holds, the name, the time and any timestamp beside it are only what the file
+  // says, and a real certificate copied onto a forgery must not collect a list's approval.
+  const unproven = { ...shared, ...NO_SIGNER, certificateCount: described.certificateCount, time: null, policy: null, timestamp: null, timestamps: [] };
+  const stamp = isTimestamp ? await readTimestampToken(signed, covered) : null;
+  const outcome = isTimestamp
+    ? stamp?.standing === 'holds'
+      ? 'holds'
+      : stamp?.standing === 'other-signature'
+        ? 'digest-mismatch'
+        : stamp?.standing === 'broken'
+          ? 'bad-signature'
+          : 'cannot-check'
+    : await checkSigner(signed, 0, covered);
+
+  // What was signed names another certificate: the one here was put there afterwards.
+  if (!isTimestamp && described.certificate && (await signingCertificateBinding(signed, 0, described.certificate)) === 'unbound') {
     return {
-      ...described,
-      verdict: 'altered',
-      detail: isTimestamp
-        ? 'This file has changed since it was timestamped. The timestamp describes different bytes than the ones here.'
-        : 'This file has changed since it was signed. The signature describes different bytes than the ones here.',
+      ...shared,
+      ...NO_SIGNER,
+      certificateCount: described.certificateCount,
+      time: null,
+      policy: null,
+      timestamp: null,
+      timestamps: [],
+      verdict: 'broken',
+      detail: 'The certificate it carries is not the one its signed details name.',
     };
   }
-}
 
-/** `id-aa-signatureTimeStampToken`. */
-const SIGNATURE_TIME_STAMP = '1.2.840.113549.1.9.16.2.14';
-
-/**
- * The timestamp a signature carries inside itself, if it carries one.
- *
- * Read out of the *unsigned* attributes, which is where it has to live: the
- * token is over the signature value, so it cannot exist until the signature
- * does, and cannot be covered by it.
- *
- * Whether it describes *this* signature is checked rather than taken on trust.
- * A token whose imprint is some other digest is not corroboration, and would
- * look exactly like corroboration if nobody compared them.
- */
-async function embeddedTimestampOf(
-  signed: SignedData,
-): Promise<CheckedSignature['timestamp']> {
-  const attributes = signed.signerInfos[0]?.unsignedAttrs?.attributes ?? [];
-  const attribute = attributes.find((candidate) => candidate.type === SIGNATURE_TIME_STAMP);
-  if (!attribute) return null;
-
-  try {
-    const content = new ContentInfo({ schema: attribute.values[0] });
-    const tokenSigned = new SignedData({ schema: content.content });
-    const eContent = tokenSigned.encapContentInfo.eContent;
-    if (!eContent) return null;
-
-    const info = TSTInfo.fromBER(eContent.valueBlock.valueHexView as unknown as ArrayBuffer);
-    const imprint = new Uint8Array(info.messageImprint.hashedMessage.valueBlock.valueHexView);
-
-    const signatureValue = new Uint8Array(signed.signerInfos[0].signature.valueBlock.valueHexView);
-    const expected = new Uint8Array(
-      await crypto.subtle.digest('SHA-256', signatureValue.slice().buffer as ArrayBuffer),
-    );
-
-    return {
-      time: info.genTime,
-      signedBy: subjectOf(tokenSigned),
-      coversSignature:
-        imprint.length === expected.length && imprint.every((byte, i) => byte === expected[i]),
-    };
-  } catch {
-    return null;
+  switch (outcome) {
+    case 'holds':
+      return { ...described, verdict: 'intact', detail: '' };
+    case 'bad-signature':
+      return {
+        ...unproven,
+        verdict: 'broken',
+        detail: isTimestamp
+          ? 'The timestamp covers this file, but its own signature does not check out against the certificate inside it.'
+          : 'The signature covers this file, but does not check out against the certificate inside it.',
+      };
+    case 'no-certificate':
+      return {
+        ...unproven,
+        verdict: 'broken',
+        detail: `This ${noun} does not carry the certificate it says it was made with, so nobody can be named as its signer and it cannot be checked.`,
+      };
+    case 'cannot-check':
+      return {
+        ...unproven,
+        verdict: 'unreadable',
+        detail: `This ${noun} uses an algorithm this browser cannot check. That says nothing either way about whether it holds.`,
+      };
+    case 'digest-mismatch':
+      return {
+        ...described,
+        verdict: 'altered',
+        detail: isTimestamp
+          ? 'This file has changed since it was timestamped. The timestamp describes different bytes than the ones here.'
+          : 'This file has changed since it was signed. The signature describes different bytes than the ones here.',
+      };
   }
-}
-
-/**
- * The chain a signature carries, checked link by link.
- *
- * The signer's certificate is the first one in a CMS structure by convention
- * and the rest are whatever the signer included, in no particular order — so
- * they are sorted into chain order before being checked, exactly as they are
- * when somebody supplies them on the signing screen.
- */
-async function chainOf(signed: SignedData): Promise<ChainLink[]> {
-  const certificates = (signed.certificates ?? []).filter(
-    (candidate): candidate is Certificate => 'subject' in candidate,
-  );
-  const [leaf, ...rest] = certificates;
-  if (!leaf || rest.length === 0) return [];
-
-  return checkLinks(leaf, orderChain(leaf, rest));
-}
-
-/** What the signing certificate declares, when there is one to read. */
-function claimsOfSigner(signed: SignedData): CertificateClaims | null {
-  const certificate = signed.certificates?.[0];
-  return certificate && 'subject' in certificate ? claimsOf(certificate) : null;
-}
-
-/** The signer's common name, or the whole subject if it has no CN. */
-function subjectOf(signed: SignedData): string | null {
-  const certificate = signed.certificates?.[0];
-  if (!certificate || !('subject' in certificate)) return null;
-  return commonNameOf(certificate.subject.typesAndValues);
-}
-
-/**
- * Who issued the signer's certificate, as the certificate itself names them.
- *
- * Not the same question as what the signature *carries*: a signature may name
- * its issuer and enclose nothing. That is the common case with a leaf-only key
- * file, and it is exactly when a reader most needs to be told which certificate
- * is missing rather than being left to work it out.
- */
-function issuerOf(signed: SignedData): string | null {
-  const certificate = signed.certificates?.[0];
-  if (!certificate || !('issuer' in certificate)) return null;
-  return commonNameOf(certificate.issuer.typesAndValues);
-}
-
-/** The signer's certificate: the first one, by CMS convention. */
-function signerCertificateOf(signed: SignedData): Certificate | null {
-  const first = signed.certificates?.[0];
-  return first && 'subject' in first ? first : null;
-}
-
-/** The common name of a distinguished name, or its last part if it has none. */
-function commonNameOf(parts: AttributeTypeAndValue[]): string | null {
-  const commonName = parts.find((part) => part.type === '2.5.4.3');
-  const chosen = commonName ?? parts[parts.length - 1];
-  return (chosen?.value.valueBlock.value as string) ?? null;
 }

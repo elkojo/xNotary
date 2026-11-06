@@ -119,7 +119,7 @@ function stringEntry(text: string, key: string): string | null {
  * Latin-1 to decode as such.
  */
 function decodeHexString(hex: string): string {
-  const bytes = parseHexRaw(hex);
+  const bytes = parseHex(hex);
   if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
     let out = '';
     for (let i = 2; i + 1 < bytes.length; i += 2) {
@@ -131,23 +131,17 @@ function decodeHexString(hex: string): string {
 }
 
 /** Hex to bytes, with no trailing-zero trimming. */
-function parseHexRaw(hex: string): Uint8Array {
-  const clean = hex.replace(/[^0-9a-fA-F]/g, '');
-  const even = clean.length % 2 === 0 ? clean : clean.slice(0, -1);
-  const out = new Uint8Array(even.length / 2);
-  for (let i = 0; i < out.length; i += 1) {
-    out[i] = Number.parseInt(even.slice(i * 2, i * 2 + 2), 16);
-  }
-  return out;
-}
-
+/**
+ * The bytes of a hex string, padding and all.
+ *
+ * A token sits in a fixed-size hole padded with zeros, and that padding is left on deliberately.
+ * The last byte of a CMS is effectively random, so stripping trailing zeros truncated about one
+ * valid signature in 256, which then read as unreadable. DER states its own length, and parsing
+ * stops where it says.
+ */
 function parseHex(hex: string): Uint8Array {
   const clean = hex.replace(/[^0-9a-fA-F]/g, '');
-  // Tokens are written into a fixed-size hole and padded with zeros; the
-  // padding is not part of the DER and has to come off before parsing.
-  const trimmed = clean.replace(/(00)+$/, '');
-  const even = trimmed.length % 2 === 0 ? trimmed : trimmed.slice(0, -1);
-
+  const even = clean.length % 2 === 0 ? clean : clean.slice(0, -1);
   const out = new Uint8Array(even.length / 2);
   for (let i = 0; i < out.length; i += 1) {
     out[i] = Number.parseInt(even.slice(i * 2, i * 2 + 2), 16);
@@ -229,7 +223,8 @@ export function findSignatures(pdf: Uint8Array): FoundSignature[] {
     if (pdf[first + firstLength] !== 0x3c || pdf[second - 1] !== 0x3e) continue;
 
     const token = parseHex(text.slice(first + firstLength + 1, second - 1));
-    if (token.length === 0) continue;
+    // A hole nothing was ever written into.
+    if (token.every((byte) => byte === 0)) continue;
 
     // The dictionary's other keys, read either side of the hex blob rather than
     // through it.

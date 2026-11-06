@@ -1,0 +1,66 @@
+name: Refresh trusted lists
+
+# Reads the EU's trusted lists once a week and proposes the result as a pull request. It verifies
+# each list's signature up to the Official Journal; if the EU's own list stops verifying, a newer
+# notice is due, this fails, and a person updates xsignature/app/scripts/lotl-anchor.json.
+#
+# It proposes and never publishes: readers see a new list only after someone merges and a release is
+# deployed. The update button on Check a signed file can fetch nothing newer than that.
+
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+defaults:
+  run:
+    working-directory: xsignature/app
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: npm
+          cache-dependency-path: |
+            xsignature/app/package-lock.json
+            app/package-lock.json
+
+      # xSignature compiles the shared bar from app/src/site, which needs app's packages too.
+      - run: npm ci --prefix ../../app
+      - run: npm ci
+
+      - name: Read the lists
+        run: npm run issuers:refresh
+
+      # A pull request opened with this token starts no other workflow, so the checks run here.
+      - name: Check it still works with them
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Propose the result
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$(git status --porcelain public/issuers scripts/crl-sources.json)" ]; then
+            echo "Nothing changed."
+            exit 0
+          fi
+          day=$(date -u +%Y-%m-%d)
+          branch="trust-lists-$day"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add public/issuers scripts/crl-sources.json
+          git commit -m "Issuer directory: lists as read on $day"
+          git push origin "$branch"
+          gh pr create --title "Trusted lists as read on $day" --body "From \`npm run issuers:refresh\`, with typecheck and tests run on this branch. See \`public/issuers/index.json\` for which lists verified and which were read from the Commission's copy. Merging changes nothing for readers until a release is deployed."
