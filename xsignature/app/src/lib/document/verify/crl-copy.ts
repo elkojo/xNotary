@@ -46,3 +46,17 @@ export async function fetchCrlCopy(
   }
   return failed ? 'unreachable' : 'absent';
 }
+
+/** Below this share of the addresses, something is wrong with the collecting rather than with one authority. */
+const MIN_COPIES = 0.5;
+
+/**
+ * Why a release should not ship these copies, or null when it can. One authority down is normal. A whole
+ * country gone, or most of the copies, would turn every green that rests on one neutral, with no error.
+ */
+export function copiesShortfall(sources: readonly { readonly list: string }[], kept: number, covered: ReadonlySet<string>): string | null {
+  const missing = [...new Set(sources.map((source) => source.list))].filter((list) => !covered.has(list)).sort();
+  if (missing.length) return `No revocation list could be collected for ${missing.join(', ')}.`;
+  if (kept < sources.length * MIN_COPIES) return `Only ${kept} of ${sources.length} revocation lists could be collected.`;
+  return null;
+}

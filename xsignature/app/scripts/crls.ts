@@ -10,8 +10,11 @@
  *
  * Addresses come from crl-sources.json, which `issuers:refresh` writes from the verified trusted
  * lists' ServiceSupplyPoints. Most countries publish none there, so coverage is what the lists offer
- * (Hungary, Poland and Slovakia as of 2026-11-05), and the summary says how much that is. Being unable
- * to reach one is never a failure of the release: the screen handles a missing copy.
+ * (Hungary, Poland and Slovakia as of 2026-11-05), and the summary says how much that is.
+ *
+ * One authority being down does not stop a release, but losing a whole country or most of the copies
+ * does (`copiesShortfall`). The screen would handle that without complaint, and every green result
+ * that rests on a copy would quietly turn neutral.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -21,7 +24,7 @@ import { webcrypto } from 'node:crypto';
 import { Certificate, CertificateRevocationList, CryptoEngine, setEngine } from 'pkijs';
 
 import { parseBer } from '../src/lib/document/verify/signer';
-import { crlFileName } from '../src/lib/document/verify/crl-copy';
+import { copiesShortfall, crlFileName } from '../src/lib/document/verify/crl-copy';
 
 if (!globalThis.crypto) Object.defineProperty(globalThis, 'crypto', { value: webcrypto });
 setEngine('node', new CryptoEngine({ name: 'node', crypto: globalThis.crypto }));
@@ -105,6 +108,13 @@ async function refreshCrls(sources: readonly CrlSource[]): Promise<void> {
     `${JSON.stringify({ asOf: new Date().toISOString().slice(0, 10), files: kept.size, bytes: total, lists: [...covered].sort() }, null, 2)}\n`,
   );
   console.log(`Revocation lists: ${stats.fetched} fetched, ${stats.keptOld} kept from last time, ${stats.failed} unusable; ${(total / 1048576).toFixed(1)} MB; from ${covered.size} countries.`);
+
+  const shortfall = copiesShortfall(sources, kept.size, covered);
+  if (shortfall) {
+    console.error(`::error::${shortfall} Re-run the release once the authority is back.`);
+    process.exitCode = 1;
+  }
 }
 
-await refreshCrls(JSON.parse(readFileSync(new URL('./crl-sources.json', import.meta.url), 'utf8')) as CrlSource[]);
+const SOURCES = JSON.parse(readFileSync(new URL('./crl-sources.json', import.meta.url), 'utf8')) as CrlSource[];
+await refreshCrls(SOURCES);

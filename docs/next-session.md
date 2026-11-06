@@ -178,6 +178,11 @@ notes, and the built site is attached as a zip. So tag with `git tag -a`, first 
 job adds it. Re-running a tag refreshes the attached build but never rewrites notes, in case a
 human edited them.
 
+**Refresh the trust data first.** Run `Refresh trusted lists`, merge its pull request, then tag: the
+tag's build fails if the lists were read more than 10 days before the tagged commit. It also collects
+the revocation list copies, and fails if a whole country or most of them could not be collected.
+That is usually an authority being down, so re-run the job later.
+
 What the tag does: refuses the tag outright if it carries no message, runs `npm run check` and
 `npm test`, builds the whole site, checks the result carries `_headers` with its per-path CSP,
 the front page at `/`, xNotary at `/xnotary/` and the root `sw.js` that retires the pre-0.5.0 worker, and attaches it to the run as the **`xnotary-dist`**
