@@ -28,6 +28,7 @@
     type FoundIssuers,
   } from '../lib/document/certificate/read/directory';
   import { revocationOf, type RevocationAnswer } from '../lib/document/verify/asic/revocation';
+  import { proveAnswer, type AnswerProof } from '../lib/document/verify/asic/proven-answer';
   import { fetchCrlCopy } from '../lib/document/verify/crl-copy';
   import { printable } from '../lib/document/verify/printable';
   import type { AttachedTimestamp, SignerFacts } from '../lib/document/verify/signer';
@@ -103,8 +104,32 @@
   }
 
   /** Past any cache, so that "the newest copy" is true when it is said. */
+  /** Whether the answer the signature carries could only have come from the right party. */
+  let carriedProof = $state<AnswerProof | null>(null);
+  /** Until that is known, nothing is fetched: a proven answer makes the issuer's list unnecessary. */
+  let proofChecked = $state(false);
+
+  async function checkCarriedAnswer(cache: RequestCache) {
+    carriedProof = null;
+    if (carriedRevocation) {
+      try {
+        carriedProof = await proveAnswer(carriedRevocation, found?.chain[0] ?? provenCarriedIssuer(), found?.listed ?? null, siteDirectory(import.meta.env.BASE_URL, cache));
+      } catch (error) {
+        if (!(error instanceof DirectoryUnreachable)) throw error;
+        lookupFailed = true;
+      }
+    }
+    proofChecked = true;
+  }
+
+  /** The issuer the signature itself carried, only if its key verified the signer's certificate. */
+  function provenCarriedIssuer(): Certificate | null {
+    return signature.issuers[0] && signature.chain[0]?.holds ? signature.issuers[0] : null;
+  }
+
   async function lookAndConfirm(cache: RequestCache) {
     await Promise.all([look(cache), lookTimeAuthority(cache)]);
+    await checkCarriedAnswer(cache);
     if (!lookupFailed && index) {
       confirmedCurrent = true;
       refreshed = 'This is the newest copy this site has.';
@@ -126,6 +151,7 @@
     refreshed = '';
     try {
       await Promise.all([look('reload'), lookTimeAuthority('reload')]);
+      await checkCarriedAnswer('reload');
       if (lookupFailed) {
         confirmedCurrent = false;
         refreshed = '';
@@ -326,9 +352,28 @@
   });
   const clearedByList = $derived(listShortfall === '');
 
-  // Nothing carried settles it, either way: anyone can add an answer, including a forged "revoked"
-  // against somebody else's good signature. The issuer's own list is always read.
-  const offerRevocationList = $derived(!isTimestamp && !!signature.certificate);
+  /**
+   * Why a proven carried answer of "not revoked" still settles nothing. Null means there is no such
+   * answer; empty means it does settle it, by the same test as a list: made after a confirmed time.
+   */
+  const carriedShortfall = $derived.by((): string | null => {
+    const answer = carriedRevocation;
+    const leaf = signature.certificate;
+    if (!answer || !carriedProof || !leaf || answer.status !== 'good' || !answer.at) return null;
+    if (!moment?.independent) return 'Nothing independent dates this signature, so the answer cannot speak for when it was made.';
+    if (answer.at.getTime() < moment.time.getTime()) return `The answer is older than the signature: it was given ${UTC(answer.at)}.`;
+    if (answer.at.getTime() > leaf.notAfter.value.getTime() && !answer.keepsExpired) {
+      return 'The answer is from after this certificate expired, when an authority need no longer track it.';
+    }
+    return '';
+  });
+  const clearedByAnswer = $derived(carriedShortfall === '');
+  const provenRevoked = $derived(!!carriedProof && carriedRevocation?.status === 'revoked');
+
+  // An answer that is not proven settles nothing, either way: anyone can add one, including a forged
+  // "revoked" against somebody else's good signature. So the issuer's own list is read, unless a proven
+  // answer has already said what that list would be asked.
+  const offerRevocationList = $derived(!isTimestamp && !!signature.certificate && proofChecked && !clearedByAnswer && !provenRevoked);
 
   $effect(() => {
     if (fetchTried || !offerRevocationList || !issuerCertificate) return;
@@ -339,6 +384,7 @@
   /** An answer says this certificate was revoked, which no green may sit beside. */
   const knownRevoked = $derived(
     (listFile?.answer?.standing === 'holds' && listFile.answer.status === 'revoked') ||
+      provenRevoked ||
       // The issuer's own list outranks an answer anyone could have added.
       (carriedRevocation?.standing === 'holds' && carriedRevocation.status === 'revoked' && !clearedByList),
   );
@@ -587,6 +633,66 @@
   </div>
 {/if}
 
+{#if carriedRevocation}
+  {@const answer = carriedRevocation}
+  {@const source = answer.from ?? 'An unnamed source'}
+  {#if answer.standing === 'broken'}
+    <div class="notice bad">
+      <strong>The revocation answer it carries does not hold up.</strong>
+      It does not check out against its own certificate, so it says nothing.
+    </div>
+  {:else if answer.standing === 'cannot-check'}
+    <div class="notice warn">
+      <strong>The revocation answer it carries could not be checked.</strong> So it says nothing
+      here.<Info>The certificate it was made with is not here, or it uses something this browser cannot compute.</Info>
+    </div>
+  {:else if answer.status === 'revoked'}
+    <div class="notice bad">
+      <strong>It carries an answer saying this certificate was revoked.</strong>
+      <span translate="no">{source}</span> said so {answer.at ? UTC(answer.at) : ''}{answer.revokedAt ? `, giving ${UTC(answer.revokedAt)} as the time of revocation` : ''}.
+      {#if carriedProof}
+        That answer comes from the party entitled to give it.
+      {:else}
+        Who answered is not checked, and anyone can add an answer to a file, so the issuer's own list decides this if it can be read.
+      {/if}
+    </div>
+  {:else if answer.status === 'unknown'}
+    <div class="notice warn">
+      <strong>It carries an answer that does not know this certificate.</strong>
+      <span translate="no">{source}</span> said so {answer.at ? UTC(answer.at) : ''}.
+    </div>
+  {:else if clearedByAnswer}
+    <div class="notice" class:ok={holds}>
+      <strong>This certificate was not revoked when the signature was made.</strong>
+      <span translate="no">{source}</span> said so {answer.at ? UTC(answer.at) : ''}, after the signature.<Info
+        >The answer travels with the signature, so nothing was asked and nothing left this device. It is more than
+        a claim because of who made it:
+        {#if carriedProof === 'issuer'}
+          the authority that issued this certificate, with the same key.
+        {:else if carriedProof === 'delegated'}
+          a responder certified for this job by the authority that issued this certificate.
+        {:else}
+          a responder that a verified trusted list records as granted, under the same provider.
+        {/if}</Info
+      >
+    </div>
+  {:else}
+    <div class="notice">
+      <strong>It carries an answer saying this certificate was not revoked.</strong>
+      <span translate="no">{source}</span> said so {answer.at ? UTC(answer.at) : ''}.
+      {#if carriedProof}
+        {carriedShortfall}
+      {:else}
+        Who answered could not be confirmed.<Info
+          >Read from the signature, not asked for: nothing left this device. It verifies against the
+          certificate it names, but anyone can add such an answer to a file. It would count if that certificate
+          belonged to the issuer, were certified by it for this job, or were on a verified trusted list.</Info
+        >
+      {/if}
+    </div>
+  {/if}
+{/if}
+
 {@render children?.()}
 
 {#if offerRevocationList && issuerCertificate}
@@ -669,7 +775,7 @@
   more is established, and the last of it never goes: nothing here can confirm a person.
 -->
 <div class="notice">
-  {#if listBacksIt && clearedByList}
+  {#if listBacksIt && (clearedByList || clearedByAnswer)}
     <strong>What this does not confirm:</strong> the person, or that the signature is valid. <em translate="no">{signature.signedBy ?? 'That name'}</em> is
     what the listed authority put in the certificate, including any role in it.
   {:else if listBacksIt}

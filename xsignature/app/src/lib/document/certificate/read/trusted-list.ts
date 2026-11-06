@@ -117,9 +117,10 @@ function readState(element: Element): ServiceState {
 /** The service was another type from this moment: not any status the rules know. */
 export const RETYPED = 'retyped';
 
-const KINDS: ReadonlyArray<readonly ['ca' | 'tsa', RegExp]> = [
+const KINDS: ReadonlyArray<readonly ['ca' | 'tsa' | 'ocsp', RegExp]> = [
   ['ca', /\/TrstSvc\/Svctype\/CA\/QC$/],
   ['tsa', /\/TrstSvc\/Svctype\/TSA\/QTST$/],
+  ['ocsp', /\/TrstSvc\/Svctype\/Certstatus\/OCSP\/QC$/],
 ];
 
 export interface ReadService {
@@ -129,11 +130,11 @@ export interface ReadService {
   /** Where the service says it publishes things: its OCSP address, its revocation lists. */
   readonly supplyPoints: readonly string[];
   /** A certificate-issuing service, or a time authority. */
-  readonly kind: 'ca' | 'tsa';
+  readonly kind: 'ca' | 'tsa' | 'ocsp';
 }
 
 /**
- * Every qualified certificate-issuing service and time authority in a list.
+ * Every qualified certificate-issuing service, time authority and OCSP responder in a list.
  *
  * The EU's lists name the type with ETSI's URI; Switzerland's and Ukraine's with their own
  * namespaces, so it is matched by its path.

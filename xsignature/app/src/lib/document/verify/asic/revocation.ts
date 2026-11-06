@@ -52,6 +52,13 @@ export interface RevocationAnswer {
    */
   readonly keepsExpired: boolean;
   /**
+   * The certificate it verified against. Null when it did not verify.
+   *
+   * Carrying this makes it possible to ask whether that certificate had any right to answer, which
+   * is what separates evidence from something anyone could have added (`proven-answer.ts`).
+   */
+  readonly madeBy: Certificate | null;
+  /**
    * - `holds`: it verifies against the certificate it names as its source.
    * - `broken`: it does not, so it says nothing.
    * - `cannot-check`: that certificate is not here, it uses something a browser cannot
@@ -158,6 +165,7 @@ const UNREADABLE = (kind: RevocationAnswer['kind']): RevocationAnswer => ({
   at: null,
   from: null,
   keepsExpired: false,
+  madeBy: null,
   standing: 'cannot-check',
 });
 
@@ -188,7 +196,7 @@ async function readOcsp(
       from: responder ? commonNameOf(responder.subject.typesAndValues) : null,
       keepsExpired: false,
     };
-    if (!responder) return { ...described, standing: 'cannot-check' };
+    if (!responder) return { ...described, madeBy: null, standing: 'cannot-check' };
 
     try {
       const holds = await getCrypto(true).verifyWithPublicKey(
@@ -197,9 +205,9 @@ async function readOcsp(
         responder.subjectPublicKeyInfo,
         basic.signatureAlgorithm,
       );
-      return { ...described, standing: holds ? 'holds' : 'broken' };
+      return { ...described, madeBy: holds ? responder : null, standing: holds ? 'holds' : 'broken' };
     } catch {
-      return { ...described, standing: 'cannot-check' };
+      return { ...described, madeBy: null, standing: 'cannot-check' };
     }
   }
   return null;
@@ -227,20 +235,20 @@ async function readCrl(der: Uint8Array, certificate: Certificate, others: readon
     keepsExpired: list.crlExtensions?.extensions.some((extension) => extension.extnID === EXPIRED_CERTS_ON_CRL) ?? false,
   };
 
-  if (scoped && !entry) return { ...described, status: 'unknown', standing: 'cannot-check' };
+  if (scoped && !entry) return { ...described, madeBy: null, status: 'unknown', standing: 'cannot-check' };
   const signers = others.filter((candidate) => candidate.subject.isEqual(list.issuer));
-  if (signers.length === 0) return { ...described, standing: 'cannot-check' };
+  if (signers.length === 0) return { ...described, madeBy: null, standing: 'cannot-check' };
 
   let ran = false;
   for (const signer of signers) {
     try {
-      if (await list.verify({ issuerCertificate: signer })) return { ...described, standing: 'holds' };
+      if (await list.verify({ issuerCertificate: signer })) return { ...described, madeBy: signer, standing: 'holds' };
       ran = true;
     } catch {
       // Another certificate of this name may be the one.
     }
   }
-  return { ...described, standing: ran ? 'broken' : 'cannot-check' };
+  return { ...described, madeBy: null, standing: ran ? 'broken' : 'cannot-check' };
 }
 
 /** Worst first: a verified "revoked" outranks everything, and nothing outranks being wrong about it. */
