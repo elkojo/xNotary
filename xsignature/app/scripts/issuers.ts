@@ -127,22 +127,39 @@ const missing: string[] = [];
 const mirrored: string[] = [];
 
 for (const { territory, url, signers } of pointers) {
-  let fetched = await get(url);
-  if (!fetched && !outsideEu.includes(territory)) {
-    fetched = await get(MIRROR(territory));
-    if (fetched) {
-      mirrored.push(territory);
-      console.warn(`${territory}: could not read ${url} — read the Commission's copy instead`);
+  // Its own server first, then the Commission's copy, keeping the first that verifies. One bad list
+  // must not stop the others, or cost it the entries it had.
+  let fetched: string | null = null;
+  let check: { ok: boolean; why: string; signed?: string } = { ok: false, why: 'not read' };
+  for (const [source, address] of [['own', url], ['copy', outsideEu.includes(territory) ? null : MIRROR(territory)]] as const) {
+    if (!address) continue;
+    const text = await get(address);
+    if (!text) continue;
+    let attempt: { ok: boolean; why: string; signed?: string };
+    try {
+      parseList(text);
+      attempt = signers.size > 0 ? await listSignature(text, signers) : { ok: false, why: 'no anchor' };
+    } catch (error) {
+      console.warn(`${territory}: ${address} could not be read: ${String(error).slice(0, 100)}`);
+      continue;
     }
+    if (!fetched || attempt.ok) {
+      fetched = text;
+      check = attempt;
+      if (source === 'copy') {
+        mirrored.push(territory);
+        console.warn(`${territory}: read the Commission's copy instead of ${url}`);
+      }
+    }
+    if (attempt.ok) break;
   }
   if (!fetched) {
     missing.push(territory);
     console.warn(`${territory}: could not read ${url} or the Commission's copy — keeping its previous entries`);
     continue;
   }
-  const check: { ok: boolean; why: string; signed?: string } = signers.size > 0 ? await listSignature(fetched, signers) : { ok: false, why: 'no anchor' };
   // Verified: only what the signature covers. Otherwise it claims nothing and completes chains by arithmetic.
-  const xml = check.signed ?? fetched;
+  const xml: string = check.signed ?? fetched;
   if (check.ok) {
     verified[territory] = {
       issued: first(xml, 'ListIssueDateTime'),

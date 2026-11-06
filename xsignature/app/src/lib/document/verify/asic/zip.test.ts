@@ -182,6 +182,30 @@ describe('what would give two programs two different files', () => {
   });
 });
 
+describe('an end record that does not describe what is there', () => {
+  const patched = (offset: number, value: number) => {
+    const zip = rawZip([entry('a.txt'), entry('b.txt')]);
+    new DataView(zip.buffer).setUint16(zip.length - 22 + offset, value, true);
+    return zip;
+  };
+
+  it('a directory size other than the real one', () => {
+    const zip = rawZip([entry('a.txt'), entry('b.txt')]);
+    const view = new DataView(zip.buffer);
+    view.setUint32(zip.length - 22 + 12, view.getUint32(zip.length - 22 + 12, true) - 40, true);
+    expect(() => readZip(zip)).toThrow(ContainerRefused);
+  });
+
+  it('a per-disk count other than the total', () => {
+    expect(() => readZip(patched(8, 1))).toThrow(ContainerRefused);
+  });
+
+  it('another disk', () => {
+    expect(() => readZip(patched(4, 1))).toThrow(ContainerRefused);
+    expect(() => readZip(patched(6, 1))).toThrow(ContainerRefused);
+  });
+});
+
 describe('names out of a file', () => {
   it('neutralises the controls that make exe.fdp read as pdf.exe', () => {
     expect(printable('invoice\u202Efdp.exe')).toBe('invoice\ufffdfdp.exe');

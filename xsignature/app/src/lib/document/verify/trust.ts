@@ -185,6 +185,9 @@ function deviceFrom(qualifiers: ReadonlySet<string>, certificate: CertificateFac
   return certificate.onQualifiedDevice;
 }
 
+const bothMoments = (values: ReadonlyArray<boolean | null>): boolean | null =>
+  values.every((value) => value === values[0]) ? values[0] : null;
+
 const plain = (text: string): string =>
   text
     .normalize('NFD')
@@ -247,7 +250,8 @@ export function checkAgainstList(
   if (yes.length === 1) {
     return {
       result: 'qualified',
-      onQualifiedDevice: deviceFrom(answers[0][yes[0]].qualifiers, certificate),
+      // Qualified at both moments means on a device at both, or the list has not settled it.
+      onQualifiedDevice: bothMoments(answers.map((answer) => deviceFrom(answer[yes[0]].qualifiers, certificate))),
       detail: '',
     };
   }
@@ -267,9 +271,12 @@ export const timeAuthorityGrantedAt = (services: readonly ListedService[], momen
  * A listed authority's expired or leaked key must not be able to date anything.
  */
 export async function confirmedTimeAuthority(certificate: Certificate, time: Date, source: DirectorySource): Promise<string | null> {
-  if (time.getTime() < certificate.notBefore.value.getTime() || time.getTime() > certificate.notAfter.value.getTime()) return null;
   const listed = await listedTimeAuthority(certificate, source);
-  return listed && timeAuthorityGrantedAt(listed.services, time) ? listed.list : null;
+  if (!listed || !timeAuthorityGrantedAt(listed.services, time)) return null;
+  const within = listed.certificates.some(
+    (evidence) => evidence.notBefore.value.getTime() <= time.getTime() && time.getTime() <= evidence.notAfter.value.getTime(),
+  );
+  return within ? listed.list : null;
 }
 
 /** The certificate's own side of the question, from what the claims reader already parsed. */

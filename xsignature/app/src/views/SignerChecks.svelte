@@ -42,6 +42,8 @@
      * and there is none; left out where nothing looks, as for a PDF, so nothing is claimed.
      */
     carriedRevocation?: RevocationAnswer | null;
+    /** Its own verdict is intact. Nothing about the certificate is green on a signature that is not. */
+    holds: boolean;
     /** A timestamp rather than a signature of identity: no chain and no level to speak of. */
     isTimestamp: boolean;
     /** Who decides whether a signer can be believed: "your PDF reader", say. */
@@ -54,7 +56,7 @@
     limits?: Snippet;
   }
 
-  let { signature, signerClock = null, carriedRevocation = undefined, isTimestamp, judge, goTo, children, limits }: Props = $props();
+  let { signature, signerClock = null, carriedRevocation = undefined, holds, isTimestamp, judge, goTo, children, limits }: Props = $props();
 
   const UTC = (time: Date): string => `${time.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')} UTC`;
   const day = (text: string): string => text.slice(0, 10);
@@ -336,7 +338,7 @@
       // The issuer's own list outranks an answer anyone could have added.
       (carriedRevocation?.standing === 'holds' && carriedRevocation.status === 'revoked' && !clearedByList),
   );
-  const listBacksIt = $derived(standing?.result === 'qualified' && moment?.independent === true && validWhenUsed && !knownRevoked);
+  const listBacksIt = $derived(holds && standing?.result === 'qualified' && moment?.independent === true && validWhenUsed && !knownRevoked);
   /**
    * Green only when all of it holds: the list backs this certificate, at a time an authority dated,
    * the reader has confirmed this is the newest copy, and that copy has not outlived its list.

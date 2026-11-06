@@ -14,7 +14,8 @@ import { Certificate, SignedData, SignerInfo } from 'pkijs';
 import {
   certificateForSid,
   checkSigner,
-  embeddedTimestampOf,
+  embeddedTimestampsOf,
+  worstTimestamp,
   factsFor,
   hashForOid,
   readTimestampToken,
@@ -191,6 +192,7 @@ async function checkCms(
     const unsigned = signed.signerInfos[index]?.unsignedAttrs?.attributes ?? [];
     const unchecked: UncheckedPart[] = unsigned.some((attribute) => ARCHIVE_ATTRIBUTES.includes(attribute.type)) ? ['archive-timestamp'] : [];
 
+    const stamps = await embeddedTimestampsOf(signed, index);
     const value = await checkSigner(signed, index, content);
     // A container's CAdES has to bind its certificate, as a baseline signature does. Without that the
     // name is only what an unsigned bundle says, which is why XAdES refuses the same thing.
@@ -215,7 +217,8 @@ async function checkCms(
           ...blankSignature(signatureName, form),
           ...facts,
           time: signingTime?.toDate?.() ?? null,
-          timestamp: await embeddedTimestampOf(signed, index),
+          timestamps: stamps,
+          timestamp: worstTimestamp(stamps),
           revocation: facts.certificate ? await revocationOf(facts.certificate, certificatesOf(signed), revocationInCms(signed, index)) : null,
           unchecked,
         },

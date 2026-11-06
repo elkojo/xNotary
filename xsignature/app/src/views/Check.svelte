@@ -26,12 +26,15 @@
 
   /** Which archive timestamps' authorities are on a verified list, granted at the time they state. */
   let listedAuthorities = $state<Set<Certificate>>(new Set());
+  /** Still asking, or could not ask: neither says anything against an authority. */
+  let authorities = $state<'asking' | 'known' | 'unreachable'>('known');
 
   $effect(() => {
     const container = opened;
     if (!container) return;
     // A slow lookup for an earlier container must not land on this one.
     let current = true;
+    authorities = 'asking';
     const stamps = [
       ...container.archives.map((archive) => ({ certificate: archive.certificate, time: archive.time })),
       ...container.signatures.flatMap((signature) => signature.archiveTimestamps.map((stamp) => ({ certificate: stamp.certificate, time: stamp.time as Date | null }))),
@@ -39,15 +42,19 @@
     void (async () => {
       const source = siteDirectory(import.meta.env.BASE_URL);
       const found = new Set<Certificate>();
+      let reached = true;
       for (const { certificate, time } of stamps) {
         if (!certificate || !time) continue;
         try {
           if (await confirmedTimeAuthority(certificate, time, source)) found.add(certificate);
         } catch {
-          // Not reached is not listed: nothing is claimed for it.
+          reached = false;
         }
       }
-      if (current) listedAuthorities = found;
+      if (current) {
+        listedAuthorities = found;
+        authorities = reached ? 'known' : 'unreachable';
+      }
     })();
     return () => {
       current = false;
@@ -199,7 +206,7 @@
 
           {#if fileName && !error}
             <div class="picked">
-              <div class="picked-name" translate="no">{fileName}</div>
+              <div class="picked-name" translate="no">{printable(fileName)}</div>
               <div class="picked-facts">
                 {#if checking}
                   Checking…
@@ -322,7 +329,14 @@
 
             {#each opened.archives as archive}
               {@const renewal = opened.archives.find((other) => other.source === archive.renewedBy)}
-              {#if archive.standing === 'holds' && renewal && isListed(renewal.certificate) && (archive.changed.length > 0 || archive.missing.length > 0)}
+              {#if archive.standing === 'holds' && authorities !== 'known' && (renewal || (archive.changed.length === 0 && archive.missing.length === 0))}
+                <div class="notice">
+                  <strong>
+                    {authorities === 'asking' ? 'Checking the archive timestamp’s authority…' : 'Could not reach this site’s copy of the trusted lists.'}
+                  </strong>
+                  {authorities === 'asking' ? '' : 'So the archive timestamp’s authority was not checked, which says nothing against it.'}
+                </div>
+              {:else if archive.standing === 'holds' && renewal && isListed(renewal.certificate) && (archive.changed.length > 0 || archive.missing.length > 0)}
                 <div class="notice">
                   <strong>An older archive timestamp no longer matches, and a newer one covers it.</strong>
                   So the protection here rests on the newer one.<Info
@@ -479,6 +493,7 @@
 
               <SignerChecks
                 {signature}
+                holds={signature.verdict === 'intact'}
                 signerClock={signature.time}
                 carriedRevocation={signature.revocation}
                 isTimestamp={signature.form === 'timestamp'}
@@ -522,7 +537,11 @@
                 {/if}
 
                 {#each signature.archiveTimestamps as stamp}
-                  {#if stamp.standing === 'holds' && !isListed(stamp.certificate)}
+                  {#if stamp.standing === 'holds' && authorities !== 'known'}
+                    <div class="notice">
+                      <strong>{authorities === 'asking' ? 'Checking the archive timestamp’s authority…' : 'Could not reach this site’s copy of the trusted lists.'}</strong>
+                    </div>
+                  {:else if stamp.standing === 'holds' && !isListed(stamp.certificate)}
                     <div class="notice">
                       <strong>An archive timestamp from {stamp.signedBy ?? 'an unnamed authority'} also covers this signature.</strong>
                       That authority is not on a list this site could verify, so its date is not confirmed.
@@ -606,10 +625,10 @@
                 </div>
               {/if}
               {#if result.reason}
-                <div><span>Reason</span><strong>{result.reason}</strong></div>
+                <div><span>Reason</span><strong>{printable(result.reason)}</strong></div>
               {/if}
               {#if result.location}
-                <div><span>Location</span><strong>{result.location}</strong></div>
+                <div><span>Location</span><strong>{printable(result.location)}</strong></div>
               {/if}
               {#if result.signedBy}
                 <div><span>Signed by</span><strong translate="no">{result.signedBy}</strong></div>
@@ -617,7 +636,7 @@
               {#if result.policy}
                 <div><span>Policy</span><code translate="no">{result.policy}</code></div>
               {/if}
-              {#if result.timestamp}
+              {#if result.timestamp && result.timestamps.length <= 1}
                 <div>
                   <span>Timestamped</span>
                   <strong>
@@ -650,6 +669,7 @@
 
             <SignerChecks
               signature={result}
+              holds={result.verdict === 'intact'}
               signerClock={result.isTimestamp ? null : result.time}
               isTimestamp={result.isTimestamp}
               judge="your PDF reader"

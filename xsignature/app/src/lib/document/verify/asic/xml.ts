@@ -92,6 +92,8 @@ export function fileNamed(uri: string, files: ReadonlyMap<string, Uint8Array>): 
   } catch {
     // Not valid percent-encoding, so the name as it stands is all there is.
   }
+  // Relative to the container's root, however a writer spells that.
+  decoded = decoded.replace(/^(?:\.?\/)+/, '');
   if (files.has(decoded)) return decoded;
   if (files.has(uri)) return uri;
   const form = decoded.normalize('NFC');

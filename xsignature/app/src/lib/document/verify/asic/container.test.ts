@@ -1125,3 +1125,43 @@ describe('findings from the fourth review', () => {
   });
 });
 
+describe('findings from the fifth review', () => {
+  const P7S = 'META-INF/signature.p7s';
+
+  /** A CMS signature carrying the given tokens, each as its own attribute. */
+  const withTokens = async (make: (value: Uint8Array) => Promise<asn1js.AsnType[]>) => {
+    const signed = new SignedData({ schema: ContentInfo.fromBER((await makeCades(CONTENT, signer)).slice().buffer as ArrayBuffer).content });
+    const value = new Uint8Array(signed.signerInfos[0].signature.valueBlock.valueHexView);
+    signed.signerInfos[0].unsignedAttrs = new SignedAndUnsignedAttributes({
+      type: 1,
+      attributes: (await make(value)).map((token) => new Attribute({ type: '1.2.840.113549.1.9.16.2.14', values: [token] })),
+    });
+    return new Uint8Array(new ContentInfo({ contentType: '1.2.840.113549.1.7.2', content: signed.toSchema(true) }).toSchema().toBER(false));
+  };
+  const asValue = (der: Uint8Array) => asn1js.fromBER(der.slice().buffer as ArrayBuffer).result;
+
+  it('hands a CAdES signature\'s tokens to the screen, which looks only at that list', async () => {
+    const p7s = await withTokens(async (value) => [asValue(await makeTimestampToken(value, authority))]);
+    const { signatures } = await check(container({ ...FILES, [P7S]: p7s }, ASIC_S));
+    expect(signatures[0].timestamps.map((stamp) => stamp.signedBy)).toEqual(['Test Authority']);
+  });
+
+  it('is not stopped by junk placed before a real token', async () => {
+    const p7s = await withTokens(async (value) => [new asn1js.Null(), asValue(await makeTimestampToken(value, authority))]);
+    const { signatures } = await check(container({ ...FILES, [P7S]: p7s }, ASIC_S));
+    expect(signatures[0].timestamps.map((stamp) => stamp.signedBy)).toEqual(['Test Authority']);
+  });
+
+  it.each([['./'], ['/']])('finds a file named from the root as %s', async (prefix) => {
+    const xml = await makeXades(FILES, signer, { references: [{ uri: `${prefix}${encodeURIComponent(NAME)}`, bytes: CONTENT }] });
+    const { signatures } = await check(container({ ...FILES, [SIGNATURES]: xml }));
+    expect(signatures[0].verdict).toBe('intact');
+  });
+
+  it('shows a certificate name without the controls that disguise it', async () => {
+    const xml = await makeXades(FILES, await makeSigner('Good\u202Eevil'));
+    const { signatures } = await check(container({ ...FILES, [SIGNATURES]: xml }));
+    expect(signatures[0].signedBy).toBe('Good\ufffdevil');
+  });
+});
+

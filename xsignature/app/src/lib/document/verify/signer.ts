@@ -28,6 +28,7 @@ import {
 
 import { checkLinks, orderChain, type ChainLink } from '../certificate/read/chain';
 import { claimsOf, type CertificateClaims } from './claims';
+import { printable } from './printable';
 
 const SUBJECT_KEY_IDENTIFIER = '2.5.29.14';
 
@@ -110,7 +111,8 @@ function statedKeyIdentifier(certificate: Certificate): Uint8Array | null {
 export function commonNameOf(parts: AttributeTypeAndValue[]): string | null {
   const commonName = parts.find((part) => part.type === '2.5.4.3');
   const chosen = commonName ?? parts[parts.length - 1];
-  return (chosen?.value.valueBlock.value as string) ?? null;
+  const name = chosen?.value.valueBlock.value as string | undefined;
+  return name === undefined ? null : printable(name);
 }
 
 /** What a signer's certificate lets a reader say about them, none of it vouched for. */
@@ -405,23 +407,31 @@ const SIGNATURE_TIME_STAMP = '1.2.840.113549.1.9.16.2.14';
  * cannot be covered by it. Being unsigned, anyone could have put it there, so it
  * is checked rather than read.
  */
-export async function embeddedTimestampOf(
-  signed: SignedData,
-  index = 0,
-): Promise<AttachedTimestamp | null> {
+export async function embeddedTimestampsOf(signed: SignedData, index = 0): Promise<AttachedTimestamp[]> {
   const signerInfo = signed.signerInfos[index];
-  const attribute = signerInfo?.unsignedAttrs?.attributes.find(
-    (candidate) => candidate.type === SIGNATURE_TIME_STAMP,
-  );
-  if (!attribute) return null;
-
-  try {
-    const content = new ContentInfo({ schema: attribute.values[0] });
-    return await readTimestampToken(
-      new SignedData({ schema: content.content }),
-      new Uint8Array(signerInfo.signature.valueBlock.valueHexView),
-    );
-  } catch {
-    return null;
+  const found: AttachedTimestamp[] = [];
+  for (const attribute of signerInfo?.unsignedAttrs?.attributes ?? []) {
+    if (attribute.type !== SIGNATURE_TIME_STAMP) continue;
+    for (const value of attribute.values) {
+      try {
+        const content = new ContentInfo({ schema: value });
+        const read = await readTimestampToken(
+          new SignedData({ schema: content.content }),
+          new Uint8Array(signerInfo.signature.valueBlock.valueHexView),
+        );
+        if (read) found.push(read);
+      } catch {
+        // Junk added beside a real token must not hide it.
+      }
+    }
   }
+  return found;
+}
+
+/** The one to report when only one can be: any that does not hold, since that is the news. */
+export const worstTimestamp = (stamps: readonly AttachedTimestamp[]): AttachedTimestamp | null =>
+  stamps.find((stamp) => stamp.standing !== 'holds') ?? stamps[0] ?? null;
+
+export async function embeddedTimestampOf(signed: SignedData, index = 0): Promise<AttachedTimestamp | null> {
+  return worstTimestamp(await embeddedTimestampsOf(signed, index));
 }

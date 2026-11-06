@@ -309,25 +309,31 @@ function isForTimeStamping(certificate: Certificate): boolean {
 export async function listedTimeAuthority(
   certificate: Certificate,
   source: DirectorySource,
-): Promise<{ readonly list: string; readonly services: readonly ListedService[] } | null> {
+): Promise<{ readonly list: string; readonly services: readonly ListedService[]; readonly certificates: readonly Certificate[] } | null> {
   const keyBytes = (holder: Certificate) => hex(holder.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHexView);
   const lookUp = async (candidate: Certificate) => {
     const keyId = await keyIdOf(candidate);
     const shard = (await source(shardOf(keyId))) as DirectoryShard | null;
+    let found: { list: string; services: readonly ListedService[]; certificates: Certificate[] } | null = null;
     for (const entry of shard?.entries[keyId] ?? []) {
       if (!entry.t?.length) continue;
       try {
         // The key itself, not what the certificate says about it: a key identifier and a name can
         // be copied into a self-made certificate by anybody.
         const listed = Certificate.fromBER(fromBase64(entry.c));
-        if (sameName(listed.subject, candidate.subject) && keyBytes(listed) === keyBytes(candidate)) return { list: entry.tl, services: entry.t };
+        if (sameName(listed.subject, candidate.subject) && keyBytes(listed) === keyBytes(candidate) && (!found || found.list === entry.tl)) {
+          found = found ?? { list: entry.tl, services: entry.t, certificates: [] };
+          found.certificates.push(listed);
+        }
       } catch {
         // One unreadable entry does not spoil the others.
       }
     }
-    return null;
+    return found;
   };
 
+  // A self-made certificate over a listed key states whatever dates it likes, so these are the listed
+  // certificates' dates, not the token's.
   const own = await lookUp(certificate);
   if (own) return own;
   // Through a certificate above it, only if it is a time-stamping certificate at all: such a service's
@@ -336,7 +342,8 @@ export async function listedTimeAuthority(
   const above = await findIssuers(certificate, source);
   for (const link of above?.chain ?? []) {
     const listed = await lookUp(link);
-    if (listed) return listed;
+    // The token's own certificate was verified through the chain, so its dates are evidence.
+    if (listed) return { ...listed, certificates: [certificate] };
   }
   return null;
 }

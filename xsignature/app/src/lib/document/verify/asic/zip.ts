@@ -15,6 +15,8 @@
  */
 import { Inflate } from 'fflate';
 
+import { printable } from '../printable';
+
 /** Why a file cannot be read as a container, in the app's own voice. */
 export class ContainerRefused extends Error {}
 
@@ -73,8 +75,13 @@ function readEntries(zip: Uint8Array, view: DataView): ZipEntry[] {
   const end = findEnd(zip, view);
   const count = view.getUint16(end + 10, true);
   const directoryOffset = view.getUint32(end + 16, true);
-  if (count === 0xffff || directoryOffset === NOT_IN_FIELD || count > MAX_ENTRIES) {
+  const directorySize = view.getUint32(end + 12, true);
+  if (count === 0xffff || directoryOffset === NOT_IN_FIELD || directorySize === NOT_IN_FIELD || count > MAX_ENTRIES) {
     throw new ContainerRefused('This container is too large to check in a browser.');
+  }
+  // One disk, and the same count both ways. Programs that use these instead would see other entries.
+  if (view.getUint16(end + 4, true) !== 0 || view.getUint16(end + 6, true) !== 0 || view.getUint16(end + 8, true) !== count) {
+    throw new ContainerRefused(TWO_READINGS);
   }
 
   const listed: Listed[] = [];
@@ -129,6 +136,8 @@ function readEntries(zip: Uint8Array, view: DataView): ZipEntry[] {
   // Every byte has to belong to the archive: the first entry starts the file, nothing but the
   // directory's own closing records sits before the end record, and there is nothing between
   // entries. A local entry the directory does not list is another file some programs will find.
+  // Some programs find the directory from its stated size rather than its stated offset.
+  if (position !== directoryOffset + directorySize) throw new ContainerRefused(TWO_READINGS);
   if (position !== end) refuseUnlessZip64Records(view, position, end, directoryOffset, count);
   const ordered = [...listed].sort((a, b) => a.offset - b.offset);
   if (ordered.length > 0 && ordered[0].offset !== 0) {
@@ -300,15 +309,7 @@ function refuseUnsafeName(name: string): void {
   }
 }
 
-/**
- * A name out of a file, made safe to show.
- *
- * Bidirectional controls are how `exe.fdp` is made to read as `pdf.exe`, and a
- * name in a list of signed files is exactly where that would be aimed.
- */
-export function printable(name: string): string {
-  return name.replace(/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '\ufffd');
-}
+export { printable };
 
 /** A name out of a file, made safe to save under: its last part, printable. */
 export function savedName(name: string): string {

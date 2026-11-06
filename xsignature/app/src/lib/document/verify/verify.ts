@@ -41,7 +41,8 @@ import { findSignatures, isDocumentTimestamp, type FoundSignature } from './find
 import {
   NO_SIGNER,
   checkSigner,
-  embeddedTimestampOf,
+  embeddedTimestampsOf,
+  worstTimestamp,
   readTimestampToken,
   readTstInfo,
   signedDataFrom,
@@ -135,6 +136,8 @@ export interface CheckedSignature {
    * otherwise look like corroboration and be none.
    */
   readonly timestamp: AttachedTimestamp | null;
+  /** Every one it carries: anyone can add one, so the screen looks for a listed authority's. */
+  readonly timestamps: readonly AttachedTimestamp[];
   readonly coversToEndOfFile: boolean;
   /** How much of the file this one covers, in bytes. */
   readonly covers: number;
@@ -174,6 +177,7 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
       policy: null,
       certificateCount: 0,
       timestamp: null,
+      timestamps: [],
       detail: 'The token in this file could not be read.',
     };
   }
@@ -200,6 +204,7 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
         chain: [],
         issuers: [],
         timestamp: null,
+        timestamps: [],
         detail: 'The token in this file could not be read as a timestamp.',
       };
     }
@@ -207,12 +212,14 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
     time = signature.signingTime;
   }
 
+  const timestamps = await embeddedTimestampsOf(signed);
   const described = {
     ...shared,
     ...(await signerFactsOf(signed)),
     time,
     policy,
-    timestamp: await embeddedTimestampOf(signed),
+    timestamp: worstTimestamp(timestamps),
+    timestamps,
   };
 
   // The library reports these different failures in different ways, and they
@@ -221,7 +228,7 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
   const noun = isTimestamp ? 'timestamp' : 'signature';
   // Until the value holds, the name, the time and any timestamp beside it are only what the file
   // says, and a real certificate copied onto a forgery must not collect a list's approval.
-  const unproven = { ...shared, ...NO_SIGNER, certificateCount: described.certificateCount, time: null, policy: null, timestamp: null };
+  const unproven = { ...shared, ...NO_SIGNER, certificateCount: described.certificateCount, time: null, policy: null, timestamp: null, timestamps: [] };
   const stamp = isTimestamp ? await readTimestampToken(signed, covered) : null;
   const outcome = isTimestamp
     ? stamp?.standing === 'holds'
@@ -242,6 +249,7 @@ async function checkOne(pdf: Uint8Array, signature: FoundSignature): Promise<Che
       time: null,
       policy: null,
       timestamp: null,
+      timestamps: [],
       verdict: 'broken',
       detail: 'The certificate it carries is not the one its signed details name.',
     };

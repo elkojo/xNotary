@@ -1,3 +1,5 @@
+import * as asn1js from 'asn1js';
+import { Certificate } from 'pkijs';
 import { describe, expect, it } from 'vitest';
 
 import type { ListedService, QualificationElement, ServiceState } from '../certificate/read/trusted-list';
@@ -163,6 +165,13 @@ describe('the device, per Table 7', () => {
   });
 });
 
+describe('the device at both moments', () => {
+  it('is left unsettled when the list said otherwise when the certificate was issued', () => {
+    const changed = service(state({ t: '2026-01-01T00:00:00Z', q: [qualifier(['QCWithQSCD'])] }), state({ q: [qualifier(['QCNoQSCD'])] }));
+    expect(check([changed])).toMatchObject({ result: 'qualified', onQualifiedDevice: null });
+  });
+});
+
 describe('a seal', () => {
   const seals = service(state({ a: ['ForeSeals'] }));
 
@@ -212,5 +221,21 @@ describe('a time authority\'s own dates', () => {
     expect(await confirmedTimeAuthority(authority.certificate, SIGNED, source)).toBe('SK');
     expect(await confirmedTimeAuthority(authority.certificate, new Date('2045-01-01T00:00:00Z'), source)).toBeNull();
   });
-});
 
+  it('come from the listed certificate, not one made over the same key', async () => {
+    // A leaked or retired key can sign anything, including a certificate stating fresh dates.
+    const keys = await makeSigner('Stamps Ltd');
+    const { shards } = await buildDirectory([{ der: keys.der, tl: 'SK', timeServices: [service()] }], 'x');
+    const source = (async (name: string) => shards[name] ?? null) as DirectorySource;
+    const reissued = new Certificate();
+    reissued.version = 2;
+    reissued.serialNumber = new asn1js.Integer({ value: 9 });
+    reissued.issuer = keys.certificate.subject;
+    reissued.subject = keys.certificate.subject;
+    reissued.notBefore.value = new Date('2040-01-01T00:00:00Z');
+    reissued.notAfter.value = new Date('2050-01-01T00:00:00Z');
+    await reissued.subjectPublicKeyInfo.importKey(keys.publicKey);
+    await reissued.sign(keys.privateKey, 'SHA-256');
+    expect(await confirmedTimeAuthority(reissued, new Date('2045-01-01T00:00:00Z'), source)).toBeNull();
+  });
+});
