@@ -142,9 +142,9 @@
       "sequence": "66"
     },
     "LV": {
-      "issued": "2026-10-08T07:13:21Z",
-      "next": "2027-04-08T07:13:21Z",
-      "sequence": "52"
+      "issued": "2026-11-02T08:28:06Z",
+      "next": "2027-05-02T07:28:06Z",
+      "sequence": "53"
     },
     "MT": {
       "issued": "2026-10-12T09:12:37Z",
@@ -197,8 +197,7 @@
     "UA"
   ],
   "fromCommissionCopy": [
-    "EE",
-    "HU"
+    "EE"
   ],
   "missing": []
 }
