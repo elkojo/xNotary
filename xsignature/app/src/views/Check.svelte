@@ -496,46 +496,11 @@
                 holds={signature.verdict === 'intact'}
                 signerClock={signature.time}
                 carriedRevocation={signature.revocation}
+                carriedEvidence={signature.carriedEvidence}
                 isTimestamp={signature.form === 'timestamp'}
                 judge={containerJudge}
                 goTo={`${containerJudge} can say that`}
               >
-                {#if signature.revocation}
-                  {@const answer = signature.revocation}
-                  {@const source = answer.from ?? 'An unnamed source'}
-                  {#if answer.standing === 'broken'}
-                    <div class="notice bad">
-                      <strong>The revocation answer it carries does not hold up.</strong>
-                      It does not check out against its own certificate, so it says nothing.
-                    </div>
-                  {:else if answer.standing === 'cannot-check'}
-                    <div class="notice warn">
-                      <strong>The revocation answer it carries could not be checked.</strong> So it says nothing
-                      here.<Info>The certificate it was made with is not here, or it uses something this browser cannot compute.</Info>
-                    </div>
-                  {:else if answer.status === 'revoked'}
-                    <div class="notice bad">
-                      <strong>It carries an answer saying this certificate was revoked.</strong>
-                      <span translate="no">{source}</span> said so {answer.at ? when(answer.at) : ''}{answer.revokedAt ? `, giving ${when(answer.revokedAt)} as the time of revocation` : ''}.
-                      Who answered is not checked, and anyone can add an answer to a file, so the issuer's own list decides this if it can be read.
-                    </div>
-                  {:else if answer.status === 'unknown'}
-                    <div class="notice warn">
-                      <strong>It carries an answer that does not know this certificate.</strong>
-                      <span translate="no">{source}</span> said so {answer.at ? when(answer.at) : ''}.
-                    </div>
-                  {:else}
-                    <div class="notice">
-                      <strong>It carries an answer saying this certificate was not revoked.</strong>
-                      <span translate="no">{source}</span> said so {answer.at ? when(answer.at) : ''}. Who answered is not checked.<Info
-                        >Read from the signature, not asked for: nothing left this device. It verifies against the
-                        certificate it names, but anyone can add such an answer to a file, and nothing here shows
-                        <span translate="no">{source}</span> is entitled to give one. That is {containerJudge}'s call.</Info
-                      >
-                    </div>
-                  {/if}
-                {/if}
-
                 {#each signature.archiveTimestamps as stamp}
                   {#if stamp.standing === 'holds' && authorities !== 'known'}
                     <div class="notice">

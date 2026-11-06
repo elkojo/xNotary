@@ -43,6 +43,8 @@ export interface DirectoryEntry {
   readonly s?: readonly ListedService[];
   /** The same, for a time authority. Never used to complete a chain's trust claim. */
   readonly t?: readonly ListedService[];
+  /** The same, for an OCSP responder. */
+  readonly o?: readonly ListedService[];
 }
 
 /** What the site knows about one list, from `index.json`. */
@@ -143,13 +145,13 @@ function fromBase64(base64: string): ArrayBuffer {
  * Deterministic: the same certificates give the same files, whatever order they came in.
  */
 export async function buildDirectory(
-  certificates: readonly { readonly der: Uint8Array; readonly tl: string; readonly services?: readonly ListedService[]; readonly timeServices?: readonly ListedService[] }[],
+  certificates: readonly { readonly der: Uint8Array; readonly tl: string; readonly services?: readonly ListedService[]; readonly timeServices?: readonly ListedService[]; readonly responderServices?: readonly ListedService[] }[],
   asOf: string,
 ): Promise<{ shards: Record<string, DirectoryShard>; names: NameIndex }> {
-  const byKey = new Map<string, Map<string, { c: string; tl: string; s?: ListedService[]; t?: ListedService[] }>>();
+  const byKey = new Map<string, Map<string, { c: string; tl: string; s?: ListedService[]; t?: ListedService[]; o?: ListedService[] }>>();
   const names = new Map<string, Set<string>>();
 
-  for (const { der, tl, services, timeServices } of certificates) {
+  for (const { der, tl, services, timeServices, responderServices } of certificates) {
     let certificate: Certificate;
     try {
       certificate = Certificate.fromBER(der.slice().buffer as ArrayBuffer);
@@ -158,21 +160,15 @@ export async function buildDirectory(
     }
     const keyId = await keyIdOf(certificate);
     const c = toBase64(der);
-    const entries = byKey.get(keyId) ?? new Map<string, { c: string; tl: string; s?: ListedService[]; t?: ListedService[] }>();
+    const entries = byKey.get(keyId) ?? new Map<string, { c: string; tl: string; s?: ListedService[]; t?: ListedService[]; o?: ListedService[] }>();
     // By certificate and list: one certificate on two lists has two histories, which must not mix.
     const entryKey = `${tl}:${c}`;
     const entry = entries.get(entryKey) ?? { c, tl };
     // One certificate can identify several services, and the rules weigh all of them.
-    if (services?.length) {
-      const known = new Set((entry.s ?? []).map((service) => JSON.stringify(service)));
-      for (const service of services) {
-        if (!known.has(JSON.stringify(service))) (entry.s ??= []).push(service);
-      }
-    }
-    if (timeServices?.length) {
-      const known = new Set((entry.t ?? []).map((service) => JSON.stringify(service)));
-      for (const service of timeServices) {
-        if (!known.has(JSON.stringify(service))) (entry.t ??= []).push(service);
+    for (const [field, added] of [['s', services], ['t', timeServices], ['o', responderServices]] as const) {
+      const known = new Set((entry[field] ?? []).map((service) => JSON.stringify(service)));
+      for (const service of added ?? []) {
+        if (!known.has(JSON.stringify(service))) (entry[field] ??= []).push(service);
       }
     }
     entries.set(entryKey, entry);
@@ -299,6 +295,16 @@ function isForTimeStamping(certificate: Certificate): boolean {
   return usage?.critical === true && !!purposes?.includes(TIME_STAMPING);
 }
 
+const OCSP_SIGNING = '1.3.6.1.5.5.7.3.9';
+
+export function isForOcspSigning(certificate: Certificate): boolean {
+  const usage = certificate.extensions?.find((candidate) => candidate.extnID === EXTENDED_KEY_USAGE);
+  const purposes = (usage?.parsedValue as { keyPurposes?: string[] } | undefined)?.keyPurposes;
+  return !!purposes?.includes(OCSP_SIGNING);
+}
+
+type ListedAuthority = { readonly list: string; readonly services: readonly ListedService[]; readonly certificates: readonly Certificate[] };
+
 /**
  * Whether a certificate that made a timestamp belongs to a time authority on a verified list:
  * by its own key, or through a certificate above it. Null when it does not.
@@ -306,10 +312,19 @@ function isForTimeStamping(certificate: Certificate): boolean {
  * Without this a timestamp only shows that the certificate it carries made it, and anybody can make
  * such a certificate and write any date into such a token.
  */
-export async function listedTimeAuthority(
+export const listedTimeAuthority = (certificate: Certificate, source: DirectorySource): Promise<ListedAuthority | null> =>
+  listedAs('t', certificate, source, isForTimeStamping);
+
+/** The same question for an OCSP responder, whose usage need not be marked critical. */
+export const listedResponder = (certificate: Certificate, source: DirectorySource): Promise<ListedAuthority | null> =>
+  listedAs('o', certificate, source, isForOcspSigning);
+
+async function listedAs(
+  field: 't' | 'o',
   certificate: Certificate,
   source: DirectorySource,
-): Promise<{ readonly list: string; readonly services: readonly ListedService[]; readonly certificates: readonly Certificate[] } | null> {
+  usable: (certificate: Certificate) => boolean,
+): Promise<ListedAuthority | null> {
   const keyBytes = (holder: Certificate) => hex(holder.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHexView);
   const lookUp = async (candidate: Certificate) => {
     const keyId = await keyIdOf(candidate);
@@ -322,14 +337,15 @@ export async function listedTimeAuthority(
     // list's, which would mix what two supervisors recorded.
     let found: { list: string; services: ListedService[]; certificates: Certificate[] } | null = null;
     for (const entry of ordered) {
-      if (!entry.t?.length || (found && found.list !== entry.tl)) continue;
+      const services = entry[field];
+      if (!services?.length || (found && found.list !== entry.tl)) continue;
       try {
         // The key itself, not what the certificate says about it: a key identifier and a name can
         // be copied into a self-made certificate by anybody.
         const listed = Certificate.fromBER(fromBase64(entry.c));
         if (sameName(listed.subject, candidate.subject) && keyBytes(listed) === keyBytes(candidate)) {
           found = found ?? { list: entry.tl, services: [], certificates: [] };
-          found.services.push(...entry.t);
+          found.services.push(...services);
           found.certificates.push(listed);
         }
       } catch {
@@ -340,16 +356,16 @@ export async function listedTimeAuthority(
   };
 
   // A self-made certificate over a listed key states whatever dates it likes, so these are the listed
-  // certificates' dates, not the token's.
+  // certificates' dates, not the one presented.
   const own = await lookUp(certificate);
   if (own) return own;
-  // Through a certificate above it, only if it is a time-stamping certificate at all: such a service's
-  // CA may issue other certificates too, and their holders are not time authorities.
-  if (!isForTimeStamping(certificate)) return null;
+  // Through a certificate above it, only if it is for this job at all: such a service's CA may issue
+  // other certificates too, and their holders are not authorities.
+  if (!usable(certificate)) return null;
   const above = await findIssuers(certificate, source);
   for (const link of above?.chain ?? []) {
     const listed = await lookUp(link);
-    // The token's own certificate was verified through the chain, so its dates are evidence.
+    // The presented certificate was verified through the chain, so its dates are evidence.
     if (listed) return { ...listed, certificates: [certificate] };
   }
   return null;

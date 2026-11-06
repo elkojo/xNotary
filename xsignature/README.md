@@ -34,7 +34,9 @@ anything it says about the files is believed; a name and a time are only read fr
 signed; a ZIP two programs could read differently is refused; and what cannot be completed
 is reported as not checked, never as intact. Counter-signatures and archive timestamps are
 checked too. A revocation answer the signature already carries is read and nothing is asked of
-anybody, so "not revoked" is reported as something the file says, with who said it. The issuer is
+anybody. It counts as a finding only when the party that made it had the right to: the signer's
+issuer, a responder that issuer certified, or one on a verified trusted list. Otherwise "not revoked"
+is reported as something the file says, with who said it. The issuer is
 looked up in this site's copy of the trusted lists, whose signatures are verified up to the EU's
 Official Journal when the site reads them, and the screen reports what the list says at the time of
 signing, naming the list and the date read. A revocation list the reader brings is checked against the

@@ -8,10 +8,9 @@
  * Be exact about what that is. These values sit in the signature's *unsigned*
  * properties, so anyone holding the file can add one. Verifying it shows that the
  * key of a certificate named as the responder produced this answer. It does not
- * show that this responder is entitled to answer, which is the same trust question
- * as the signer's name, and is not answered here. So a "not revoked" is reported as
- * something the file says, never as a finding, and it is never shown as a success.
- * A "revoked" is treated with the same care: somebody else may have added it to a good signature.
+ * show that this responder is entitled to answer, which `proven-answer.ts` decides.
+ * Until that has been shown, a "not revoked" is only something the file says, and a
+ * "revoked" gets the same care: somebody else may have added it to a good signature.
  *
  * An answer only speaks for the certificate it names. One about the timestamp
  * authority's certificate, which long-term signatures also carry, says nothing
@@ -42,6 +41,17 @@ export interface RevocationAnswer {
   readonly revokedAt: Date | null;
   /** When the answer was given. Null when it could not be read at all. */
   readonly at: Date | null;
+  /**
+   * The moment its status describes, which is what it can speak for. An OCSP response may be given
+   * well after the status it reports (`thisUpdate`), so `at` must not stand in for this: an answer
+   * given after a signature can describe a moment before it.
+   */
+  readonly statusAt: Date | null;
+  /**
+   * The hash of the issuer's key an OCSP response says it is about. Compared by `proven-answer.ts` once
+   * the issuer is established, since a re-keyed authority has several certificates of one name.
+   */
+  readonly aboutIssuerKey: { readonly hash: string; readonly value: Uint8Array } | null;
   /** Who it names as answering. Not vouched for. */
   readonly from: string | null;
   /**
@@ -51,6 +61,13 @@ export interface RevocationAnswer {
    * after the certificate expired proves nothing by leaving it out.
    */
   readonly keepsExpired: boolean;
+  /**
+   * The certificate it verified against. Null when it did not verify.
+   *
+   * Carrying this makes it possible to ask whether that certificate had any right to answer, which
+   * is what separates evidence from something anyone could have added (`proven-answer.ts`).
+   */
+  readonly madeBy: Certificate | null;
   /**
    * - `holds`: it verifies against the certificate it names as its source.
    * - `broken`: it does not, so it says nothing.
@@ -135,8 +152,11 @@ function statusOf(single: SingleResponse): { status: RevocationStatus; revokedAt
   }
 }
 
-/** The certificate that made a response, by the identifier the response gives. */
-async function responderOf(basic: BasicOCSPResponse, others: readonly Certificate[]): Promise<Certificate | null> {
+/**
+ * The certificates that may have made a response, by the identifier the response gives. Several, since
+ * the certificates a response carries are outside what it signs, so anyone can put a same-named one first.
+ */
+async function respondersOf(basic: BasicOCSPResponse, others: readonly Certificate[]): Promise<Certificate[]> {
   const candidates = [...(basic.certs ?? []), ...others];
   const id = basic.tbsResponseData.responderID;
 
@@ -144,11 +164,11 @@ async function responderOf(basic: BasicOCSPResponse, others: readonly Certificat
     const keyId = new Uint8Array(id.valueBlock.valueHexView);
     for (const candidate of candidates) {
       const key = new Uint8Array(candidate.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHexView);
-      if (sameBytes(await hashOf('SHA-1', key), keyId)) return candidate;
+      if (sameBytes(await hashOf('SHA-1', key), keyId)) return [candidate];
     }
-    return null;
+    return [];
   }
-  return candidates.find((candidate) => candidate.subject.isEqual(id as RelativeDistinguishedNames)) ?? null;
+  return candidates.filter((candidate) => candidate.subject.isEqual(id as RelativeDistinguishedNames));
 }
 
 const UNREADABLE = (kind: RevocationAnswer['kind']): RevocationAnswer => ({
@@ -156,8 +176,11 @@ const UNREADABLE = (kind: RevocationAnswer['kind']): RevocationAnswer => ({
   status: 'unknown',
   revokedAt: null,
   at: null,
+  statusAt: null,
+  aboutIssuerKey: null,
   from: null,
   keepsExpired: false,
+  madeBy: null,
   standing: 'cannot-check',
 });
 
@@ -180,27 +203,35 @@ async function readOcsp(
     if (about === 'unreadable') return UNREADABLE('OCSP');
     if (!about) continue;
 
-    const responder = await responderOf(basic, others);
+    const responders = await respondersOf(basic, others);
     const described = {
       kind: 'OCSP' as const,
       ...statusOf(single),
       at: basic.tbsResponseData.producedAt,
-      from: responder ? commonNameOf(responder.subject.typesAndValues) : null,
+      statusAt: single.thisUpdate,
+      aboutIssuerKey: {
+        hash: hashForOid(single.certID.hashAlgorithm.algorithmId)!,
+        value: new Uint8Array(single.certID.issuerKeyHash.valueBlock.valueHexView),
+      },
+      from: responders[0] ? commonNameOf(responders[0].subject.typesAndValues) : null,
       keepsExpired: false,
     };
-    if (!responder) return { ...described, standing: 'cannot-check' };
-
-    try {
-      const holds = await getCrypto(true).verifyWithPublicKey(
-        basic.tbsResponseData.tbsView.slice().buffer as ArrayBuffer,
-        basic.signature,
-        responder.subjectPublicKeyInfo,
-        basic.signatureAlgorithm,
-      );
-      return { ...described, standing: holds ? 'holds' : 'broken' };
-    } catch {
-      return { ...described, standing: 'cannot-check' };
+    let ran = false;
+    for (const responder of responders) {
+      try {
+        const holds = await getCrypto(true).verifyWithPublicKey(
+          basic.tbsResponseData.tbsView.slice().buffer as ArrayBuffer,
+          basic.signature,
+          responder.subjectPublicKeyInfo,
+          basic.signatureAlgorithm,
+        );
+        if (holds) return { ...described, from: commonNameOf(responder.subject.typesAndValues), madeBy: responder, standing: 'holds' };
+        ran = true;
+      } catch {
+        // Another certificate of this name may be the one.
+      }
     }
+    return { ...described, madeBy: null, standing: ran ? 'broken' : 'cannot-check' };
   }
   return null;
 }
@@ -223,24 +254,26 @@ async function readCrl(der: Uint8Array, certificate: Certificate, others: readon
     status: (entry ? 'revoked' : 'good') as RevocationStatus,
     revokedAt: entry?.revocationDate.value ?? null,
     at: list.thisUpdate.value,
+    statusAt: list.thisUpdate.value,
+    aboutIssuerKey: null,
     from: commonNameOf(list.issuer.typesAndValues),
     keepsExpired: list.crlExtensions?.extensions.some((extension) => extension.extnID === EXPIRED_CERTS_ON_CRL) ?? false,
   };
 
-  if (scoped && !entry) return { ...described, status: 'unknown', standing: 'cannot-check' };
+  if (scoped && !entry) return { ...described, madeBy: null, status: 'unknown', standing: 'cannot-check' };
   const signers = others.filter((candidate) => candidate.subject.isEqual(list.issuer));
-  if (signers.length === 0) return { ...described, standing: 'cannot-check' };
+  if (signers.length === 0) return { ...described, madeBy: null, standing: 'cannot-check' };
 
   let ran = false;
   for (const signer of signers) {
     try {
-      if (await list.verify({ issuerCertificate: signer })) return { ...described, standing: 'holds' };
+      if (await list.verify({ issuerCertificate: signer })) return { ...described, madeBy: signer, standing: 'holds' };
       ran = true;
     } catch {
       // Another certificate of this name may be the one.
     }
   }
-  return { ...described, standing: ran ? 'broken' : 'cannot-check' };
+  return { ...described, madeBy: null, standing: ran ? 'broken' : 'cannot-check' };
 }
 
 /** Worst first: a verified "revoked" outranks everything, and nothing outranks being wrong about it. */
@@ -255,11 +288,18 @@ const rank = (answer: RevocationAnswer): number => {
  * What a signature's embedded answers say about one certificate, or null when none
  * of them is about it. Of several, the worst; among equals, the newest.
  */
-export async function revocationOf(
+export const revocationOf = async (
   certificate: Certificate,
   others: readonly Certificate[],
   embedded: EmbeddedRevocation,
-): Promise<RevocationAnswer | null> {
+): Promise<RevocationAnswer | null> => (await revocationsOf(certificate, others, embedded))[0] ?? null;
+
+/** Every embedded answer about one certificate, worst first. */
+export async function revocationsOf(
+  certificate: Certificate,
+  others: readonly Certificate[],
+  embedded: EmbeddedRevocation,
+): Promise<RevocationAnswer[]> {
   const issuers = others.filter((candidate) => candidate !== certificate && candidate.subject.isEqual(certificate.issuer));
 
   const answers: RevocationAnswer[] = [];
@@ -273,7 +313,7 @@ export async function revocationOf(
   }
 
   answers.sort((a, b) => rank(a) - rank(b) || (b.at?.getTime() ?? 0) - (a.at?.getTime() ?? 0));
-  return answers[0] ?? null;
+  return answers;
 }
 
 /**
