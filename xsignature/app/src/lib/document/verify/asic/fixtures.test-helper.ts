@@ -476,7 +476,7 @@ async function certIdFor(subject: Signer, issuer: Signer): Promise<CertID> {
 export async function makeOcsp(
   subject: Signer,
   responder: Signer,
-  options: { status?: 'good' | 'revoked' | 'unknown'; carryResponder?: boolean; issuer?: Signer; certIdHashOid?: string; thisUpdate?: Date } = {},
+  options: { status?: 'good' | 'revoked' | 'unknown'; carryResponder?: boolean; issuer?: Signer; certIdHashOid?: string; thisUpdate?: Date; decoys?: Certificate[] } = {},
 ): Promise<Uint8Array> {
   const status = options.status ?? 'good';
   const certStatus =
@@ -495,7 +495,7 @@ export async function makeOcsp(
       producedAt: new Date(Date.UTC(2026, 10, 5, 10, 0, 9)),
       responses: [new SingleResponse({ certID, certStatus, thisUpdate: options.thisUpdate ?? new Date(Date.UTC(2026, 10, 5, 10, 0, 9)) })],
     }),
-    ...(options.carryResponder === false ? {} : { certs: [responder.certificate] }),
+    ...(options.carryResponder === false ? {} : { certs: [...(options.decoys ?? []), responder.certificate] }),
   });
   await basic.sign(responder.privateKey, 'SHA-256');
 

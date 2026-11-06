@@ -10,15 +10,16 @@
  *  - `listed`: made by a responder a verified trusted list records as granted at that time, under the
  *    same provider as the authority that issued the signer's certificate.
  *
- * Anything else is null, and stays a plain statement of what the file says. `issuer` here has to be the
- * certificate whose key verified the signer's, not merely one of the right name. Without one, nothing
- * can be proven: nobody can say who had the right to answer about a certificate of unknown origin.
+ * Anything else is null, and stays a plain statement of what the file says. `issuer` here has to be a
+ * certificate from a verified list whose key verified the signer's. One the file carries, or the reader
+ * brought, will not do: a forger can make an authority of their own, and it would vouch for itself.
+ * Without such an issuer, nothing can be proven.
  */
 import type { Certificate } from 'pkijs';
 
 import { DirectoryUnreachable, isForOcspSigning, listedResponder, type DirectorySource } from '../../certificate/read/directory';
 import type { ListedService } from '../../certificate/read/trusted-list';
-import { grantedAndInDates } from '../trust';
+import { grantedAndInDates, serviceActiveAt } from '../trust';
 import { revocationsOf, type EmbeddedRevocation, type RevocationAnswer } from './revocation';
 import { digest, sameBytes } from './xml';
 
@@ -33,12 +34,12 @@ export interface CarriedEvidence {
 export interface CarriedAnswer {
   readonly answer: RevocationAnswer;
   readonly proof: AnswerProof | null;
+  /** Whether it could be proven could not be decided, because this site's directory could not be read. */
+  readonly unjudged?: boolean;
 }
 
 const keyOf = (certificate: Certificate): Uint8Array =>
   new Uint8Array(certificate.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHexView);
-
-export const sameKey = (a: Certificate, b: Certificate): boolean => sameBytes(keyOf(a), keyOf(b));
 
 const withinDates = (certificate: Certificate, time: Date): boolean =>
   certificate.notBefore.value.getTime() <= time.getTime() && time.getTime() <= certificate.notAfter.value.getTime();
@@ -59,7 +60,15 @@ export async function proveAnswer(
   const about = answer.aboutIssuerKey;
   if (about && !sameBytes(await digest(about.hash, keyOf(issuer)), about.value)) return null;
 
-  if (sameKey(made, issuer)) return 'issuer';
+  // An answer describes no moment after it was made. Without this, an old key's backdated answer could
+  // pass the date checks below by when it says it was made, and settle things by what it says it describes.
+  if (answer.statusAt && answer.statusAt.getTime() > answer.at.getTime()) return null;
+
+  // An authority past its dates, or withdrawn from its list by then, has no standing left to answer.
+  if (!withinDates(issuer, answer.at)) return null;
+  if (issuerListing && !serviceActiveAt(issuerListing.services, answer.at)) return null;
+
+  if (sameBytes(keyOf(made), keyOf(issuer))) return 'issuer';
 
   if (answer.kind !== 'OCSP') return null;
 
@@ -100,14 +109,13 @@ export async function proveCarried(
   const answers: CarriedAnswer[] = [];
   let unreachable = false;
   for (const answer of await revocationsOf(leaf, known, evidence.embedded)) {
-    let proof: AnswerProof | null = null;
     try {
-      proof = await proveAnswer(answer, issuer, issuerListing, source);
+      answers.push({ answer, proof: await proveAnswer(answer, issuer, issuerListing, source) });
     } catch (error) {
       if (!(error instanceof DirectoryUnreachable)) throw error;
       unreachable = true;
+      answers.push({ answer, proof: null, unjudged: true });
     }
-    answers.push({ answer, proof });
   }
   return { answers, unreachable };
 }
@@ -131,8 +139,10 @@ export function judgeNotRevoked(
 }
 
 /**
- * The one to report. A proven "revoked" outranks everything; then a proven "not revoked" that settles
- * the question, by `settles`; then any other proven answer, newest first; then the worst of the rest.
+ * The one to report. A proven "revoked" outranks everything, then a "revoked" nobody could judge, since
+ * it may be genuine. Next a proven "not revoked" that settles the question, by `settles`: it says the
+ * certificate was good after the signature, and that answers anything else the file may hold. Without
+ * one, nothing is settled, so the worst of them is reported, proven or not. `answers` come worst first.
  */
 export function chooseCarried(answers: readonly CarriedAnswer[], settles: (answer: RevocationAnswer) => boolean): CarriedAnswer | null {
   const proven = answers
@@ -140,8 +150,8 @@ export function chooseCarried(answers: readonly CarriedAnswer[], settles: (answe
     .sort((a, b) => (b.answer.statusAt?.getTime() ?? 0) - (a.answer.statusAt?.getTime() ?? 0));
   return (
     proven.find((carried) => carried.answer.status === 'revoked') ??
+    answers.find((carried) => carried.unjudged && carried.answer.status === 'revoked') ??
     proven.find((carried) => carried.answer.status === 'good' && settles(carried.answer)) ??
-    proven[0] ??
     answers[0] ??
     null
   );

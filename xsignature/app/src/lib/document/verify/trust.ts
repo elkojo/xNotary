@@ -261,6 +261,15 @@ export function checkAgainstList(
   return { result: 'not-qualified', onQualifiedDevice: null, detail: 'The list does not treat it as a qualified certificate.' };
 }
 
+/**
+ * Whether a listed service was operating under supervision at that moment. Lists before 2016 say so in
+ * other words. Weaker than granted, which is the right question for an authority's standing to speak
+ * for its past certificates, not for whether it could date something.
+ */
+const ACTIVE = new Set(['granted', 'undersupervision', 'accredited', 'supervisionincessation']);
+export const serviceActiveAt = (services: readonly ListedService[], moment: Date): boolean =>
+  services.some((service) => ACTIVE.has(stateAt(service, moment)?.s ?? ''));
+
 /** Whether a listed service was granted at that moment, by its own history. */
 export const serviceGrantedAt = (services: readonly ListedService[], moment: Date): boolean =>
   services.some((service) => stateAt(service, moment)?.s === 'granted');

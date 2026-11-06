@@ -32,7 +32,6 @@
     chooseCarried,
     judgeNotRevoked,
     proveCarried,
-    sameKey,
     type CarriedAnswer,
     type CarriedEvidence,
   } from '../lib/document/verify/asic/proven-answer';
@@ -118,17 +117,15 @@
   let proofChecked = $state(false);
   /** Only the newest run may report. Assigned at the end, so a re-check does not blank what is shown. */
   let proofRun = 0;
-  let provenWith: Certificate | null = null;
 
   async function checkCarriedAnswer(cache: RequestCache) {
     const run = ++proofRun;
     const leaf = signature.certificate;
-    provenWith = issuerCertificate;
     let answers: readonly CarriedAnswer[] | null = null;
     let unreachable = false;
     try {
       if (leaf && carriedEvidence) {
-        ({ answers, unreachable } = await proveCarried(leaf, carriedEvidence, provenWith, found?.listed ?? null, siteDirectory(import.meta.env.BASE_URL, cache)));
+        ({ answers, unreachable } = await proveCarried(leaf, carriedEvidence, found?.chain[0] ?? null, found?.listed ?? null, siteDirectory(import.meta.env.BASE_URL, cache)));
       }
     } finally {
       if (run === proofRun) {
@@ -382,25 +379,18 @@
    * answer; empty means it does settle it, by the same test as a list: made after a confirmed time.
    */
   const carried = $derived(chooseCarried(provenAnswers ?? [], (answer) => shortfallOf(answer, 'answer') === ''));
-  const shownAnswer = $derived(carried?.answer ?? carriedRevocation ?? null);
+  // Once read again, that reading stands: it may have found the first one is about another key.
+  const shownAnswer = $derived(provenAnswers ? (carried?.answer ?? null) : (carriedRevocation ?? null));
   const carriedProof = $derived(carried?.proof ?? null);
   const carriedShortfall = $derived(shownAnswer && carriedProof ? shortfallOf(shownAnswer, 'answer') : null);
-  const clearedByAnswer = $derived(carriedShortfall === '');
+  const listSaysRevoked = $derived(listFile?.answer?.standing === 'holds' && listFile.answer.status === 'revoked');
+  const clearedByAnswer = $derived(carriedShortfall === '' && !listSaysRevoked);
   const provenRevoked = $derived(!!carriedProof && shownAnswer?.status === 'revoked');
 
   // An answer that is not proven settles nothing, either way: anyone can add one, including a forged
   // "revoked" against somebody else's good signature. So the issuer's own list is read, unless a proven
   // answer has already said what that list would be asked.
-  const offerRevocationList = $derived(!isTimestamp && !!signature.certificate && proofChecked && !clearedByAnswer && !provenRevoked);
-
-  // An issuer found later, by the reader bringing it, can prove what could not be proven before. This
-  // comes before the fetch below, so that nothing is fetched while the answer is being looked at again.
-  $effect(() => {
-    const issuer = issuerCertificate;
-    if (!proofChecked || !issuer || (provenWith && sameKey(provenWith, issuer))) return;
-    proofChecked = false;
-    void checkCarriedAnswer('default');
-  });
+  const offerRevocationList = $derived(!isTimestamp && !!signature.certificate && proofChecked && ((!clearedByAnswer && !provenRevoked) || listSaysRevoked));
 
   $effect(() => {
     if (fetchTried || !offerRevocationList || !issuerCertificate) return;
@@ -410,7 +400,7 @@
 
   /** An answer says this certificate was revoked, which no green may sit beside. */
   const knownRevoked = $derived(
-    (listFile?.answer?.standing === 'holds' && listFile.answer.status === 'revoked') ||
+    listSaysRevoked ||
       provenRevoked ||
       // The issuer's own list outranks an answer anyone could have added.
       (shownAnswer?.standing === 'holds' && shownAnswer.status === 'revoked' && !clearedByList),
@@ -762,7 +752,7 @@
   {#if !clearedByList && listFile?.answer?.status !== 'revoked'}
     <div class="notice">
       <strong>{fetching ? 'Checking revocation…' : 'Revocation: not checked.'}</strong>
-      {#if carriedRevocation === null}This signature carries no answer.{/if}<Info
+      {#if carriedRevocation !== undefined && !shownAnswer}This signature carries no answer.{/if}<Info
         >No web page can ask an authority directly, so this site keeps copies of the revocation lists it can
         collect, as new as the site's last release. A copy is checked here against the key that issued this
         certificate. Nothing about you or the file is sent.</Info

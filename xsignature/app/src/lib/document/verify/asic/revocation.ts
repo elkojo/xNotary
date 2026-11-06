@@ -152,8 +152,11 @@ function statusOf(single: SingleResponse): { status: RevocationStatus; revokedAt
   }
 }
 
-/** The certificate that made a response, by the identifier the response gives. */
-async function responderOf(basic: BasicOCSPResponse, others: readonly Certificate[]): Promise<Certificate | null> {
+/**
+ * The certificates that may have made a response, by the identifier the response gives. Several, since
+ * the certificates a response carries are outside what it signs, so anyone can put a same-named one first.
+ */
+async function respondersOf(basic: BasicOCSPResponse, others: readonly Certificate[]): Promise<Certificate[]> {
   const candidates = [...(basic.certs ?? []), ...others];
   const id = basic.tbsResponseData.responderID;
 
@@ -161,11 +164,11 @@ async function responderOf(basic: BasicOCSPResponse, others: readonly Certificat
     const keyId = new Uint8Array(id.valueBlock.valueHexView);
     for (const candidate of candidates) {
       const key = new Uint8Array(candidate.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHexView);
-      if (sameBytes(await hashOf('SHA-1', key), keyId)) return candidate;
+      if (sameBytes(await hashOf('SHA-1', key), keyId)) return [candidate];
     }
-    return null;
+    return [];
   }
-  return candidates.find((candidate) => candidate.subject.isEqual(id as RelativeDistinguishedNames)) ?? null;
+  return candidates.filter((candidate) => candidate.subject.isEqual(id as RelativeDistinguishedNames));
 }
 
 const UNREADABLE = (kind: RevocationAnswer['kind']): RevocationAnswer => ({
@@ -200,7 +203,7 @@ async function readOcsp(
     if (about === 'unreadable') return UNREADABLE('OCSP');
     if (!about) continue;
 
-    const responder = await responderOf(basic, others);
+    const responders = await respondersOf(basic, others);
     const described = {
       kind: 'OCSP' as const,
       ...statusOf(single),
@@ -210,22 +213,25 @@ async function readOcsp(
         hash: hashForOid(single.certID.hashAlgorithm.algorithmId)!,
         value: new Uint8Array(single.certID.issuerKeyHash.valueBlock.valueHexView),
       },
-      from: responder ? commonNameOf(responder.subject.typesAndValues) : null,
+      from: responders[0] ? commonNameOf(responders[0].subject.typesAndValues) : null,
       keepsExpired: false,
     };
-    if (!responder) return { ...described, madeBy: null, standing: 'cannot-check' };
-
-    try {
-      const holds = await getCrypto(true).verifyWithPublicKey(
-        basic.tbsResponseData.tbsView.slice().buffer as ArrayBuffer,
-        basic.signature,
-        responder.subjectPublicKeyInfo,
-        basic.signatureAlgorithm,
-      );
-      return { ...described, madeBy: holds ? responder : null, standing: holds ? 'holds' : 'broken' };
-    } catch {
-      return { ...described, madeBy: null, standing: 'cannot-check' };
+    let ran = false;
+    for (const responder of responders) {
+      try {
+        const holds = await getCrypto(true).verifyWithPublicKey(
+          basic.tbsResponseData.tbsView.slice().buffer as ArrayBuffer,
+          basic.signature,
+          responder.subjectPublicKeyInfo,
+          basic.signatureAlgorithm,
+        );
+        if (holds) return { ...described, from: commonNameOf(responder.subject.typesAndValues), madeBy: responder, standing: 'holds' };
+        ran = true;
+      } catch {
+        // Another certificate of this name may be the one.
+      }
     }
+    return { ...described, madeBy: null, standing: ran ? 'broken' : 'cannot-check' };
   }
   return null;
 }
