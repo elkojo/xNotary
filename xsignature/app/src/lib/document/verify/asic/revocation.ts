@@ -8,10 +8,9 @@
  * Be exact about what that is. These values sit in the signature's *unsigned*
  * properties, so anyone holding the file can add one. Verifying it shows that the
  * key of a certificate named as the responder produced this answer. It does not
- * show that this responder is entitled to answer, which is the same trust question
- * as the signer's name, and is not answered here. So a "not revoked" is reported as
- * something the file says, never as a finding, and it is never shown as a success.
- * A "revoked" is treated with the same care: somebody else may have added it to a good signature.
+ * show that this responder is entitled to answer, which `proven-answer.ts` decides.
+ * Until that has been shown, a "not revoked" is only something the file says, and a
+ * "revoked" gets the same care: somebody else may have added it to a good signature.
  *
  * An answer only speaks for the certificate it names. One about the timestamp
  * authority's certificate, which long-term signatures also carry, says nothing
@@ -42,6 +41,17 @@ export interface RevocationAnswer {
   readonly revokedAt: Date | null;
   /** When the answer was given. Null when it could not be read at all. */
   readonly at: Date | null;
+  /**
+   * The moment its status describes, which is what it can speak for. An OCSP response may be given
+   * well after the status it reports (`thisUpdate`), so `at` must not stand in for this: an answer
+   * given after a signature can describe a moment before it.
+   */
+  readonly statusAt: Date | null;
+  /**
+   * The hash of the issuer's key an OCSP response says it is about. Compared by `proven-answer.ts` once
+   * the issuer is established, since a re-keyed authority has several certificates of one name.
+   */
+  readonly aboutIssuerKey: { readonly hash: string; readonly value: Uint8Array } | null;
   /** Who it names as answering. Not vouched for. */
   readonly from: string | null;
   /**
@@ -163,6 +173,8 @@ const UNREADABLE = (kind: RevocationAnswer['kind']): RevocationAnswer => ({
   status: 'unknown',
   revokedAt: null,
   at: null,
+  statusAt: null,
+  aboutIssuerKey: null,
   from: null,
   keepsExpired: false,
   madeBy: null,
@@ -193,6 +205,11 @@ async function readOcsp(
       kind: 'OCSP' as const,
       ...statusOf(single),
       at: basic.tbsResponseData.producedAt,
+      statusAt: single.thisUpdate,
+      aboutIssuerKey: {
+        hash: hashForOid(single.certID.hashAlgorithm.algorithmId)!,
+        value: new Uint8Array(single.certID.issuerKeyHash.valueBlock.valueHexView),
+      },
       from: responder ? commonNameOf(responder.subject.typesAndValues) : null,
       keepsExpired: false,
     };
@@ -231,6 +248,8 @@ async function readCrl(der: Uint8Array, certificate: Certificate, others: readon
     status: (entry ? 'revoked' : 'good') as RevocationStatus,
     revokedAt: entry?.revocationDate.value ?? null,
     at: list.thisUpdate.value,
+    statusAt: list.thisUpdate.value,
+    aboutIssuerKey: null,
     from: commonNameOf(list.issuer.typesAndValues),
     keepsExpired: list.crlExtensions?.extensions.some((extension) => extension.extnID === EXPIRED_CERTS_ON_CRL) ?? false,
   };
@@ -263,11 +282,18 @@ const rank = (answer: RevocationAnswer): number => {
  * What a signature's embedded answers say about one certificate, or null when none
  * of them is about it. Of several, the worst; among equals, the newest.
  */
-export async function revocationOf(
+export const revocationOf = async (
   certificate: Certificate,
   others: readonly Certificate[],
   embedded: EmbeddedRevocation,
-): Promise<RevocationAnswer | null> {
+): Promise<RevocationAnswer | null> => (await revocationsOf(certificate, others, embedded))[0] ?? null;
+
+/** Every embedded answer about one certificate, worst first. */
+export async function revocationsOf(
+  certificate: Certificate,
+  others: readonly Certificate[],
+  embedded: EmbeddedRevocation,
+): Promise<RevocationAnswer[]> {
   const issuers = others.filter((candidate) => candidate !== certificate && candidate.subject.isEqual(certificate.issuer));
 
   const answers: RevocationAnswer[] = [];
@@ -281,7 +307,7 @@ export async function revocationOf(
   }
 
   answers.sort((a, b) => rank(a) - rank(b) || (b.at?.getTime() ?? 0) - (a.at?.getTime() ?? 0));
-  return answers[0] ?? null;
+  return answers;
 }
 
 /**

@@ -165,22 +165,10 @@ export async function buildDirectory(
     const entryKey = `${tl}:${c}`;
     const entry = entries.get(entryKey) ?? { c, tl };
     // One certificate can identify several services, and the rules weigh all of them.
-    if (services?.length) {
-      const known = new Set((entry.s ?? []).map((service) => JSON.stringify(service)));
-      for (const service of services) {
-        if (!known.has(JSON.stringify(service))) (entry.s ??= []).push(service);
-      }
-    }
-    if (timeServices?.length) {
-      const known = new Set((entry.t ?? []).map((service) => JSON.stringify(service)));
-      for (const service of timeServices) {
-        if (!known.has(JSON.stringify(service))) (entry.t ??= []).push(service);
-      }
-    }
-    if (responderServices?.length) {
-      const known = new Set((entry.o ?? []).map((service) => JSON.stringify(service)));
-      for (const service of responderServices) {
-        if (!known.has(JSON.stringify(service))) (entry.o ??= []).push(service);
+    for (const [field, added] of [['s', services], ['t', timeServices], ['o', responderServices]] as const) {
+      const known = new Set((entry[field] ?? []).map((service) => JSON.stringify(service)));
+      for (const service of added ?? []) {
+        if (!known.has(JSON.stringify(service))) (entry[field] ??= []).push(service);
       }
     }
     entries.set(entryKey, entry);

@@ -2,6 +2,7 @@
 import type { Certificate } from 'pkijs';
 
 import { NO_SIGNER, type AttachedTimestamp, type SignerFacts } from '../signer';
+import type { CarriedEvidence } from './proven-answer';
 import type { RevocationAnswer } from './revocation';
 
 export type ContainerVerdict =
@@ -58,6 +59,8 @@ export interface ContainerSignature extends SignerFacts {
   readonly counterChanged: boolean;
   /** What the signature's own embedded answers say about the signer's certificate. */
   readonly revocation: RevocationAnswer | null;
+  /** What that was read from, to read again once this site has found the issuer. */
+  readonly carriedEvidence: CarriedEvidence | null;
   /**
    * Archive timestamps inside this signature.
    *
@@ -135,6 +138,7 @@ export const blankSignature = (source: string, form: ContainerSignature['form'])
   counters: null,
   counterChanged: false,
   revocation: null,
+  carriedEvidence: null,
   archiveTimestamps: [],
   detail: '',
 });

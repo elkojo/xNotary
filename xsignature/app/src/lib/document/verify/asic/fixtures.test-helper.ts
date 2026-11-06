@@ -476,7 +476,7 @@ async function certIdFor(subject: Signer, issuer: Signer): Promise<CertID> {
 export async function makeOcsp(
   subject: Signer,
   responder: Signer,
-  options: { status?: 'good' | 'revoked' | 'unknown'; carryResponder?: boolean; issuer?: Signer; certIdHashOid?: string } = {},
+  options: { status?: 'good' | 'revoked' | 'unknown'; carryResponder?: boolean; issuer?: Signer; certIdHashOid?: string; thisUpdate?: Date } = {},
 ): Promise<Uint8Array> {
   const status = options.status ?? 'good';
   const certStatus =
@@ -493,7 +493,7 @@ export async function makeOcsp(
     tbsResponseData: new ResponseData({
       responderID: responder.certificate.subject,
       producedAt: new Date(Date.UTC(2026, 10, 5, 10, 0, 9)),
-      responses: [new SingleResponse({ certID, certStatus, thisUpdate: new Date(Date.UTC(2026, 10, 5, 10, 0, 9)) })],
+      responses: [new SingleResponse({ certID, certStatus, thisUpdate: options.thisUpdate ?? new Date(Date.UTC(2026, 10, 5, 10, 0, 9)) })],
     }),
     ...(options.carryResponder === false ? {} : { certs: [responder.certificate] }),
   });

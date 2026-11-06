@@ -28,7 +28,14 @@
     type FoundIssuers,
   } from '../lib/document/certificate/read/directory';
   import { revocationOf, type RevocationAnswer } from '../lib/document/verify/asic/revocation';
-  import { proveAnswer, type AnswerProof } from '../lib/document/verify/asic/proven-answer';
+  import {
+    chooseCarried,
+    judgeNotRevoked,
+    proveCarried,
+    sameKey,
+    type CarriedAnswer,
+    type CarriedEvidence,
+  } from '../lib/document/verify/asic/proven-answer';
   import { fetchCrlCopy } from '../lib/document/verify/crl-copy';
   import { printable } from '../lib/document/verify/printable';
   import type { AttachedTimestamp, SignerFacts } from '../lib/document/verify/signer';
@@ -44,6 +51,8 @@
      * and there is none; left out where nothing looks, as for a PDF, so nothing is claimed.
      */
     carriedRevocation?: RevocationAnswer | null;
+    /** What that was read from, read again here once the issuer has been established. */
+    carriedEvidence?: CarriedEvidence | null;
     /** Its own verdict is intact. Nothing about the certificate is green on a signature that is not. */
     holds: boolean;
     /** A timestamp rather than a signature of identity: no chain and no level to speak of. */
@@ -58,7 +67,7 @@
     limits?: Snippet;
   }
 
-  let { signature, signerClock = null, carriedRevocation = undefined, holds, isTimestamp, judge, goTo, children, limits }: Props = $props();
+  let { signature, signerClock = null, carriedRevocation = undefined, carriedEvidence = null, holds, isTimestamp, judge, goTo, children, limits }: Props = $props();
 
   const UTC = (time: Date): string => `${time.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')} UTC`;
   const day = (text: string): string => text.slice(0, 10);
@@ -103,33 +112,40 @@
     lookedUp = true;
   }
 
-  /** Past any cache, so that "the newest copy" is true when it is said. */
-  /** Whether the answer the signature carries could only have come from the right party. */
-  let carriedProof = $state<AnswerProof | null>(null);
+  /** Every answer the signature carries about this certificate, each with what it was proven to be. */
+  let provenAnswers = $state.raw<readonly CarriedAnswer[] | null>(null);
   /** Until that is known, nothing is fetched: a proven answer makes the issuer's list unnecessary. */
   let proofChecked = $state(false);
+  /** Only the newest run may report. Assigned at the end, so a re-check does not blank what is shown. */
+  let proofRun = 0;
+  let provenWith: Certificate | null = null;
 
   async function checkCarriedAnswer(cache: RequestCache) {
-    carriedProof = null;
-    if (carriedRevocation) {
-      try {
-        carriedProof = await proveAnswer(carriedRevocation, found?.chain[0] ?? provenCarriedIssuer(), found?.listed ?? null, siteDirectory(import.meta.env.BASE_URL, cache));
-      } catch (error) {
-        if (!(error instanceof DirectoryUnreachable)) throw error;
-        lookupFailed = true;
+    const run = ++proofRun;
+    const leaf = signature.certificate;
+    provenWith = issuerCertificate;
+    let answers: readonly CarriedAnswer[] | null = null;
+    let unreachable = false;
+    try {
+      if (leaf && carriedEvidence) {
+        ({ answers, unreachable } = await proveCarried(leaf, carriedEvidence, provenWith, found?.listed ?? null, siteDirectory(import.meta.env.BASE_URL, cache)));
+      }
+    } finally {
+      if (run === proofRun) {
+        if (answers) provenAnswers = answers;
+        if (unreachable) lookupFailed = true;
+        proofChecked = true;
       }
     }
-    proofChecked = true;
   }
 
-  /** The issuer the signature itself carried, only if its key verified the signer's certificate. */
-  function provenCarriedIssuer(): Certificate | null {
-    return signature.issuers[0] && signature.chain[0]?.holds ? signature.issuers[0] : null;
-  }
-
+  /** Past any cache, so that "the newest copy" is true when it is said. */
   async function lookAndConfirm(cache: RequestCache) {
-    await Promise.all([look(cache), lookTimeAuthority(cache)]);
-    await checkCarriedAnswer(cache);
+    try {
+      await Promise.all([look(cache), lookTimeAuthority(cache)]);
+    } finally {
+      await checkCarriedAnswer(cache);
+    }
     if (!lookupFailed && index) {
       confirmedCurrent = true;
       refreshed = 'This is the newest copy this site has.';
@@ -150,8 +166,11 @@
     refreshing = true;
     refreshed = '';
     try {
-      await Promise.all([look('reload'), lookTimeAuthority('reload')]);
-      await checkCarriedAnswer('reload');
+      try {
+        await Promise.all([look('reload'), lookTimeAuthority('reload')]);
+      } finally {
+        await checkCarriedAnswer('reload');
+      }
       if (lookupFailed) {
         confirmedCurrent = false;
         refreshed = '';
@@ -339,41 +358,49 @@
    * prove it: the issuer's key made it, only the issuer holds that key, and it was made after a
    * time somebody independent confirmed.
    */
-  const listShortfall = $derived.by((): string | null => {
-    const answer = listFile?.answer;
+  function shortfallOf(answer: RevocationAnswer, noun: 'list' | 'answer'): string | null {
     const leaf = signature.certificate;
-    if (!answer || !leaf || answer.standing !== 'holds' || answer.status !== 'good' || !answer.at) return null;
-    if (!moment?.independent) return 'Nothing independent dates this signature, so the list cannot speak for when it was made.';
-    if (answer.at.getTime() < moment.time.getTime()) return `The list is older than the signature: it was issued ${UTC(answer.at)}.`;
-    if (answer.at.getTime() > leaf.notAfter.value.getTime() && !answer.keepsExpired) {
-      return 'The list is from after this certificate expired, and an authority may drop expired certificates from its lists.';
+    switch (leaf && judgeNotRevoked(answer, moment, leaf)) {
+      case 'settles':
+        return '';
+      case 'undated':
+        return `Nothing independent dates this signature, so the ${noun} cannot speak for when it was made.`;
+      case 'before-signature':
+        return `The ${noun} speaks only for ${UTC(answer.statusAt!)}, which is before the signature.`;
+      case 'after-expiry':
+        return `The ${noun} is from after this certificate expired, when an authority need no longer track it.`;
+      default:
+        return null;
     }
-    return '';
-  });
+  }
+
+  const listShortfall = $derived(listFile?.answer?.standing === 'holds' ? shortfallOf(listFile.answer, 'list') : null);
   const clearedByList = $derived(listShortfall === '');
 
   /**
    * Why a proven carried answer of "not revoked" still settles nothing. Null means there is no such
    * answer; empty means it does settle it, by the same test as a list: made after a confirmed time.
    */
-  const carriedShortfall = $derived.by((): string | null => {
-    const answer = carriedRevocation;
-    const leaf = signature.certificate;
-    if (!answer || !carriedProof || !leaf || answer.status !== 'good' || !answer.at) return null;
-    if (!moment?.independent) return 'Nothing independent dates this signature, so the answer cannot speak for when it was made.';
-    if (answer.at.getTime() < moment.time.getTime()) return `The answer is older than the signature: it was given ${UTC(answer.at)}.`;
-    if (answer.at.getTime() > leaf.notAfter.value.getTime() && !answer.keepsExpired) {
-      return 'The answer is from after this certificate expired, when an authority need no longer track it.';
-    }
-    return '';
-  });
+  const carried = $derived(chooseCarried(provenAnswers ?? [], (answer) => shortfallOf(answer, 'answer') === ''));
+  const shownAnswer = $derived(carried?.answer ?? carriedRevocation ?? null);
+  const carriedProof = $derived(carried?.proof ?? null);
+  const carriedShortfall = $derived(shownAnswer && carriedProof ? shortfallOf(shownAnswer, 'answer') : null);
   const clearedByAnswer = $derived(carriedShortfall === '');
-  const provenRevoked = $derived(!!carriedProof && carriedRevocation?.status === 'revoked');
+  const provenRevoked = $derived(!!carriedProof && shownAnswer?.status === 'revoked');
 
   // An answer that is not proven settles nothing, either way: anyone can add one, including a forged
   // "revoked" against somebody else's good signature. So the issuer's own list is read, unless a proven
   // answer has already said what that list would be asked.
   const offerRevocationList = $derived(!isTimestamp && !!signature.certificate && proofChecked && !clearedByAnswer && !provenRevoked);
+
+  // An issuer found later, by the reader bringing it, can prove what could not be proven before. This
+  // comes before the fetch below, so that nothing is fetched while the answer is being looked at again.
+  $effect(() => {
+    const issuer = issuerCertificate;
+    if (!proofChecked || !issuer || (provenWith && sameKey(provenWith, issuer))) return;
+    proofChecked = false;
+    void checkCarriedAnswer('default');
+  });
 
   $effect(() => {
     if (fetchTried || !offerRevocationList || !issuerCertificate) return;
@@ -386,7 +413,7 @@
     (listFile?.answer?.standing === 'holds' && listFile.answer.status === 'revoked') ||
       provenRevoked ||
       // The issuer's own list outranks an answer anyone could have added.
-      (carriedRevocation?.standing === 'holds' && carriedRevocation.status === 'revoked' && !clearedByList),
+      (shownAnswer?.standing === 'holds' && shownAnswer.status === 'revoked' && !clearedByList),
   );
   const listBacksIt = $derived(holds && standing?.result === 'qualified' && moment?.independent === true && validWhenUsed && !knownRevoked);
   /**
@@ -633,8 +660,8 @@
   </div>
 {/if}
 
-{#if carriedRevocation}
-  {@const answer = carriedRevocation}
+{#if shownAnswer}
+  {@const answer = shownAnswer}
   {@const source = answer.from ?? 'An unnamed source'}
   {#if answer.standing === 'broken'}
     <div class="notice bad">
@@ -653,7 +680,7 @@
       {#if carriedProof}
         That answer comes from the party entitled to give it.
       {:else}
-        Who answered is not checked, and anyone can add an answer to a file, so the issuer's own list decides this if it can be read.
+        Who answered could not be confirmed, and anyone can add an answer to a file, so the issuer's own list decides this if it can be read.
       {/if}
     </div>
   {:else if answer.status === 'unknown'}
@@ -664,7 +691,7 @@
   {:else if clearedByAnswer}
     <div class="notice" class:ok={holds}>
       <strong>This certificate was not revoked when the signature was made.</strong>
-      <span translate="no">{source}</span> said so {answer.at ? UTC(answer.at) : ''}, after the signature.<Info
+      <span translate="no">{source}</span> said so as of {answer.statusAt ? UTC(answer.statusAt) : ''}, after the signature.<Info
         >The answer travels with the signature, so nothing was asked and nothing left this device. It is more than
         a claim because of who made it:
         {#if carriedProof === 'issuer'}

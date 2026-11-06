@@ -4,7 +4,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { buildDirectory, type DirectorySource } from '../../certificate/read/directory';
 import { certificateIssuedBy, makeCrl, makeOcsp, makeSigner, type Signer } from './fixtures.test-helper';
-import { proveAnswer } from './proven-answer';
+import { DirectoryUnreachable } from '../../certificate/read/directory';
+import { chooseCarried, judgeNotRevoked, proveAnswer, proveCarried, type CarriedAnswer } from './proven-answer';
 import { revocationOf } from './revocation';
 
 const OCSP_SIGNING = '1.3.6.1.5.5.7.3.9';
@@ -63,8 +64,7 @@ describe('an answer that could only have come from the right party', () => {
     const provider = { n: ['Provider'], h: [{ s: 'granted', t: '2020-01-01T00:00:00Z' }] };
     const { shards } = await buildDirectory([{ der: responder.der, tl: 'SK', responderServices: [provider] }], 'x');
     const source = (async (name: string) => shards[name] ?? null) as DirectorySource;
-    const stranger = await makeSigner('Some Issuer');
-    expect(await proveAnswer(await answered(responder), stranger.certificate, { list: 'SK', services: [provider] }, source)).toBe('listed');
+    expect(await proveAnswer(await answered(responder), issuer.certificate, { list: 'SK', services: [provider] }, source)).toBe('listed');
   });
 });
 
@@ -105,7 +105,6 @@ describe('what anyone could have added', () => {
 
 describe('a listed responder that does not qualify', () => {
   const provider = { n: ['Provider'], h: [{ s: 'granted', t: '2020-01-01T00:00:00Z' }] };
-  const stranger = () => makeSigner('Some Issuer');
 
   const sourceFor = async (der: Uint8Array, tl: string, service: typeof provider) => {
     const { shards } = await buildDirectory([{ der, tl, responderServices: [service] }], 'x');
@@ -115,25 +114,146 @@ describe('a listed responder that does not qualify', () => {
   it('on another country\'s list', async () => {
     const responder = await makeSigner('R');
     const source = await sourceFor(responder.der, 'CZ', provider);
-    expect(await proveAnswer(await answered(responder), (await stranger()).certificate, { list: 'SK', services: [provider] }, source)).toBeNull();
+    expect(await proveAnswer(await answered(responder), issuer.certificate, { list: 'SK', services: [provider] }, source)).toBeNull();
   });
 
   it('under another provider', async () => {
     const responder = await makeSigner('R');
     const source = await sourceFor(responder.der, 'SK', { ...provider, n: ['Someone Else'] });
-    expect(await proveAnswer(await answered(responder), (await stranger()).certificate, { list: 'SK', services: [provider] }, source)).toBeNull();
+    expect(await proveAnswer(await answered(responder), issuer.certificate, { list: 'SK', services: [provider] }, source)).toBeNull();
   });
 
   it('withdrawn when it answered', async () => {
     const responder = await makeSigner('R');
     const source = await sourceFor(responder.der, 'SK', { ...provider, h: [{ s: 'withdrawn', t: '2020-01-01T00:00:00Z' }] });
-    expect(await proveAnswer(await answered(responder), (await stranger()).certificate, { list: 'SK', services: [provider] }, source)).toBeNull();
+    expect(await proveAnswer(await answered(responder), issuer.certificate, { list: 'SK', services: [provider] }, source)).toBeNull();
   });
 
   it('a certificate copying a listed responder\'s name, with another key', async () => {
     const responder = await makeSigner('R');
     const copy = await makeSigner('R');
     const source = await sourceFor(responder.der, 'SK', provider);
-    expect(await proveAnswer(await answered(copy), (await stranger()).certificate, { list: 'SK', services: [provider] }, source)).toBeNull();
+    expect(await proveAnswer(await answered(copy), issuer.certificate, { list: 'SK', services: [provider] }, source)).toBeNull();
+  });
+});
+
+describe('an answer about another key of the same authority', () => {
+  it('does not speak for this certificate, even from the issuer', async () => {
+    // A re-keyed authority: one name, two keys. The response names the old one.
+    const rekeyed = await makeSigner('Issuing CA');
+    const der = await makeOcsp(signer, rekeyed, { issuer });
+    const answer = (await revocationOf(signer.certificate, [issuer.certificate], { ocsp: [der], crl: [] }))!;
+    expect(answer.standing).toBe('holds');
+    expect(await proveAnswer(answer, rekeyed.certificate, null, nowhere)).toBeNull();
+  });
+});
+
+describe('what an answer can speak for', () => {
+  const independent = { time: new Date('2026-11-05T09:00:00Z'), independent: true };
+  const late = new Date('2026-11-05T10:00:00Z');
+
+  it('reads the status time apart from when the response was given', async () => {
+    const answer = await answered(issuer, { thisUpdate: new Date('2026-01-01T00:00:00Z') });
+    expect(answer.at?.toISOString()).toBe('2026-11-05T10:00:09.000Z');
+    expect(answer.statusAt?.toISOString()).toBe('2026-01-01T00:00:00.000Z');
+  });
+
+  it('a response given after the signature, about a moment before it, settles nothing', async () => {
+    const answer = await answered(issuer, { thisUpdate: new Date('2026-11-05T08:59:59Z') });
+    expect(answer.at!.getTime()).toBeGreaterThan(independent.time.getTime());
+    expect(judgeNotRevoked(answer, independent, signer.certificate)).toBe('before-signature');
+  });
+
+  it('a status from after a confirmed time settles it', async () => {
+    expect(judgeNotRevoked(await answered(issuer, { thisUpdate: late }), independent, signer.certificate)).toBe('settles');
+  });
+
+  it('with no independent time it settles nothing', async () => {
+    expect(judgeNotRevoked(await answered(issuer), { ...independent, independent: false }, signer.certificate)).toBe('undated');
+  });
+
+  it('after the certificate expired, an authority need no longer track it', async () => {
+    const expiry = signer.certificate.notAfter.value;
+    const after = new Date(expiry.getTime() + 1000);
+    expect(judgeNotRevoked(await answered(issuer, { thisUpdate: after }), independent, signer.certificate)).toBe('after-expiry');
+  });
+
+  it('it is no judgement of a "revoked"', async () => {
+    expect(judgeNotRevoked(await answered(issuer, { status: 'revoked' }), independent, signer.certificate)).toBeNull();
+  });
+});
+
+describe('several answers side by side', () => {
+  const evidence = async (ocsp: Uint8Array[], crl: Uint8Array[] = [], certificates = [issuer.certificate]) => ({ embedded: { ocsp, crl }, certificates });
+  const settles = () => true;
+
+  it('a forged "revoked" cannot hide a proven answer', async () => {
+    const forged = await makeSigner('OCSP Responder');
+    const { answers } = await proveCarried(
+      signer.certificate,
+      await evidence([await makeOcsp(signer, forged, { issuer, status: 'revoked' }), await makeOcsp(signer, issuer, { issuer })]),
+      issuer.certificate,
+      null,
+      nowhere,
+    );
+    expect(answers).toHaveLength(2);
+    expect(answers[0].answer.status).toBe('revoked');
+    expect(answers[0].proof).toBeNull();
+    expect(chooseCarried(answers, settles)).toMatchObject({ proof: 'issuer', answer: { status: 'good' } });
+  });
+
+  it('a proven "revoked" outranks a proven "not revoked"', async () => {
+    const { answers } = await proveCarried(
+      signer.certificate,
+      await evidence([await makeOcsp(signer, issuer, { issuer }), await makeOcsp(signer, issuer, { issuer, status: 'revoked' })]),
+      issuer.certificate,
+      null,
+      nowhere,
+    );
+    expect(chooseCarried(answers, settles)).toMatchObject({ proof: 'issuer', answer: { status: 'revoked' } });
+  });
+
+  it('prefers the proven answer that settles it over a newer one that does not', () => {
+    const answer = (statusAt: string) => ({ status: 'good', statusAt: new Date(statusAt) }) as CarriedAnswer['answer'];
+    const older = { answer: answer('2026-01-01T00:00:00Z'), proof: 'issuer' } as const;
+    const newer = { answer: answer('2026-06-01T00:00:00Z'), proof: 'issuer' } as const;
+    expect(chooseCarried([newer, older], (candidate) => candidate === older.answer)).toBe(older);
+    expect(chooseCarried([older, newer], () => false)).toBe(newer);
+  });
+
+  it('with nothing proven, the worst is reported, unproven', async () => {
+    const forged = await makeSigner('OCSP Responder');
+    const { answers } = await proveCarried(
+      signer.certificate,
+      await evidence([await makeOcsp(signer, forged, { issuer, status: 'revoked' })]),
+      issuer.certificate,
+      null,
+      nowhere,
+    );
+    expect(chooseCarried(answers, settles)).toMatchObject({ proof: null, answer: { status: 'revoked' } });
+  });
+
+  it('a list that could not be read at first is proven once the issuer is known', async () => {
+    const carried = await evidence([], [await makeCrl(issuer)], []);
+    const before = await proveCarried(signer.certificate, carried, null, null, nowhere);
+    expect(before.answers[0]).toMatchObject({ proof: null, answer: { standing: 'cannot-check' } });
+    const after = await proveCarried(signer.certificate, carried, issuer.certificate, null, nowhere);
+    expect(after.answers[0]).toMatchObject({ proof: 'issuer', answer: { standing: 'holds' } });
+  });
+
+  it('an unreachable directory keeps what is already proven, and says so', async () => {
+    const responder = await makeSigner('Maybe Listed');
+    const down: DirectorySource = async () => {
+      throw new DirectoryUnreachable('down');
+    };
+    const { answers, unreachable } = await proveCarried(
+      signer.certificate,
+      await evidence([await makeOcsp(signer, responder, { issuer }), await makeOcsp(signer, issuer, { issuer })]),
+      issuer.certificate,
+      { list: 'SK', services: [] },
+      down,
+    );
+    expect(unreachable).toBe(true);
+    expect(chooseCarried(answers, settles)?.proof).toBe('issuer');
   });
 });

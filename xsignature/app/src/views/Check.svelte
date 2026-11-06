@@ -496,6 +496,7 @@
                 holds={signature.verdict === 'intact'}
                 signerClock={signature.time}
                 carriedRevocation={signature.revocation}
+                carriedEvidence={signature.carriedEvidence}
                 isTimestamp={signature.form === 'timestamp'}
                 judge={containerJudge}
                 goTo={`${containerJudge} can say that`}

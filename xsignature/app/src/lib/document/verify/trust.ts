@@ -261,22 +261,28 @@ export function checkAgainstList(
   return { result: 'not-qualified', onQualifiedDevice: null, detail: 'The list does not treat it as a qualified certificate.' };
 }
 
-/** Whether a time authority's service was granted at that moment, by its own history. */
-export const timeAuthorityGrantedAt = (services: readonly ListedService[], moment: Date): boolean =>
+/** Whether a listed service was granted at that moment, by its own history. */
+export const serviceGrantedAt = (services: readonly ListedService[], moment: Date): boolean =>
   services.some((service) => stateAt(service, moment)?.s === 'granted');
+
+/**
+ * Whether a listed authority could act at that moment: granted, and within the dates of the listed
+ * certificate. A self-made certificate over a listed key states whatever dates it likes, so only the
+ * listed one's count. A listed authority's expired or leaked key must not be able to date anything.
+ */
+export const grantedAndInDates = (listed: { readonly services: readonly ListedService[]; readonly certificates: readonly Certificate[] }, moment: Date): boolean =>
+  serviceGrantedAt(listed.services, moment) &&
+  listed.certificates.some(
+    (evidence) => evidence.notBefore.value.getTime() <= moment.getTime() && moment.getTime() <= evidence.notAfter.value.getTime(),
+  );
 
 /**
  * The trusted list a timestamp's time rests on, or null when it rests on none: its authority is on a
  * verified list, granted at the time stated, and that time falls within its own certificate's dates.
- * A listed authority's expired or leaked key must not be able to date anything.
  */
 export async function confirmedTimeAuthority(certificate: Certificate, time: Date, source: DirectorySource): Promise<string | null> {
   const listed = await listedTimeAuthority(certificate, source);
-  if (!listed || !timeAuthorityGrantedAt(listed.services, time)) return null;
-  const within = listed.certificates.some(
-    (evidence) => evidence.notBefore.value.getTime() <= time.getTime() && time.getTime() <= evidence.notAfter.value.getTime(),
-  );
-  return within ? listed.list : null;
+  return listed && grantedAndInDates(listed, time) ? listed.list : null;
 }
 
 /** The certificate's own side of the question, from what the claims reader already parsed. */
