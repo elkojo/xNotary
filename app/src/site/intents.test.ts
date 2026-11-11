@@ -92,8 +92,54 @@ describe('the "I want to…" box (R1)', () => {
     }
   });
 
+  it.each([
+    ['nota', 'official-where'],
+    ['plná m', 'poa-what'],
+    ['power of att', 'poa-what'],
+    ['katas', 'property-what'],
+    ['apost', 'abroad-where'],
+    ['časové raz', 'proof-kind'],
+    ['výpis z obch', 'company-what'],
+    ['identifik', 'kyc-remote'],
+  ])('finds "%s", still being typed, as %s', (phrase, target) => {
+    expect(suggest(phrase)[0]?.target).toBe(target);
+  });
+
+  it.each([
+    ['notray', 'official-where'],
+    ['atorney', 'poa-what'],
+    ['power of atorney', 'poa-what'],
+    ['katastar', 'property-what'],
+    ['smlovua', 'sign-kind'],
+    ['apostile', 'abroad-where'],
+    ['nemovitsot', 'property-what'],
+    ['timestmap', 'proof-kind'],
+    ['certfied copy', 'copy-what'],
+    ['identifikace klijenta', 'kyc-remote'],
+  ])('forgives the typo in "%s": %s', (phrase, target) => {
+    expect(suggest(phrase)[0]?.target).toBe(target);
+  });
+
+  it('ranks an exact word above a partial one, and a partial above a typo', () => {
+    const score = (p: string) => suggest(p)[0].score;
+    expect(score('notary')).toBeGreaterThan(score('nota'));
+    expect(score('nota')).toBeGreaterThan(score('notray'));
+  });
+
+  it('counts a typed word once, however many terms it resembles', () => {
+    // "documents" fits `document` exactly and `dokument` with a typo: one word, one count.
+    expect(suggest('Sign property documents')[0].target).toBe('property-what');
+  });
+
+  it('only lets the word still being typed match partially', () => {
+    // "pro" ends a finished word here, so it must not pull in "property" or "prove".
+    expect(suggest('plna moc pro katastr').map((s) => s.target)).toEqual(['poa-what', 'property-what']);
+    expect(suggest('plna moc pro')[0].target).toBe('poa-what');
+  });
+
   it('falls back cleanly when nothing matches', () => {
-    for (const phrase of ['', '   ', 'zxqv nonsense words', 'hello', 'amlodipine']) expect(suggest(phrase)).toEqual([]);
+    for (const phrase of ['', '   ', 'zxqv nonsense words', 'hello', 'help', 'amlodipine', 'na', 'the', 'weather today', 'recipe for cake', 'football'])
+      expect(suggest(phrase), phrase).toEqual([]);
   });
 
   it('ignores diacritics and case, as people type', () => {

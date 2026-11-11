@@ -13,6 +13,14 @@
  * `overen podpis` matches "ověřený podpis" and "ověřeného podpisu"; a word of three letters or
  * fewer must match a whole word, so `aml` does not match "amlodipine". `strong` terms name the
  * situation outright and weigh more than `terms`, which only point towards it.
+ *
+ * Two looser matches find the best match while the reader is still typing, or mistyped, each
+ * worth less than an exact one (`QUALITY`):
+ * - **partial**: the last word typed — the one under the cursor — may be the start of a term's
+ *   word: "nota" finds `notar`, "plná mo" finds `plna moc`. Only the last word, so a finished
+ *   short word ("pro", "na") never drags in "property" or "nájem".
+ * - **typo**: one letter wrong, missing, extra or swapped in a word of five letters or more, two
+ *   from nine: "notray", "atorney", "smlovua".
  */
 import { JOURNEYS, NODES, type JourneyId, type NodeId } from './situations';
 
@@ -55,7 +63,7 @@ export const INTENTS: readonly Intent[] = [
   {
     target: 'poa-what',
     strong: ['power of attorney', 'plna moc', 'plnou moc', 'plne moci', 'plnou moci', 'zmocnen', 'zmocnit', 'proxy'],
-    terms: ['act for me', 'on my behalf', 'authorise someone', 'authorize someone', 'represent', 'zastup', 'jednat za me', 'za me', 'power', 'mandate'],
+    terms: ['act for me', 'on my behalf', 'authorise someone', 'authorize someone', 'represent', 'zastup', 'jednat za me', 'za me', 'power', 'mandate', 'attorney'],
   },
   {
     target: 'proof-kind',
@@ -134,12 +142,64 @@ export function normalize(text: string): string {
     .trim();
 }
 
-/** Whether `term` (normalized) occurs in `words`, each of its words starting a typed word. */
-function occurs(term: string, words: readonly string[]): boolean {
+/** How much a match counts, by how it matched. */
+const QUALITY = { exact: 1, partial: 0.7, typo: 0.6 } as const;
+
+/** Edit distance with adjacent swaps (optimal string alignment), stopping early past `max`. */
+function distance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let best = Infinity;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      best = Math.min(best, d[i][j]);
+    }
+    if (best > max) return max + 1;
+  }
+  return d[a.length][b.length];
+}
+
+/** How a term's word matches one typed word: 0 for not at all. `last`: the word being typed. */
+function fit(part: string, word: string, last: boolean): number {
+  if (part.length <= 3 ? word === part : word.startsWith(part)) return QUALITY.exact;
+  // Still being typed: the word so far starts the term's word. Three letters at least on its own;
+  // to finish a phrase whose other words already matched, any length (handled by `occurs`).
+  if (last && word.length >= 3 && part.startsWith(word)) return QUALITY.partial;
+  if (part.length >= 5 && word.length >= 5) {
+    const max = part.length >= 9 ? 2 : 1;
+    // A term's word is a stem, so compare it with the same length of the typed word; and the
+    // whole word too, for a letter missing from the stem itself ("atorney" for `attorney`).
+    const typo = Math.min(distance(part, word.slice(0, part.length), max), distance(part, word, max));
+    if (typo <= max) return QUALITY.typo;
+  }
+  return 0;
+}
+
+/**
+ * Where `term` (normalized) fits `words` best: its quality (0 for nowhere) and the typed words it
+ * used, so that one typed word is not counted twice — "documents" fits `document` exactly and
+ * `dokument` with a typo, and is one word.
+ */
+function occurs(term: string, words: readonly string[]): { q: number; at: number[] } {
   const parts = term.split(' ');
-  const fits = (part: string, word: string) => (part.length <= 3 ? word === part : word.startsWith(part));
-  for (let i = 0; i + parts.length <= words.length; i++) if (parts.every((p, k) => fits(p, words[i + k]))) return true;
-  return false;
+  let best = { q: 0, at: [] as number[] };
+  for (let i = 0; i + parts.length <= words.length; i++) {
+    let q = 1;
+    for (let k = 0; k < parts.length && q; k++) {
+      const at = i + k;
+      const last = at === words.length - 1;
+      let f = fit(parts[k], words[at], last);
+      // The last word of a phrase may be a single letter when the rest already fits: "plná m".
+      if (!f && last && k > 0 && parts[k].startsWith(words[at])) f = QUALITY.partial;
+      q = Math.min(q, f);
+    }
+    if (q > best.q) best = { q, at: parts.map((_, k) => i + k) };
+  }
+  return best;
 }
 
 export interface Suggestion {
@@ -150,7 +210,7 @@ export interface Suggestion {
 
 /**
  * At most two suggestions, best first, one per journey; none for a phrase that matches nothing.
- * A journey scores everything matched in it. It starts at its first question unless a term
+ * A journey scores everything matched in it, each match weighed by how well it matched. It starts at its first question unless a term
  * names one of its tool choices outright (`strong`), and then starts there. Ties keep the order
  * of the journeys on the page.
  */
@@ -159,15 +219,31 @@ export function suggest(text: string): Suggestion[] {
   if (!words.length) return [];
   const out: Suggestion[] = [];
   for (const journey of JOURNEYS) {
+    // Every match in this journey, best first; each typed word counts once, at its best.
+    const matches: { q: number; at: number[]; weight: number; target: NodeId; strong: boolean }[] = [];
+    for (const intent of INTENTS) {
+      if (NODES[intent.target].journey !== journey.id) continue;
+      for (const [terms, weight, strong] of [[intent.strong, STRONG, true], [intent.terms, TERM, false]] as const)
+        for (const t of terms) {
+          const m = occurs(t, words);
+          if (m.q) matches.push({ ...m, weight, target: intent.target, strong });
+        }
+    }
+    matches.sort((a, b) => b.q * b.weight - a.q * a.weight);
+    const used = new Set<number>();
     let score = 0;
     let target = journey.first;
     let deepest = 0;
-    for (const intent of INTENTS) {
-      if (NODES[intent.target].journey !== journey.id) continue;
-      const strong = intent.strong.filter((t) => occurs(t, words)).length;
-      score += strong * STRONG + intent.terms.filter((t) => occurs(t, words)).length * TERM;
-      if (intent.target !== journey.first && strong > deepest) [target, deepest] = [intent.target, strong];
+    const deeper = new Map<NodeId, number>();
+    for (const m of matches) {
+      // A phrase that shares a word with a better match still counts when it matched exactly:
+      // "plna moc" and "plnou moc" are different terms, and an exact phrase is real evidence.
+      if (m.q < 1 && m.at.some((i) => used.has(i))) continue;
+      m.at.forEach((i) => used.add(i));
+      score += m.q * m.weight;
+      if (m.strong && m.target !== journey.first) deeper.set(m.target, (deeper.get(m.target) ?? 0) + m.q);
     }
+    for (const [t, n] of deeper) if (n > deepest) [target, deepest] = [t, n];
     if (score) out.push({ target, journey: journey.id, score });
   }
   return out.sort((a, b) => b.score - a.score).slice(0, 2); // a stable sort keeps the page's order on a tie

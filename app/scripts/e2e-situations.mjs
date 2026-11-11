@@ -145,6 +145,8 @@ try {
     ['/?lang=cs', 'plna moc pro katastr', 'K čemu bude plná moc sloužit?'],
     ['situations/?lang=cs', 'úředně ověřený podpis', 'Kde bude dokument použit?'],
     ['situations/?lang=en', 'I need to prove my file existed', 'Make a new proof, or check one you have?'],
+    ['/?lang=en', 'nota', 'Where will the document be used?'], // still being typed
+    ['situations/?lang=en', 'power of atorney', 'What will the power of attorney be used for?'], // a typo
   ];
   const sentWhileTyping = [];
   for (const [where, phrase, expected] of intake) {
