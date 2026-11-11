@@ -17,6 +17,7 @@ export interface QuestionCs {
 export interface OutcomeCs {
   readonly title: string;
   readonly lead: string;
+  readonly why: string;
   readonly steps: readonly string[];
   readonly go: readonly string[];
 }
@@ -154,12 +155,14 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'official-cz': {
     title: 'Možná notáře vůbec nepotřebujete',
     lead: 'Kde zákon vyžaduje úředně ověřený podpis, uznává české právo místo něj uznávaný elektronický podpis — pokud úřad může z registru obyvatel ověřit, že kvalifikovaný certifikát patří vám (§ 6 odst. 2 zákona č. 12/2020 Sb.).',
+    why: 'Dokument jde do Česka, zákon vyžaduje úředně ověřený podpis a máte kvalifikovaný certifikát: právě tehdy § 6 odst. 2 zákona č. 12/2020 Sb. dovoluje nahradit ho uznávaným elektronickým podpisem.',
     steps: CZ_ROUTE_STEPS,
     go: ['Podepsat PDF'],
   },
   'official-nocert': {
     title: 'Nejdřív si pořiďte kvalifikovaný certifikát',
     lead: 'Je to jediný krok, který online postup nepřeskočí, a zajišťuje ho kvalifikovaný poskytovatel služeb vytvářejících důvěru, ne tato stránka.',
+    why: 'Online postup stojí na kvalifikovaném certifikátu přiřazeném k vám, a ten zatím nemáte.',
     steps: [
       'Vyberte si poskytovatele, který je pro Česko uveden v důvěryhodném seznamu EU.',
       'Ověří vaši totožnost — na pobočce, nebo u některých poskytovatelů online — a vydá certifikát jako soubor s klíčem nebo na kartě.',
@@ -170,6 +173,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'official-eu': {
     title: 'Zeptejte se příjemce, co přijme',
     lead: 'Každá země si sama určuje, jak se podpis úředně ověřuje. Kvalifikovaný elektronický podpis má v celé EU účinky vlastnoručního podpisu, sám o sobě ale nikde není úředně ověřeným podpisem.',
+    why: 'Dokument jde do jiné země EU a jen její pravidla určují, jak se tam podpis úředně ověřuje.',
     steps: [
       'Zeptejte se, zda přijmou kvalifikovaný elektronický podpis, nebo elektronickou náhradu ověřeného podpisu podle práva své země.',
       'Pokud ne: notář, doma nebo v jejich zemi. Někteří jednají na dálku, přes videokonferenci.',
@@ -180,6 +184,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'official-deed': {
     title: 'Tady je potřeba notář',
     lead: 'Notářský zápis sepisuje notář. Žádný nástroj pro podpis, tady ani jinde, ho nevytvoří.',
+    why: 'Notářský zápis je úkon notáře, ne druh podpisu.',
     steps: [
       'Zeptejte se příjemce, ze které země musí zápis pocházet.',
       'Zeptejte se tamního notáře, zda se můžete zúčastnit přes videokonferenci. V Česku to notářský řád umožňuje s prostředkem pro elektronickou identifikaci s vysokou úrovní záruky (§ 64a), pokud to notář nabízí.',
@@ -189,6 +194,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'official-unsure': {
     title: 'Nejdřív zjistěte, co se vyžaduje',
     lead: 'Podpis PDF, úřední ověření podpisu a sepsání notářského zápisu jsou různé postupy. Udělat ten nesprávný stojí víc než se zeptat.',
+    why: 'Postup závisí na tom, co příjemce chce, a to zatím nevíte.',
     steps: [
       'Zeptejte se příjemce: přijmete elektronický podpis, nebo potřebujete úředně ověřený podpis či notářský zápis?',
       'Pokud úředně ověřený podpis: zeptejte se, který zákon ho vyžaduje. Online postup platí jen tam, kde ho vyžaduje zákon.',
@@ -219,6 +225,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'sign-keyfile': {
     title: 'Podepište ho souborem s klíčem',
     lead: '„Podepsat PDF“ umístí váš podpis na stránku a podepíše soubor vaším certifikátem, přímo v tomto prohlížeči.',
+    why: 'Příjemce čeká podpis certifikátem a váš klíč je v souboru, který tento prohlížeč umí přečíst.',
     steps: [
       'Soubor s klíčem se čte ve vašem zařízení a nikam se neodesílá.',
       'Podpis ze souboru s klíčem je zaručený elektronický podpis, nikdy kvalifikovaný: soubor lze zkopírovat. Ověřte si, že příjemce tuto úroveň přijme.',
@@ -228,6 +235,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'sign-card': {
     title: 'Použijte program ke své kartě',
     lead: 'Ke klíči na kartě nebo tokenu se webová stránka nedostane, takže tato stránka jím podepisovat neumí. Právě to, že klíč nikdy neopustí certifikovaný hardware, dělá takový podpis kvalifikovaným.',
+    why: 'Váš klíč je na kartě nebo tokenu, ke kterým se webová stránka nedostane.',
     steps: [
       'Podepište programem, který jste dostali ke kartě, nebo který poskytuje vaše certifikační autorita.',
       'Co podepsaný soubor tvrdí, pak můžete zkontrolovat zde.',
@@ -237,6 +245,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'sign-nocert': {
     title: 'Nejdřív si pořiďte certifikát',
     lead: 'Certifikační autorita ho vydá poté, co ověří vaši totožnost — někde online, jinde osobně.',
+    why: 'Podpis certifikátem potřebuje certifikát, a ten zatím nemáte.',
     steps: [
       'Zeptejte se příjemce, jakou úroveň podpisu přijme.',
       'Pro kvalifikovaný certifikát vyberte poskytovatele z důvěryhodného seznamu toho právního rámce, ve kterém příjemce působí — v EU kvalifikovaného poskytovatele služeb vytvářejících důvěru.',
@@ -247,6 +256,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'sign-picture': {
     title: 'Dejte na něj obrázek svého podpisu',
     lead: 'Obrázek si vytvořte jednou a pak ho umístěte na PDF.',
+    why: 'Příjemce čeká jen viditelnou značku, ne podpis, který ukazuje, kdo podepsal.',
     steps: ['Obrázek nic nedokazuje o tom, kdo ho tam dal: kdokoli s tímto obrázkem může udělat totéž.'],
     go: ['Vytvořit obrázek podpisu', 'Umístit ho na PDF'],
   },
@@ -265,6 +275,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'poa-private': {
     title: 'Podepište ji a předejte zmocněnci',
     lead: 'Plná moc pro soukromou záležitost nepotřebuje zvláštní formu, pokud ji druhá strana nevyžaduje.',
+    why: 'Plná moc pro soukromou záležitost nemá předepsanou formu.',
     steps: [
       'Napište, kdo smí jednat, v čem a do kdy.',
       'Podepište ji — certifikátem pro silnější důkaz, kdo podepsal, nebo vlastnoručně.',
@@ -275,6 +286,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'poa-deed': {
     title: 'Podpis na ní musí ověřit oprávněná osoba',
     lead: 'Pro úkon, který vyžaduje formu veřejné listiny, potřebuje plná moc úředně ověřený podpis, a elektronická náhrada podle § 6 odst. 2 zákona č. 12/2020 Sb. se na ni nevztahuje (§ 6 odst. 3).',
+    why: '§ 6 odst. 3 zákona č. 12/2020 Sb. vylučuje z elektronického postupu právě takovou plnou moc.',
     steps: [
       'Nechte podpis ověřit osobně, u notáře nebo na pracovišti Czech POINT.',
       'Nebo se zeptejte notáře, zda umí ověřit elektronický podpis na dálku (§ 74a notářského řádu), nebo zda se notářského úkonu můžete místo udělení plné moci zúčastnit sami přes videokonferenci (§ 64a).',
@@ -295,12 +307,14 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'proof-make': {
     title: 'Opatřete soubor časovým razítkem',
     lead: 'Vaše zařízení opustí jen otisk souboru. Soubor a jeho certifikát uchovávejte spolu.',
+    why: 'Chcete doklad o tom, kdy soubor existoval, a k tomu nepotřebujete certifikát ani nikoho dalšího.',
     steps: ['Časové razítko ukazuje, že soubor do té doby existoval. Neříká nic o tom, kdo ho napsal ani zda je pravdivý.'],
     go: ['Doložit, že soubor existoval'],
   },
   'proof-check': {
     title: 'Porovnejte soubor s jeho certifikátem',
     lead: 'Potřebujete původní, nezměněný soubor a certifikát, který pro něj vznikl.',
+    why: 'Máte soubor a certifikát, který pro něj vznikl, takže jde o to, zda si odpovídají.',
     steps: ['Shoda ukazuje, že soubor existoval nejpozději k času uvedenému v certifikátu. Neukazuje, kdo ho napsal.'],
     go: ['Ověřit důkaz xNotary'],
   },
@@ -317,6 +331,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'check-pdf': {
     title: 'Podívejte se, co tvrdí podpisy v něm',
     lead: '„Zkontrolovat podepsaný soubor“ přečte každý podpis a zjistí, zda se soubor od podpisu změnil.',
+    why: 'Dostali jste podepsané PDF, takže první otázka je, co tvrdí jeho podpisy.',
     steps: ['Zda si certifikát podepisujícího zaslouží důvěru, posoudí váš prohlížeč PDF podle důvěryhodného seznamu právního rámce, ve kterém byl vydán.'],
     go: ['Zkontrolovat podepsaný soubor'],
   },
@@ -336,6 +351,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'copy-paper': {
     title: 'Nechte si kopii ověřit osobně',
     lead: 'Oprávněné pracoviště porovná kopii s originálem a ověří, že se shodují.',
+    why: 'Ověřená kopie porovnává papír s papírem, a to umí jen oprávněné pracoviště.',
     steps: [
       'Zaneste originál na pracoviště Czech POINT (mnoho poboček pošty a obecních úřadů) nebo k notáři.',
       'Pokud potřebujete jen doložit, že soubor v daném čase existoval, časové razítko to udělá online — ověřená kopie to ale není.',
@@ -345,6 +361,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'copy-convert': {
     title: 'Požádejte o autorizovanou konverzi',
     lead: 'Autorizovaná konverze převede papírový dokument na elektronický, nebo naopak, se stejnými právními účinky, jako má originál.',
+    why: 'Jen autorizovaná konverze dává nové podobě stejné právní účinky, jako má originál.',
     steps: ['Provádí ji pracoviště Czech POINT, notář nebo jiné oprávněné pracoviště. Vezměte s sebou originál.'],
     go: [],
   },
@@ -362,6 +379,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'company-deed': {
     title: 'Tady je potřeba notářský zápis',
     lead: 'Založení společnosti s ručením omezeným a změna jejího zakladatelského dokumentu se dělají před notářem, formou notářského zápisu.',
+    why: 'Společnost s ručením omezeným se ze zákona zakládá notářským zápisem.',
     steps: [
       'Zeptejte se notáře, zda se můžete zúčastnit přes videokonferenci s prostředkem pro elektronickou identifikaci (§ 64a notářského řádu). Ne každý notář to nabízí.',
       'Notář obvykle podá změnu do obchodního rejstříku sám.',
@@ -371,6 +389,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'company-filing': {
     title: 'Podepište ji uznávaným elektronickým podpisem',
     lead: 'Kde rejstřík na takové listině vyžaduje úředně ověřený podpis, platí český online postup: uznávaný elektronický podpis na kvalifikovaném certifikátu, který lze přes registr obyvatel přiřadit k vám (§ 6 odst. 2 zákona č. 12/2020 Sb.).',
+    why: 'Rejstřík vyžaduje úředně ověřený podpis a v Česku ho § 6 odst. 2 zákona č. 12/2020 Sb. dovoluje nahradit uznávaným elektronickým podpisem.',
     steps: CZ_ROUTE_STEPS,
     go: ['Podepsat PDF'],
   },
@@ -378,6 +397,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'company-authority': {
     title: 'Opatřete si úřední výpis z rejstříku',
     lead: 'Kdo smí za firmu jednat, je zapsáno v obchodním rejstříku, a doklad o tom vydává rejstřík. Výtisk z jeho veřejných webových stránek je jen informativní: úřední výpis to není.',
+    why: 'Kdo smí za firmu jednat, může doložit jen rejstřík, takže doklad musí pocházet od něj.',
     steps: [
       'V Česku: ověřený výstup z pracoviště Czech POINT, nebo úředně ověřený elektronický opis z rejstříku (§ 3 a § 5 zákona č. 304/2013 Sb.).',
       'Na Slovensku: požádejte o elektronický výpis přes e-službu na slovensko.sk. Rejstříkový soud ho vydá bezplatně, opatřený kvalifikovanou elektronickou pečetí, jako soubor .asice.',
@@ -395,6 +415,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'property-contract': {
     title: 'Zeptejte se advokáta nebo katastrálního úřadu, jakou formu potřebuje',
     lead: 'Katastr nemovitostí má vlastní pravidla pro to, jak se smlouva podepisuje, na papíře i elektronicky, a každá strana je musí splnit.',
+    why: 'Katastr nemovitostí si sám určuje formu smlouvy, podle které zapisuje.',
     steps: [
       'Zeptejte se, jaké podpisy přijme od každé strany a zda smlouva potřebuje kvalifikované elektronické časové razítko.',
       'Časové razítko z této stránky je ukotvené v Bitcoinu: dokládá, kdy soubor existoval, ale kvalifikované časové razítko to není.',
@@ -429,6 +450,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'abroad-esig-eu': {
     title: 'Kvalifikovaný podpis platí v celé EU',
     lead: 'V EU má kvalifikovaný elektronický podpis účinky vlastnoručního podpisu a podpis vytvořený v jednom členském státě uznávají všechny ostatní.',
+    why: 'V EU uznávají kvalifikovaný elektronický podpis vytvořený v jednom členském státě všechny ostatní.',
     steps: [
       'Podpis vytvořený zde ze souboru s klíčem je zaručený, ne kvalifikovaný. Ověřte si, že ho příjemce přijme, nebo podepište kvalifikovaným podpisem od svého poskytovatele.',
       'Zeptejte se, zda podpis nepotřebují navíc úředně ověřený: kvalifikovaný podpis to není.',
@@ -438,6 +460,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'abroad-esig-world': {
     title: 'Zeptejte se příjemce, jaké podpisy přijme',
     lead: 'Mimo EU nic nenutí příjemce přijmout elektronický podpis vytvořený podle pravidel EU.',
+    why: 'Mimo EU rozhodují o tom, které elektronické podpisy platí, pravidla příjemce.',
     steps: [
       'Zeptejte se, jaký druh elektronického podpisu a jaký formát přijme.',
       'Pokud přijme podpis certifikátem, podepište PDF a pošlete ho tak, jak požaduje.',
@@ -447,6 +470,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'abroad-sworn-eu': {
     title: 'Tady je potřeba notář',
     lead: 'Prohlášení „před notářem“ znamená, že notář vidí, jak podepisujete, a ověří to. Žádný nástroj pro podpis to nedokáže.',
+    why: 'Podpis před notářem vyžaduje, aby u toho notář byl, a to žádný nástroj nedokáže.',
     steps: [
       'Notář v Česku ověří váš podpis na prohlášení, i na anglickém formuláři.',
       'Zeptejte se příjemce, zda navíc nepotřebuje překlad nebo apostilu na notářském ověření.',
@@ -456,6 +480,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'abroad-sworn-world': {
     title: 'Notář a obvykle apostila',
     lead: 'Notář ověří váš podpis. Mimo EU chce země příjemce obvykle ještě apostilu na tomto ověření — nebo, pokud není stranou Haagské úmluvy, superlegalizaci.',
+    why: 'Mimo EU potřebuje notářské ověření obvykle apostilu, než se na ně jiná země spolehne.',
     steps: [
       'Nechte si podpis ověřit u notáře.',
       'Zeptejte se příjemce, zda potřebuje apostilu, superlegalizaci nebo překlad, a ověřte si zemi v seznamu smluvních států úmluvy.',
@@ -467,6 +492,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'kyc-remote': {
     title: 'Zvolte postup, který AML zákon dovoluje',
     lead: 'Povinná osoba podle AML zákona — realitní zprostředkovatel, leasingová společnost, poskytovatel úvěru — musí klienta identifikovat dřív, než s ním uzavře obchod. První identifikace probíhá za fyzické přítomnosti, pokud zákon nedovoluje postup na dálku. Tato stránka nikoho neidentifikuje.',
+    why: 'Jak lze klienta identifikovat, určuje AML zákon, a na dálku jen za jeho podmínek.',
     steps: [
       'Na dálku zákon přijímá prostředek pro elektronickou identifikaci s vysokou úrovní záruky, včetně bankovní identity za podmínek, které zákon stanoví (§ 8a).',
       'V případech s nižším rizikem dovoluje i některé další způsoby na dálku, například identifikační údaje podepsané kvalifikovaným elektronickým podpisem (§ 11).',

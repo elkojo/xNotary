@@ -637,6 +637,61 @@ footer.site .family-links a {
 }
 
 /* ------------------------------------------------------ /situations/ -- */
+/* The "I want to…" box (Intake.svelte), above the cards on the front page and /situations/. */
+
+.intake {
+  max-width: 720px;
+  margin: 0 0 28px;
+}
+/* The front page centres its hero; the box follows it there, its own text still reading left. */
+.hub .intake {
+  margin: 28px auto 32px;
+}
+.intake-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13px;
+  font-weight: 720;
+}
+.intake-row {
+  display: flex;
+  gap: 8px;
+}
+.intake-row .input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 16px;
+}
+.intake-note {
+  margin: 6px 0 0;
+  color: var(--faint);
+  font-size: 12px;
+}
+.intake-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: baseline;
+  margin-top: 12px;
+  font-size: 14px;
+}
+.intake-suggestions span {
+  color: var(--ink-soft);
+}
+.intake-suggestions a {
+  color: var(--ink);
+  font-weight: 600;
+}
+.intake-suggestions a.lead {
+  font-weight: 800;
+}
+.intake-none {
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
 /* Start from your situation (hub/Situations.svelte). The cards and answers borrow the task
    menu's look — a title over a line of description — because they are the same kind of thing. */
 
@@ -756,6 +811,47 @@ a.situation-card {
   color: var(--faint);
   font-size: 12.5px;
   line-height: 1.6;
+}
+.situation-why {
+  margin-top: 20px;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.situation-why summary {
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+.situation-why p {
+  margin: 10px 0 0;
+}
+.situation-why ol {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+.situation-why li > * + * {
+  margin-left: 8px;
+}
+.situation-why li + li {
+  margin-top: 4px;
+}
+.situation-why li > span::after {
+  content: ' →';
+}
+.situation-why strong {
+  color: var(--ink);
+}
+.situation-why .place-code {
+  padding: 0 4px;
+  border: 1px solid var(--line-dark);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.situation-why-reason {
+  color: var(--ink);
 }
 .situation-examples {
   margin-top: 22px;

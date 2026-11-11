@@ -9,11 +9,12 @@
 -->
 <script lang="ts">
   import Info from '../src/site/Info.svelte';
+  import Intake from '../src/site/Intake.svelte';
   import SiteBar from '../src/site/SiteBar.svelte';
   import Stepper from '../src/site/Stepper.svelte';
   import { pick, site } from '../src/site/lang.svelte';
   import { TASKS, pageHref } from '../src/site/services';
-  import { JOURNEYS, NODES, examplesChecked, journeyOf, situationsIn, stageOf, type NodeId, type Place } from '../src/site/situations';
+  import { JOURNEYS, NODES, examplesChecked, journeyOf, situationsIn, stageOf, trail, type NodeId, type Place } from '../src/site/situations';
   import HubFooter from './HubFooter.svelte';
 
   let menu = $state<'services' | 'tasks' | null>(null);
@@ -47,6 +48,8 @@
   const here = $derived(path.at(-1) ?? null);
   const node = $derived(here ? words.nodes[here] : null);
   const journey = $derived(here ? words.journeys.find((j) => j.id === journeyOf(here).id)! : null);
+  /** The answers that led here, in the chosen language (R4). */
+  const answered = $derived(trail(path, words.nodes));
 
   const TEXT = {
     en: {
@@ -60,6 +63,11 @@
       sources: 'Sources',
       checked: 'checked',
       examples: 'Examples of providers',
+      why: 'Why this route?',
+      youSaid: 'You said:',
+      change: 'Change an answer',
+      direct: 'You opened this step directly, so no answers led here.',
+      fromStart: 'Answer the questions from the start',
       notAdvice: 'Information, not legal advice. Rules change; the recipient has the last word.',
       foot: 'Document tools and guidance, not notarial services or legal advice. What a recipient accepts depends on the country, the document and the recipient.',
     },
@@ -74,6 +82,11 @@
       sources: 'Zdroje',
       checked: 'ověřeno',
       examples: 'Příklady poskytovatelů',
+      why: 'Proč právě tento postup?',
+      youSaid: 'Odpověděli jste:',
+      change: 'Změnit odpověď',
+      direct: 'Tento krok jste otevřeli přímo, takže sem nevedly žádné odpovědi.',
+      fromStart: 'Projít otázky od začátku',
       notAdvice: 'Informace, ne právní rada. Pravidla se mění; poslední slovo má příjemce.',
       foot: 'Nástroje pro dokumenty a orientace v nich, ne notářské služby ani právní poradenství. Co příjemce přijme, záleží na zemi, na dokumentu a na příjemci.',
     },
@@ -107,6 +120,8 @@
     </div>
 
     {#if !node || !journey}
+      <Intake onpick={(id) => (path = [id])} />
+
       <div class="situation-grid">
         {#each words.journeys as j, i}
           <button class="situation-card" class:lead={i === 0} type="button" onclick={() => begin(j.first)}>
@@ -181,6 +196,35 @@
                   {/each}
                 </div>
               {/if}
+              <!--
+                Why this route? (R4) The answers that led here, each with a way back to its question,
+                and the one sentence that decides the route. Folded: the outcome comes first.
+              -->
+              <details class="situation-why">
+                <summary>{t.why}</summary>
+                {#if answered.length}
+                  <p>{t.youSaid}</p>
+                  <ol>
+                    {#each answered as step}
+                      <li>
+                        <span>{step.question.title}</span>
+                        <strong
+                          >{#if step.answer.place && PLACES[step.answer.place].code}<span class="place-code" translate="no"
+                              >{PLACES[step.answer.place].code}</span
+                            >{' '}{/if}{step.answer.label}</strong
+                        >
+                        <button class="link-button" type="button" onclick={() => (path = path.slice(0, step.at + 1))}>{t.change}</button>
+                      </li>
+                    {/each}
+                  </ol>
+                {:else}
+                  <p>
+                    {t.direct}
+                    <button class="link-button" type="button" onclick={() => begin(journeyOf(here!).first)}>{t.fromStart}</button>
+                  </p>
+                {/if}
+                <p class="situation-why-reason">{node.why}</p>
+              </details>
               {#if node.examples?.length}
                 <!--
                   Who does the step this site cannot, as examples (R3). The note is one visible line,

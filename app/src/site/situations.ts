@@ -79,6 +79,11 @@ export interface Question {
   readonly title: string;
   readonly lead: string;
   readonly answers: readonly Answer[];
+  /**
+   * Its answers choose a tool, not a legal route, so the "I want to…" box may answer it for the
+   * reader (intents.ts). Every other question decides a route and is always asked.
+   */
+  readonly choosesTool?: true;
 }
 
 export interface Outcome {
@@ -87,6 +92,8 @@ export interface Outcome {
   readonly light: Light;
   readonly title: string;
   readonly lead: string;
+  /** "Why this route?" (R4): the one sentence that decides it, shown under the answers that led here. */
+  readonly why: string;
   readonly steps: readonly string[];
   /** The tools that do the next step, by service and page. */
   readonly go: readonly { readonly service: ServiceId; readonly page: string; readonly label: string }[];
@@ -330,6 +337,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'online',
     title: 'You may not need a notary at all',
     lead: 'Where a law requires an officially verified signature, Czech law accepts a recognised electronic signature instead — if the authority can confirm through the population register that the qualified certificate is yours (§ 6(2) of Act 12/2020 Coll.).',
+    why: 'The document goes to Czechia, a law asks for an officially verified signature, and you have a qualified certificate: that is when § 6(2) of Act 12/2020 Coll. lets a recognised electronic signature stand in for it.',
     steps: CZ_ROUTE_STEPS,
     go: [{ service: 'xsignature', page: 'document', label: 'Sign a PDF' }],
     sources: [S.dia, S.act12, S.portal, S.act297],
@@ -341,6 +349,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'assisted',
     title: 'First, get a qualified certificate',
     lead: 'It is the one step the online route cannot skip, and a qualified trust service provider does it, not this site.',
+    why: 'The online route rests on a qualified certificate tied to you, and you do not have one yet.',
     steps: [
       'Choose a provider listed for Czechia on the EU trust list.',
       'It checks who you are — at a branch, or online with some providers — and issues the certificate as a key file or on a card.',
@@ -357,6 +366,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'assisted',
     title: 'Ask the recipient what they accept',
     lead: 'Each country decides how a signature is officially verified. A qualified electronic signature has the effect of a handwritten one across the EU, but it is not an officially verified signature by itself, anywhere.',
+    why: 'The document goes to another EU country, and only that country\'s rules decide how a signature is officially verified there.',
     steps: [
       'Ask whether they accept a qualified electronic signature, or their own country’s electronic substitute for a verified one.',
       'If not: a notary, at home or in their country. Some act remotely, by video.',
@@ -372,6 +382,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'in-person',
     title: 'This needs a notary',
     lead: 'A notarial deed is drawn up by a notary. No signature tool, here or anywhere else, makes one.',
+    why: 'A notarial deed is an act of the notary, not a kind of signature.',
     steps: [
       'Ask the recipient which country the deed must come from.',
       'Ask a notary there whether you can take part by video. In Czechia the Notarial Code allows it with an electronic identity at the high level (§ 64a), where the notary offers it.',
@@ -386,6 +397,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'assisted',
     title: 'First, find out what is required',
     lead: 'Signing a PDF, having a signature officially verified and having a deed drawn up are different procedures. Doing the wrong one costs more than asking.',
+    why: 'The route depends on what the recipient asked for, and that is not known yet.',
     steps: [
       'Ask the recipient: do you accept an electronic signature, or do you need an officially verified signature or a notarial deed?',
       'If an officially verified signature: ask which law requires it. The online route applies only where a law does.',
@@ -429,6 +441,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'online',
     title: 'Sign it with your key file',
     lead: 'Sign a PDF places your signature on the page and signs the file with your certificate, in this browser.',
+    why: 'The recipient expects a signature made with a certificate, and your key is in a file this browser can read.',
     steps: [
       'The key file is read on your device and never sent.',
       'A signature made from a key file is an advanced signature, never a qualified one: a file can be copied. Check that the recipient accepts that level.',
@@ -441,6 +454,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'assisted',
     title: "Use your card's own signing software",
     lead: 'A key on a card or a token cannot be reached from a web page, so this site cannot sign with it. That the key never leaves certified hardware is what makes such a signature qualified.',
+    why: 'Your key is on a card or a token, which a web page cannot reach.',
     steps: [
       'Sign with the software that came with your card, or that your certificate authority provides.',
       'You can then check what the signed file claims here.',
@@ -453,6 +467,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'assisted',
     title: 'Get a certificate first',
     lead: 'A certificate authority issues one after checking who you are — some online, some in person.',
+    why: 'A signature made with a certificate needs a certificate, and you do not have one yet.',
     steps: [
       'Ask the recipient which level of signature they accept.',
       'For a qualified certificate, choose a provider on the trust list of the framework the recipient works under — in the EU, a qualified trust service provider.',
@@ -469,6 +484,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'online',
     title: 'Put a picture of your signature on it',
     lead: 'Make the picture once, then place it on the PDF.',
+    why: 'The recipient expects only a visible mark, not a signature that shows who signed.',
     steps: ['A picture proves nothing about who put it there: anyone with the image can do the same.'],
     go: [
       { service: 'xsignature', page: 'signature', label: 'Make a signature image' },
@@ -504,6 +520,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'online',
     title: 'Sign it and give it to the person',
     lead: 'A power of attorney for a private matter needs no particular form, unless the other side asks for one.',
+    why: 'A power of attorney for a private matter has no required form.',
     steps: [
       'Write who may act, for what, and until when.',
       'Sign it — with a certificate for stronger evidence of who signed, or by hand.',
@@ -517,6 +534,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'assisted',
     title: 'Its signature must be verified by an authorised person',
     lead: 'For an act that needs a public deed, the power of attorney needs an officially verified signature, and the electronic substitute in § 6(2) of Act 12/2020 Coll. does not apply to it (§ 6(3)).',
+    why: '§ 6(3) of Act 12/2020 Coll. excludes exactly this power of attorney from the electronic route.',
     steps: [
       'Have the signature verified in person, at a notary or a Czech POINT office.',
       'Or ask the notary whether they can verify an electronic signature remotely (§ 74a of the Notarial Code), or whether you can take part in the notarial act by video yourself instead of giving a power of attorney (§ 64a).',
@@ -534,6 +552,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     stage: 0,
     title: 'Make a new proof, or check one you have?',
     lead: 'No certificate is needed for either.',
+    choosesTool: true,
     answers: [
       { label: 'Make a proof for a file now', hint: 'Later, show that this exact version existed by then.', next: 'proof-make' },
       { label: 'Check a proof I already have', hint: 'Match the original file to its certificate.', next: 'proof-check' },
@@ -545,6 +564,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'online',
     title: 'Timestamp the file',
     lead: 'Only a fingerprint of the file leaves your device. Keep the file and its certificate together.',
+    why: 'You want evidence of when a file existed, which needs no certificate and nobody else.',
     steps: ['A timestamp shows the file existed by that time. It says nothing about who wrote it, or whether it is true.'],
     go: [{ service: 'xnotary', page: 'notarize', label: 'Prove a file existed' }],
   },
@@ -554,6 +574,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'online',
     title: 'Match the file to its certificate',
     lead: 'You need the original file, unchanged, and the certificate made for it.',
+    why: 'You have a file and the certificate made for it, so the question is whether they match.',
     steps: ['A match shows the file existed by the time the certificate states. It does not show who wrote it.'],
     go: [{ service: 'xnotary', page: 'verify', label: 'Verify an xNotary proof' }],
   },
@@ -565,6 +586,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     stage: 0,
     title: 'What did you receive?',
     lead: 'Two different checks, for two different things.',
+    choosesTool: true,
     answers: [
       { label: 'A signed PDF', hint: 'See who it says signed it, and whether it changed since.', next: 'check-pdf' },
       { label: 'A file and its xNotary certificate', hint: 'Match the file to the proof.', next: 'proof-check' },
@@ -576,6 +598,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'online',
     title: 'See what the signatures in it claim',
     lead: 'Check a signed file reads each signature, and whether the file has changed since it was signed.',
+    why: 'You received a signed PDF, so the first question is what its signatures claim.',
     steps: ["Whether the signer's certificate deserves trust is for your PDF reader to say, against the trust list of the framework it was issued under."],
     go: [{ service: 'xsignature', page: 'check', label: 'Check a signed file' }],
   },
@@ -602,6 +625,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'in-person',
     title: 'Have the copy certified in person',
     lead: 'An authorised office compares the copy with the original and certifies that they match.',
+    why: 'A certified copy compares paper with paper, which only an authorised office can do.',
     steps: [
       'Take the original to a Czech POINT office (many post offices and municipal offices) or to a notary.',
       'If you only need to show that a file existed at a given time, a timestamp does that online — but it is not a certified copy.',
@@ -616,6 +640,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'in-person',
     title: 'Ask for an authorised conversion',
     lead: 'Authorised conversion turns a paper document into an electronic one, or the reverse, with the same legal force as the original.',
+    why: 'Only authorised conversion gives the new form the legal force of the original.',
     steps: ['A Czech POINT office, a notary or another authorised office does it. Bring the original.'],
     go: [],
     sources: [S.conversion],
@@ -649,6 +674,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'assisted',
     title: 'This needs a notarial deed',
     lead: 'Founding a limited company and changing its founding document are done before a notary, as a notarial deed.',
+    why: 'By law, a limited company is founded by a notarial deed.',
     steps: [
       'Ask a notary whether you can take part by video with an electronic identity (§ 64a of the Notarial Code). Not every notary offers it.',
       'The notary usually files the change with the commercial register directly.',
@@ -663,6 +689,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'online',
     title: 'Sign it with a recognised electronic signature',
     lead: 'Where the register requires an officially verified signature on such a document, the Czech online route applies: a recognised electronic signature on a qualified certificate that can be tied to you through the population register (§ 6(2) of Act 12/2020 Coll.).',
+    why: 'The register asks for an officially verified signature, and in Czechia § 6(2) of Act 12/2020 Coll. lets a recognised electronic signature replace it.',
     steps: CZ_ROUTE_STEPS,
     go: [{ service: 'xsignature', page: 'document', label: 'Sign a PDF' }],
     sources: [S.dia, S.act12, S.portal, S.act297],
@@ -675,6 +702,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'assisted',
     title: 'Get an official extract from the register',
     lead: 'Who may act for a company is in the commercial register, and the register issues the proof. A printout from its public website is for information only: it is not an official extract.',
+    why: 'Only the register can show who may act for a company, so the proof must come from it.',
     steps: [
       'In Czechia: a verified extract from a Czech POINT office, or an officially verified electronic copy from the register (§§ 3 and 5 of Act 304/2013 Coll.).',
       'In Slovakia: request the electronic extract through the e-service on slovensko.sk. The registry court issues it free of charge, sealed with a qualified electronic seal, as an .asice file.',
@@ -703,6 +731,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'assisted',
     title: 'Ask your lawyer or the land registry which form it needs',
     lead: 'The land registry has its own rules for how a contract is signed, on paper or electronically, and every party has to meet them.',
+    why: 'The land registry sets its own form for a contract it acts on.',
     steps: [
       'Ask which signatures it accepts from each party, and whether the contract needs a qualified electronic timestamp.',
       'A timestamp from this site is anchored in Bitcoin: it is evidence of when a file existed, not a qualified timestamp.',
@@ -757,6 +786,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'online',
     title: 'A qualified signature carries across the EU',
     lead: 'In the EU, a qualified electronic signature has the effect of a handwritten one, and one made in one member state is recognised in all of them.',
+    why: 'Within the EU, a qualified electronic signature made in one member state is recognised in all of them.',
     steps: [
       'A signature made here from a key file is advanced, not qualified. Check that the recipient accepts that, or sign with a qualified signature from your provider.',
       'Ask whether they also need the signature verified by an authority: a qualified signature is not that.',
@@ -771,6 +801,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'assisted',
     title: 'Ask the recipient which signatures they accept',
     lead: 'Outside the EU, nothing obliges a recipient to accept an electronic signature made under EU rules.',
+    why: 'Outside the EU, the recipient\'s own rules decide which electronic signatures count.',
     steps: [
       'Ask which kind of electronic signature, and which format, they accept.',
       'If they accept a signature made with a certificate, sign the PDF and send it as they ask.',
@@ -783,6 +814,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'in-person',
     title: 'This needs a notary',
     lead: 'A declaration "before a notary" means a notary sees you sign and certifies it. No signature tool does that.',
+    why: 'Signing before a notary needs the notary to witness it, which no tool can do.',
     steps: [
       'A notary in Czechia certifies your signature on the declaration, also on an English-language form.',
       'Ask the recipient whether they also need a translation, or an apostille on the notary’s certification.',
@@ -797,6 +829,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'in-person',
     title: 'A notary, and usually an apostille',
     lead: 'A notary certifies your signature. Outside the EU, the recipient’s country usually also wants an apostille on that certification — or, where it is not party to the Hague Convention, a consular legalisation.',
+    why: 'Outside the EU, a notary\'s certification usually needs an apostille before another country relies on it.',
     steps: [
       'Have the signature certified by a notary.',
       'Ask the recipient whether they need an apostille, a consular legalisation or a translation, and check the country on the Convention list.',
@@ -813,6 +846,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     light: 'assisted',
     title: 'Use a route the AML Act allows',
     lead: 'A firm the AML Act obliges — an estate agent, a leasing company, a lender — must identify a client before doing business. The first identification is in person, unless the Act allows a remote route. This site does not identify anyone.',
+    why: 'The AML Act decides how a client may be identified, and remotely only on its terms.',
     steps: [
       'Remotely, the Act accepts an electronic identity at the high level, including a bank identity under the conditions the Act sets (§ 8a).',
       'In lower-risk cases it allows a few other remote methods, such as identification data signed with a qualified electronic signature (§ 11).',
@@ -832,6 +866,25 @@ export const journeyOf = (node: NodeId): Journey => JOURNEYS.find((j) => j.id ==
 export function stageOf(node: NodeId): number {
   const n = NODES[node];
   return n.kind === 'question' ? n.stage : journeyOf(node).stages.length - 1;
+}
+
+/**
+ * The answers that led along `path` (a list of node ids, as /situations/ keeps it): for each
+ * question but the last node, the answer whose `next` is the following node. "Why this route?"
+ * shows them, each with a way back to its question. A path opened mid-way — from a link to one
+ * step, or from the "I want to…" box — starts later and has fewer answers, never invented ones.
+ */
+export function trail(
+  path: readonly NodeId[],
+  nodes: Readonly<Record<NodeId, SituationNode>> = NODES,
+): { readonly at: number; readonly question: Question; readonly answer: Answer }[] {
+  const out: { at: number; question: Question; answer: Answer }[] = [];
+  for (let i = 0; i < path.length - 1; i++) {
+    const q = nodes[path[i]];
+    const answer = q?.kind === 'question' ? q.answers.find((a) => a.next === path[i + 1]) : undefined;
+    if (q?.kind === 'question' && answer) out.push({ at: i, question: q, answer });
+  }
+  return out;
 }
 
 /**
@@ -858,6 +911,7 @@ export function situationsIn(lang: Lang): {
         ...node,
         title: o.title,
         lead: o.lead,
+        why: o.why,
         steps: o.steps,
         go: node.go.map((g, i) => ({ ...g, label: o.go[i] })),
         sources: node.sources?.map((s) => ({ ...s, label: SOURCES_CS[s.url] ?? s.label })),

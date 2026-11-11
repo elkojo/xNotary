@@ -6,7 +6,7 @@ const outcomes = Object.entries(NODES).filter((e): e is [string, Outcome] => e[1
 const textOf = (node: (typeof NODES)[string]) =>
   node.kind === 'question'
     ? [node.title, node.lead, ...node.answers.flatMap((a) => [a.label, a.hint ?? ''])].join(' ')
-    : [node.title, node.lead, ...node.steps, ...node.go.map((g) => g.label)].join(' ');
+    : [node.title, node.lead, node.why, ...node.steps, ...node.go.map((g) => g.label)].join(' ');
 const everything = Object.values(NODES).map(textOf).join(' ');
 
 describe('the graph', () => {
@@ -316,5 +316,55 @@ describe('provider examples (R3)', () => {
     const later = staleExamples(new Date('2027-06-01T00:00:00Z'));
     expect(later.length).toBeGreaterThan(0);
     expect(later[0]).toMatchObject({ checked: '2026-11-11' });
+  });
+});
+
+import { trail } from './situations';
+
+describe('why this route (R4)', () => {
+  /** Every path from a journey's first question to an outcome, as the page walks them. */
+  function paths(): string[][] {
+    const out: string[][] = [];
+    const walk = (path: string[]) => {
+      const node = NODES[path.at(-1)!];
+      if (node.kind === 'outcome') return void out.push(path);
+      for (const a of node.answers) if (!path.includes(a.next)) walk([...path, a.next]);
+    };
+    for (const j of JOURNEYS) walk([j.first]);
+    return out;
+  }
+
+  it('gives every outcome the one sentence that decides it, in both languages', () => {
+    const cs = situationsIn('cs');
+    for (const [id, o] of outcomes) {
+      expect(o.why, id).toMatch(/^\S.{20,}\.$/);
+      const c = cs.nodes[id];
+      expect(c.kind === 'outcome' && c.why, id).toMatch(/^\S.{20,}\.$/);
+    }
+  });
+
+  it('renders the answers behind every outcome reached, each with the question it answered', () => {
+    const all = paths();
+    expect(new Set(all.map((p) => p.at(-1))).size).toBe(outcomes.length);
+    for (const path of all) {
+      const t = trail(path);
+      expect(t.map((s) => s.at), path.join(' → ')).toEqual(path.slice(0, -1).map((_, i) => i));
+      for (const step of t) expect(step.answer.next).toBe(path[step.at + 1]);
+    }
+  });
+
+  it('shows the destination first on the Czech route, as the page says it', () => {
+    const t = trail(['official-where', 'official-ask', 'official-cert', 'official-cz']);
+    expect(t.map((s) => s.answer.place ?? s.answer.label)).toEqual(['CZ', 'An officially verified signature', 'Yes']);
+  });
+
+  it('invents nothing for a path opened mid-way, and changing an answer gives a new result', () => {
+    expect(trail(['sign-nocert'])).toEqual([]);
+    expect(trail(['official-cert', 'official-cz']).map((s) => s.question.title)).toEqual([
+      'Do you have a qualified certificate for electronic signatures?',
+    ]);
+    // "Change an answer" truncates the path to that question; the next answer replaces the rest.
+    const changed = [...['official-where', 'official-ask', 'official-cert', 'official-cz'].slice(0, 3), 'official-nocert'];
+    expect(trail(changed).at(-1)?.answer.label).toBe('No, or I am not sure');
   });
 });

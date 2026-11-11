@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Intake from '../src/site/Intake.svelte';
   import SiteBar from '../src/site/SiteBar.svelte';
   import { pick, site } from '../src/site/lang.svelte';
   import { SERVICES, SITUATIONS_HREF, TABS_CS } from '../src/site/services';
@@ -47,6 +48,9 @@
         <h1>{t.lead} <mark class="hlm">{t.mark}</mark></h1>
         <p>{t.intro}</p>
       </div>
+
+      <!-- A few words instead of a card, matched in this page (R1). The cards stay below either way. -->
+      <Intake />
 
       <!--
         Situations first, tools second: a first-time visitor should not have to know which of
