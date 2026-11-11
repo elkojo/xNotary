@@ -240,6 +240,9 @@ jobs:
           test -s dist/xsignature/issuers/index.json || { echo '::error::the issuer directory is missing from dist/xsignature/issuers/'; exit 1; }
           test "$(ls dist/xsignature/issuers/ | wc -l)" -gt 200 || { echo '::error::the issuer directory has too few shards'; exit 1; }
           grep -q '"build":' dist/version.json || { echo '::error::dist/version.json is missing — open pages could never learn of a new release'; exit 1; }
+          grep -q '"format":' dist/situations/rules.json || { echo '::error::dist/situations/rules.json is missing — agents and llms.txt point to it'; exit 1; }
+          test -f dist/situations/rules.schema.json || { echo '::error::dist/situations/rules.schema.json is missing'; exit 1; }
+          grep -q 'situations/rules.json' dist/llms.txt || { echo '::error::dist/llms.txt is missing or does not point to the rules'; exit 1; }
           grep -A1 '^/version.json' dist/_headers | grep -q 'no-store' || { echo '::error::/version.json is not served no-store'; exit 1; }
           grep -q 'registration.unregister' dist/sw.js || { echo '::error::dist/sw.js, which retires the pre-0.5.0 worker, is missing'; exit 1; }
 

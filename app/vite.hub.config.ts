@@ -9,6 +9,7 @@ import { buildId } from './scripts/build-id';
 import { revision } from './scripts/revision';
 import { siteVersion } from './scripts/site-version';
 import { SERVICES } from './src/site/services';
+import { RULES_SCHEMA, llmsTxt, rules } from './src/site/situations-export';
 import { LIGHTNING, lightningUri } from './src/site/support';
 
 /**
@@ -101,10 +102,28 @@ function versionFile(): Plugin {
   };
 }
 
+/**
+ * What /situations/ decides, for agents (E1): /situations/rules.json and its schema, and /llms.txt
+ * pointing to them. Generated from the same data as the page (src/site/situations-export.ts), so
+ * they cannot say something the page does not. Static and same-origin: no CSP change.
+ */
+function agentFiles(): Plugin {
+  return {
+    name: 'hub-agent-files',
+    apply: 'build',
+    generateBundle() {
+      const meta = { version: siteVersion(), build: buildId() };
+      this.emitFile({ type: 'asset', fileName: 'situations/rules.json', source: JSON.stringify(rules(meta), null, 1) + '\n' });
+      this.emitFile({ type: 'asset', fileName: 'situations/rules.schema.json', source: JSON.stringify(RULES_SCHEMA, null, 1) + '\n' });
+      this.emitFile({ type: 'asset', fileName: 'llms.txt', source: llmsTxt(meta) });
+    },
+  };
+}
+
 export default defineConfig({
   root: fileURLToPath(new URL('./hub/', import.meta.url)),
   base: '/',
-  plugins: [svelte(), noticesIndex(), versionFile()],
+  plugins: [svelte(), noticesIndex(), versionFile(), agentFiles()],
   define: {
     __APP_REVISION__: JSON.stringify(REVISION.label),
     __APP_COMMIT__: JSON.stringify(REVISION.commit),
