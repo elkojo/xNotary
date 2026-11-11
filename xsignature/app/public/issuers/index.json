@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-11-06",
+  "asOf": "2026-11-09",
   "source": "https://ec.europa.eu/tools/lotl/eu-lotl.xml",
   "outsideEu": {
     "CH": "https://trustedlist.tsl-switzerland.ch/tsl-ch.xml",
@@ -142,9 +142,9 @@
       "sequence": "66"
     },
     "LV": {
-      "issued": "2026-11-02T08:28:06Z",
-      "next": "2027-05-02T07:28:06Z",
-      "sequence": "53"
+      "issued": "2026-11-06T06:41:58Z",
+      "next": "2027-05-06T05:41:58Z",
+      "sequence": "54"
     },
     "MT": {
       "issued": "2026-10-12T09:12:37Z",
@@ -157,9 +157,9 @@
       "sequence": "79"
     },
     "NO": {
-      "issued": "2026-09-14T10:22:13Z",
-      "next": "2027-03-14T11:22:13Z",
-      "sequence": "89"
+      "issued": "2026-11-06T12:43:26Z",
+      "next": "2027-05-06T11:43:26Z",
+      "sequence": "90"
     },
     "PL": {
       "issued": "2026-10-23T11:45:38Z",
@@ -197,7 +197,8 @@
     "UA"
   ],
   "fromCommissionCopy": [
-    "EE"
+    "EE",
+    "IT"
   ],
   "missing": []
 }
