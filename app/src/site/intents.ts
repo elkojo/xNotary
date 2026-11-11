@@ -33,24 +33,34 @@ export const INTENTS: readonly Intent[] = [
       'notarised signature', 'notarized signature', 'legalise', 'legalize', 'legalisation', 'legalization',
       'uredne overen', 'overen podpis', 'overit podpis', 'overeni podpisu', 'legaliz', 'uredni overeni',
     ],
-    terms: ['authority', 'government', 'office', 'urad', 'uredn', 'czech point'],
+    // "Notary" is how most people name an officially verified signature, so it points here: the
+    // first question then separates a verified signature from a notarial deed.
+    terms: [
+      'authority', 'government', 'office', 'urad', 'uredn', 'czech point', 'notar', 'notaris', 'notariz', 'notarial',
+      'overit', 'overeni', 'overen', 'verified', 'data box', 'datova schranka', 'datovou schrankou', 'submit', 'podat', 'podani',
+      'will', 'zavet', 'inheritance', 'dedictvi', 'divorce', 'rozvod',
+    ],
   },
   {
     target: 'sign-kind',
     // To sign is also the verb of most other situations ("sign a contract for the land registry"),
     // so it only points here; the kinds of signature name it.
     strong: ['electronic signature', 'e signature', 'esign', 'digital signature', 'elektronick podpis', 'digitalni podpis'],
-    terms: ['sign', 'signature', 'podpis', 'podepsat', 'podepis', 'pdf', 'key file', 'certifikat', 'certificate'],
+    terms: [
+      'sign', 'signature', 'podpis', 'podepsat', 'podepis', 'pdf', 'key file', 'certifikat', 'certificate',
+      'contract', 'agreement', 'smlouv', 'dohod', 'lease', 'rent', 'najem', 'landlord', 'pronajimat', 'consent', 'souhlas',
+      'document', 'dokument', 'listin', 'bank id', 'bankid', 'bankovni identit',
+    ],
   },
   {
     target: 'poa-what',
     strong: ['power of attorney', 'plna moc', 'plnou moc', 'plne moci', 'plnou moci', 'zmocnen', 'zmocnit', 'proxy'],
-    terms: ['act for me', 'on my behalf', 'authorise someone', 'authorize someone', 'represent', 'zastup', 'jednat za me', 'za me'],
+    terms: ['act for me', 'on my behalf', 'authorise someone', 'authorize someone', 'represent', 'zastup', 'jednat za me', 'za me', 'power', 'mandate'],
   },
   {
     target: 'proof-kind',
     strong: ['timestamp', 'time stamp', 'file existed', 'proof of existence', 'casove razitko', 'casovym razitkem', 'existoval', 'existenc', 'opentimestamps'],
-    terms: ['prove', 'proof', 'existed', 'dolozit', 'prokazat', 'dukaz', 'bitcoin', 'blockchain', 'when i wrote', 'who was first', 'autorstv'],
+    terms: ['prove', 'proof', 'existed', 'dolozit', 'prokazat', 'dukaz', 'bitcoin', 'blockchain', 'when i wrote', 'who was first', 'autorstv', 'razitk', 'date of', 'datum'],
   },
   {
     target: 'proof-make',
@@ -74,7 +84,12 @@ export const INTENTS: readonly Intent[] = [
   },
   {
     target: 'copy-what',
-    strong: ['certified copy', 'true copy', 'overena kopie', 'overenou kopii', 'vidimac', 'konverz', 'autorizovana konverze', 'opis'],
+    strong: [
+      'certified copy', 'true copy', 'overena kopie', 'overenou kopii', 'vidimac', 'konverz', 'autorizovana konverze', 'opis',
+      // Papers people most often need a certified copy of.
+      'birth certificate', 'rodn list', 'rodneho listu', 'marriage certificate', 'oddac list', 'diploma', 'diplom', 'vysvedceni',
+      'criminal record', 'rejstrik trest', 'rejstriku trest',
+    ],
     terms: ['copy', 'kopie', 'kopii', 'scan', 'sken', 'paper original', 'original'],
   },
   {
@@ -93,8 +108,10 @@ export const INTENTS: readonly Intent[] = [
   },
   {
     target: 'abroad-where',
-    strong: ['abroad', 'another country', 'other country', 'foreign', 'zahranic', 'apostil', 'superlegaliz', 'affidavit', 'embassy', 'konzul', 'ambasad'],
-    terms: ['translation', 'preklad', 'sworn', 'cizin', 'outside the eu', 'mimo eu'],
+    strong: ['abroad', 'another country', 'other country', 'foreign', 'zahranic', 'apostil', 'superlegaliz', 'affidavit', 'embassy', 'konzul', 'ambasad', 'translat', 'preklad'],
+    // An apostille or a legalisation decides the request even when it names a document too
+    // ("apostille for a birth certificate"), so those weigh twice.
+    terms: ['apostil', 'superlegaliz', 'sworn', 'cizin', 'outside the eu', 'mimo eu', 'visa', 'viz', 'embass'],
   },
   {
     target: 'kyc-remote',

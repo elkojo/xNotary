@@ -53,6 +53,24 @@ const PHRASES: readonly [string, string][] = [
   ['dokument do zahraničí s apostilou', 'abroad-where'],
   ['identifikace klienta na dálku AML', 'kyc-remote'],
   ['elektronický podpis smlouvy', 'sign-kind'],
+  // Single everyday words, as people type them before they know the site's terms.
+  ['notary', 'official-where'],
+  ['I need a notary', 'official-where'],
+  ['notarize a document', 'official-where'],
+  ['notář', 'official-where'],
+  ['ověřit', 'official-where'],
+  ['data box', 'official-where'],
+  ['datová schránka', 'official-where'],
+  ['contract', 'sign-kind'],
+  ['smlouva', 'sign-kind'],
+  ['nájemní smlouva', 'sign-kind'],
+  ['document', 'sign-kind'],
+  ['dokument', 'sign-kind'],
+  ['rodný list', 'copy-what'],
+  ['birth certificate', 'copy-what'],
+  ['výpis z rejstříku trestů', 'copy-what'],
+  ['translate a document', 'abroad-where'],
+  ['časové razítko', 'proof-kind'],
 ];
 
 describe('the "I want to…" box (R1)', () => {
