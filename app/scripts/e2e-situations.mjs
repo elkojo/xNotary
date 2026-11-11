@@ -185,6 +185,19 @@ try {
     copied.split('\n')[0],
   );
 
+  // /ai/: the two texts copy, and the skill is served as a file and as a zip.
+  await open('ai/?lang=en');
+  for (const [which, starts] of [['project', 'In this project, advise me'], ['agent', 'Install the xNotary skill.']]) {
+    await evaluate(`[...document.querySelectorAll('.ai-copy')].find((b) => b.querySelector('[data-copy="${which}"]')).querySelector('button').click()`);
+    await sleep(300);
+    const got = await evaluate(`navigator.clipboard.readText()`);
+    check(`/ai/ copies the ${which} text`, got.startsWith(starts) && got.includes(baseUrl.origin), got.split('\n')[0]);
+  }
+  const skill = await evaluate(`fetch('/ai/xnotary/SKILL.md').then((r) => r.text())`);
+  check('/ai/ serves the skill file', /^---\nname: xnotary\n/.test(skill));
+  const zipHead = await evaluate(`fetch('/ai/xnotary-skill.zip').then((r) => r.arrayBuffer()).then((b) => [...new Uint8Array(b).slice(0, 4)].join(','))`);
+  check('/ai/ serves the skill zip', zipHead === '80,75,3,4', zipHead);
+
   // Typing must send nothing at all — not even to this site.
   check('typing in the box sends nothing', sentWhileTyping.length === 0, sentWhileTyping.join(', '));
   check('no script errors', errors.length === 0, errors.join(' | '));

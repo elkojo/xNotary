@@ -308,6 +308,7 @@ Information, not legal advice. This site performs no official act: it does not o
 
 ## Source
 
+- [xNotary in your AI assistant](/ai/): texts to paste into a project's instructions or into an agent, and the skill itself at /ai/xnotary/SKILL.md (zipped: /ai/xnotary-skill.zip).
 - [Source code](https://github.com/elkojo/xNotary) (AGPL-3.0-or-later), including an Agent Skill in \`agent/\` (Claude Code: \`/plugin marketplace add elkojo/xNotary\`).
 `;
 }

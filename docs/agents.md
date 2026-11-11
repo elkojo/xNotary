@@ -20,6 +20,7 @@ machine can use.
 | E8 | **Hand-off links.** `/situations/#<journey or node>` opens a step; `/situations/?q=<text>` fills the "I want to…" box, matched in the person's browser. | `hub/Situations.svelte`, `src/site/Intake.svelte` |
 | — | **"Ask your own AI"** beside the box: copies the person's words as a question for their own assistant, pointing it at `rules.json` and `llms.txt`, with the limits. Copied, never sent: no assistant is opened and nothing typed goes into an address. | `src/site/ask-ai.ts`, `Intake.svelte` |
 | — | **Install from the repository.** It is a Claude Code plugin marketplace (`/plugin marketplace add elkojo/xNotary`); `agent/` is the plugin, and its skill folder installs in claude.ai, ChatGPT and Codex. | `.claude-plugin/`, `agent/README.md` |
+| — | **`/ai/` — xNotary in your AI assistant.** Three ways, recommended first: standing instructions pasted into a chat assistant's project (Claude, ChatGPT, Gemini; nothing installed); one text for an agent on the person's computer (Claude Code, Codex, Hermes), which shows the commands and asks first; the skill as a zip for claude.ai and ChatGPT. The site serves the skill itself at `/ai/xnotary/SKILL.md`, which Hermes installs from a URL. The skill's description stays under 200 characters, claude.ai's limit on upload. | `hub/Ai.svelte`, `src/site/ai-install.ts`, `vite.hub.config.ts` |
 
 Tests hold them together: the rules validate against their schema, the skill names the fields of
 the format it reads, and `docs/situations-map.md` — the same data for people — fails CI when stale.

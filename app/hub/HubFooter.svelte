@@ -1,8 +1,9 @@
-<!-- The footer of the site's own pages: the front page and /support/. -->
+<!-- The footer of the site's own pages: the front page, /situations/, /ai/ and /support/. -->
 <script lang="ts">
   import { site } from '../src/site/lang.svelte';
   import { SERVICES } from '../src/site/services';
   import { SUPPORT_HREF } from '../src/site/support';
+  import { AI_HREF } from '../src/site/ai-install';
 
   const SOURCE_URL = 'https://github.com/elkojo/xNotary';
   const revision = __APP_REVISION__;
@@ -17,6 +18,7 @@
       {#each SERVICES as s}
         <a href={s.href}>{s.name}{s.external ? ' ↗' : ''}</a>
       {/each}
+      <a href={AI_HREF}>{site.lang === 'cs' ? 'Ve vašem AI' : 'In your AI assistant'}</a>
       <a href={SUPPORT_HREF}>{site.lang === 'cs' ? 'Podpora' : 'Support'}</a>
     </div>
     {#if site.lang === 'cs'}

@@ -1,6 +1,6 @@
 ---
 name: xnotary
-description: Choose the right route for an official or signed-document task (officially verified signature, power of attorney, certified copy, company register, property, use abroad, AML client identification) from xNotary.digital's published rules, and timestamp or verify a file on Bitcoin with OpenTimestamps, hashing locally. Use when someone asks how to get a signature verified, whether an electronic signature replaces a notary, how to prove a file existed at a time, or how to check an xNotary certificate or .ots proof.
+description: Advises on document tasks (verified signature, power of attorney, certified copy, company, property, abroad) from xNotary.digital's rules; timestamps and verifies files on Bitcoin.
 license: AGPL-3.0-or-later
 ---
 

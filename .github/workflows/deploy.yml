@@ -243,6 +243,9 @@ jobs:
           grep -q '"format":' dist/situations/rules.json || { echo '::error::dist/situations/rules.json is missing — agents and llms.txt point to it'; exit 1; }
           test -f dist/situations/rules.schema.json || { echo '::error::dist/situations/rules.schema.json is missing'; exit 1; }
           grep -q 'situations/rules.json' dist/llms.txt || { echo '::error::dist/llms.txt is missing or does not point to the rules'; exit 1; }
+          test -f dist/ai/index.html || { echo '::error::dist/ai/ is missing — /ai/ and the Help page point to it'; exit 1; }
+          cmp -s dist/ai/xnotary/SKILL.md ../agent/skills/xnotary/SKILL.md || { echo '::error::dist/ai/xnotary/SKILL.md is missing or differs from agent/skills/xnotary/SKILL.md'; exit 1; }
+          unzip -p dist/ai/xnotary-skill.zip xnotary/SKILL.md | cmp -s - ../agent/skills/xnotary/SKILL.md || { echo '::error::dist/ai/xnotary-skill.zip does not hold the current skill as xnotary/SKILL.md'; exit 1; }
           grep -A1 '^/version.json' dist/_headers | grep -q 'no-store' || { echo '::error::/version.json is not served no-store'; exit 1; }
           grep -q 'registration.unregister' dist/sw.js || { echo '::error::dist/sw.js, which retires the pre-0.5.0 worker, is missing'; exit 1; }
 

@@ -107,6 +107,10 @@ describe('the Agent Skill (E2)', () => {
     expect(skill).toMatch(/^---\nname: xnotary\ndescription: .{80,}\n/);
   });
 
+  it('keeps its description within the 200 characters claude.ai accepts on upload', () => {
+    expect(/^description: (.*)$/m.exec(skill)![1].length).toBeLessThanOrEqual(200);
+  });
+
   it('reads the format of rules.json this build writes, by the fields it has', () => {
     const doc = rules({ version: '0', build: '0' });
     expect(skill).toContain(`\`format\` is \`${doc.format}\``);

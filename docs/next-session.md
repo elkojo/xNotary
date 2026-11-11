@@ -30,7 +30,10 @@ with the team's feedback) and four decisions taken that day:
   primary text, and Italy's effect is conditional on AgID standards, which the entry says.
 - **For agents**: `/situations/rules.json` + schema, `/llms.txt`, the Agent Skill (`agent/`),
   hand-off links with `?q=`. The repository installs as a Claude Code plugin marketplace, and an
-  "Ask your own AI" button beside the box copies the reader's question for their assistant. **For the team**: `docs/situations-map.md`, generated.
+  "Ask your own AI" button beside the box copies the reader's question for their assistant.
+  `/ai/` explains the three ways to use xNotary from an assistant, and serves the skill as a file
+  and a zip. The menu paths it names in claude.ai and ChatGPT were read on 2026-11-11 from
+  third-party guides: check them in the real apps before the release. **For the team**: `docs/situations-map.md`, generated.
 - **Release**: hashed `assets/` cached immutable; a tag fails on examples older than 180 days; the
   rollback runbook is in the deploy section below.
 

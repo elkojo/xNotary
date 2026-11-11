@@ -984,3 +984,73 @@ a.situation-card {
   font-size: 12.5px;
   text-align: center;
 }
+
+/* ------------------------------------------------------------- /ai/ -- */
+/* xNotary in your AI assistant (hub/Ai.svelte): one card per way, a copy box in each. */
+
+.ai-way {
+  margin-top: 18px;
+  padding: 22px 24px;
+  border: 1px solid var(--line-dark);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.ai-way.lead {
+  border-color: var(--selected-line);
+}
+.ai-way h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.ai-who {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+}
+.ai-way ol {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.ai-way .action-group {
+  margin-top: 14px;
+}
+.ai-copy {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  margin-top: 14px;
+}
+.ai-copy pre,
+.ai-manual pre {
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border: 1px solid var(--line-dark);
+  border-radius: 9px;
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ai-manual {
+  margin-top: 12px;
+  font-size: 13.5px;
+}
+.ai-manual summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+.ai-manual pre {
+  margin-top: 8px;
+  white-space: pre;
+  word-break: normal;
+}
+.ai-page a.button {
+  text-decoration: none;
+}

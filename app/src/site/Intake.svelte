@@ -16,6 +16,7 @@
 <script lang="ts">
   import Fresh from './Fresh.svelte';
   import Info from './Info.svelte';
+  import { AI_HREF } from './ai-install';
   import { askAiPrompt } from './ask-ai';
   import { pick, site } from './lang.svelte';
   import { SITUATIONS_HREF } from './services';
@@ -57,6 +58,7 @@
       askInfo:
         'Copies your words as a question for Claude, ChatGPT or another assistant, with a link to this site’s rules, so it answers from the same knowledge base. Nothing is sent: you paste it yourself, or not.',
       manual: 'Copy this into your AI assistant:',
+      always: 'Use it every time →',
     },
     cs: {
       label: 'Potřebuji…',
@@ -70,6 +72,7 @@
       askInfo:
         'Zkopíruje vaše slova jako dotaz pro Claude, ChatGPT nebo jiného asistenta, s odkazem na pravidla tohoto webu, aby odpovídal ze stejné znalostní báze. Nic se neodesílá: vložíte to sami, nebo ne.',
       manual: 'Zkopírujte to do svého AI asistenta:',
+      always: 'Používat pokaždé →',
     },
   };
   const t = $derived(pick(TEXT));
@@ -139,6 +142,7 @@
       <button class="link-button" type="button" onclick={copyPrompt}
         ><Fresh text={asked === 'copied' ? t.copied : t.ask} /></button
       ><Info>{t.askInfo}</Info>
+      {#if asked === 'copied'}<a href={AI_HREF}>{t.always}</a>{/if}
     </div>
     {#if asked === 'manual'}
       <label class="intake-manual"

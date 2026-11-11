@@ -437,6 +437,23 @@
           </div>
         </details>
 
+        <details class="explain" id="q-ai">
+          <summary>Can I use this from Claude, ChatGPT or another AI assistant?</summary>
+          <div>
+            <p>
+              Yes. Your assistant can answer from the same rules as the site, ask the same questions and
+              report the same outcome, with its sources and when they were checked — and timestamp a file
+              with the reference OpenTimestamps client, hashing it on your computer.
+              <a href="/ai/">xNotary in your AI assistant</a> has a text to paste into a project's
+              instructions, one for agents such as Claude Code, Codex or Hermes, and the skill to install.
+            </p>
+            <p>
+              It never signs, sends or approves anything for you. Where a step needs your signature, it
+              hands you to the site or to your own signing tool.
+            </p>
+          </div>
+        </details>
+
         <details class="explain" id="q-adobe">
           <summary>I already sign in Adobe — why this?</summary>
           <div>
