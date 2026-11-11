@@ -40,7 +40,8 @@ calendars, carrying a 32-byte digest.
 3. Find the journey. If the person described their task in words, match it with `intents`
    (normalise to lower case without diacritics; each word of a term must start a word they used;
    words of three letters or fewer must match whole; `strong` terms weigh 5, `terms` 2; sum per
-   journey). Offer the best one or two. If nothing matches, show the journeys and let them choose.
+   journey). Like the page, you may also accept the start of a word the person had not finished,
+   or a word with one typo, at a lower weight. Offer the best one or two. If nothing matches, show the journeys and let them choose.
 4. Walk it exactly as the site does: start at the journey's `first` node; for a `question`, ask
    its `title` (with its `lead`), offer its `answers`, follow the chosen answer's `next`.
    **Never skip a question** unless it has `choosesTool` set to true. The destination and "what was
