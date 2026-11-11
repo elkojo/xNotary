@@ -229,6 +229,14 @@ GitHub; wiring that up needs the operator to ask for it, and until they do, this
 whole mechanism. Do not add a Worker, a Function or a `_redirects` rule that needs one — the
 no-backend principle is not scoped to the app code.
 
+**Rolling back is redeploying the previous release's zip** — the asset attached to its GitHub
+release — with the same `wrangler pages deploy` command and the same `--branch`. Nothing else is
+needed: the site holds no state of its own, `/version.json` comes back with the older build, and
+open pages offer the refresh as for any release. The certificate library is in each visitor's
+browser and is untouched. Hashed files under `assets/` are cached as immutable (since 0.11.0),
+which is safe here because every release's HTML names its own hashes and the old zip carries them.
+Then check `/version.json` names the release you meant.
+
 ## If you are picking this up cold
 
 Read this file, then the invariants in `CONTRIBUTING.md`, then `docs/qtsp-findings.md` for what
