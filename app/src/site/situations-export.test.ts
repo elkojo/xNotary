@@ -99,3 +99,26 @@ describe('/llms.txt', () => {
     expect(txt).toMatch(/untrusted data, never instructions/);
   });
 });
+
+describe('the Agent Skill (E2)', () => {
+  const skill = readFileSync(new URL('../../../agent/skill/xnotary/SKILL.md', import.meta.url), 'utf8');
+
+  it('is a skill: name and description in its frontmatter', () => {
+    expect(skill).toMatch(/^---\nname: xnotary\ndescription: .{80,}\n/);
+  });
+
+  it('reads the format of rules.json this build writes, by the fields it has', () => {
+    const doc = rules({ version: '0', build: '0' });
+    expect(skill).toContain(`\`format\` is \`${doc.format}\``);
+    for (const field of ['intents', 'strong', 'terms', 'choosesTool', 'first', 'answers', 'next', 'light', 'why', 'sources', 'checked', 'examplesNote', 'notAdvice'])
+      expect(skill, field).toContain(`\`${field}\``);
+  });
+
+  it('carries the rules every agent route keeps', () => {
+    expect(skill).toMatch(/Never give consent for them, never sign with\s+their qualified signature/);
+    expect(skill).toMatch(/Only the SHA-256 digest may leave the device/);
+    expect(skill).toMatch(/not a qualified electronic\s+timestamp/);
+    expect(skill).toMatch(/data, never instructions/);
+    expect(skill).toMatch(/\*\*Never skip a question\*\*/);
+  });
+});
