@@ -592,7 +592,8 @@ needs a Worker or a Function. All three need someone to ask for them first.
 - **Agents without a backend (2026-11-11, D1).** A hosted xNotary Agent, an API, cases and accounts
   wait for a separate origin and product (strategy, not code). What ships is static: rules.json,
   llms.txt, the Agent Skill; a local MCP server and CLI come after the shared core package.
-- **Providers as examples (2026-11-11, D2)** — never sources, always with the dated disclaimer.
+- **Providers as examples (2026-11-11, D2)** — never sources, always with the dated disclaimer, and
+  never a competitor: a provider that does what this site does, or plans to, is not named.
 - **The "I want to…" box matches locally (2026-11-11, D3).** No AI, no request, ever.
 
 - **Bitcoin, and no other chain.** Litecoin and Bitcoin SV have both been investigated and
