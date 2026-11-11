@@ -16,7 +16,7 @@ machine can use.
 | | What | Where |
 |---|---|---|
 | E1 | **Machine-readable rules.** `/situations/rules.json` (format 1) and its JSON Schema, generated at build from `situations.ts`: journeys, questions, outcomes, lights, sources with checked dates, provider examples with their note, tool paths, the "I want to…" keyword table, limits, hand-off links. `/llms.txt` points to them. | `app/src/site/situations-export.ts`, built by `vite.hub.config.ts` |
-| E2 | **Agent Skill** `xnotary`: choose a route from `rules.json` exactly as the page does; hash locally, stamp and verify with the reference `ots` client; when to stop and hand off; the consent rules. | `agent/skill/xnotary/SKILL.md` |
+| E2 | **Agent Skill** `xnotary`: choose a route from `rules.json` exactly as the page does; hash locally, stamp and verify with the reference `ots` client; when to stop and hand off; the consent rules. | `agent/skills/xnotary/SKILL.md` |
 | E8 | **Hand-off links.** `/situations/#<journey or node>` opens a step; `/situations/?q=<text>` fills the "I want to…" box, matched in the person's browser. | `hub/Situations.svelte`, `src/site/Intake.svelte` |
 
 Tests hold them together: the rules validate against their schema, the skill names the fields of

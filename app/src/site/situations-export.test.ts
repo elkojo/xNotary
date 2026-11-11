@@ -101,7 +101,7 @@ describe('/llms.txt', () => {
 });
 
 describe('the Agent Skill (E2)', () => {
-  const skill = readFileSync(new URL('../../../agent/skill/xnotary/SKILL.md', import.meta.url), 'utf8');
+  const skill = readFileSync(new URL('../../../agent/skills/xnotary/SKILL.md', import.meta.url), 'utf8');
 
   it('is a skill: name and description in its frontmatter', () => {
     expect(skill).toMatch(/^---\nname: xnotary\ndescription: .{80,}\n/);

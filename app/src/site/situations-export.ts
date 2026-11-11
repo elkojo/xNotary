@@ -3,7 +3,7 @@
  * decision engine, and nothing restates it by hand where it could drift.
  *
  * - `rules()` → /situations/rules.json, with `RULES_SCHEMA` → /situations/rules.schema.json (E1),
- *   built by vite.hub.config.ts. The machine-readable contract the Agent Skill (agent/skill/) and
+ *   built by vite.hub.config.ts. The machine-readable contract the Agent Skill (agent/) and
  *   any later local MCP server read. Same origin, static: the page's CSP does not change.
  * - `situationsMap()` → docs/situations-map.md (R8): every journey, question and outcome with its
  *   light, sources and dates, for the team and the lawyer instead of hand-drawn trees. Written by
@@ -308,6 +308,6 @@ Information, not legal advice. This site performs no official act: it does not o
 
 ## Source
 
-- [Source code](https://github.com/elkojo/xNotary) (AGPL-3.0-or-later), including an Agent Skill in \`agent/skill/\`.
+- [Source code](https://github.com/elkojo/xNotary) (AGPL-3.0-or-later), including an Agent Skill in \`agent/\` (Claude Code: \`/plugin marketplace add elkojo/xNotary\`).
 `;
 }
