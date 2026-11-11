@@ -185,7 +185,15 @@ try {
     copied.split('\n')[0],
   );
 
-  // /ai/: the two texts copy, and the skill is served as a file and as a zip.
+  // The "I want to…" menu leads to /ai/, second after "Start from your situation".
+  await open('/?lang=en');
+  await evaluate(`document.querySelector('.task-btn').click()`);
+  await sleep(200);
+  const menuItems = await evaluate(`[...document.querySelectorAll('.task-item')].slice(0, 2).map((a) => a.getAttribute('href') + ' ' + a.querySelector('strong').innerText)`);
+  check('the "I want to…" menu offers the AI assistant page', menuItems[1] === '/ai/ Use your AI assistant', JSON.stringify(menuItems));
+
+  // /ai/: the two texts copy, and the skill is served as a file and as a zip. They carry the
+  // origin the page is served from (location.origin), never a fixed address.
   await open('ai/?lang=en');
   for (const [which, starts] of [['project', 'In this project, advise me'], ['agent', 'Install the xNotary skill.']]) {
     await evaluate(`[...document.querySelectorAll('.ai-copy')].find((b) => b.querySelector('[data-copy="${which}"]')).querySelector('button').click()`);
