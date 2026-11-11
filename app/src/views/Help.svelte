@@ -330,6 +330,58 @@
             timestamp alongside it is the first post-MVP milestone.
           </div>
         </details>
+
+        <!--
+          Each citation was read in the judgment or the official text itself on 2026-11-11, not in a
+          summary: the list it came from was partly secondary. Re-read before changing a word.
+        -->
+        <details class="explain" id="q-court">
+          <summary>Is a Bitcoin timestamp evidence in court?</summary>
+          <div>
+            <p>
+              It can be — as one piece of evidence, which the court weighs. It is not a qualified
+              timestamp, and no court is bound to presume it accurate the way the law presumes a
+              qualified one.
+            </p>
+            <p>Some courts and legislators have gone further:</p>
+            <ul>
+              <li>
+                The
+                <a href="https://english.court.gov.cn/2019-12/04/c_766707.htm" target="_blank" rel="noopener noreferrer"
+                  >Hangzhou Internet Court</a
+                > (China) accepted evidence anchored in blockchains, Bitcoin among them, in a copyright case
+                decided on 27 June 2018.
+              </li>
+              <li>
+                The
+                <a
+                  href="https://www.legalis.net/jurisprudences/tribunal-judiciaire-de-marseille-1ere-ch-civile-jugement-du-20-mars-2025/"
+                  target="_blank"
+                  rel="noopener noreferrer">Tribunal judiciaire de Marseille</a
+                > (France) held on 20 March 2025 that two blockchain timestamp reports established who
+                held the copyright in a set of designs — alongside trademarks and earlier publication.
+              </li>
+              <li>
+                Italy's
+                <a
+                  href="https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legge:2018-12-14;135~art8ter"
+                  target="_blank"
+                  rel="noopener noreferrer">Law 12/2019 (art. 8-ter of Decree-Law 135/2018)</a
+                > gives storing a document on a distributed ledger the effect of an electronic
+                timestamp, subject to technical standards the national digital agency was to set.
+              </li>
+            </ul>
+            <p>
+              In the EU, eIDAS adds that an electronic timestamp may not be refused as evidence only
+              because it is electronic or not qualified (<a
+                href="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02014R0910-20240520"
+                target="_blank"
+                rel="noopener noreferrer">art. 41(1)</a
+              >). Whether a particular proof convinces is still for the court. Information, not legal
+              advice; checked 2026-11-11.
+            </p>
+          </div>
+        </details>
       </div>
     </div>
 
@@ -382,6 +434,33 @@
               Outside the EU, use whatever your own framework recognises: xNotary reads the signature
               the same way either way, and names the authority that issued it.
             </p>
+          </div>
+        </details>
+
+        <details class="explain" id="q-adobe">
+          <summary>I already sign in Adobe — why this?</summary>
+          <div>
+            <p>
+              Keep signing in Adobe if it suits you. A signature is made by your certificate, not by
+              the program: the same certificate on the same card or key file gives the same signature
+              wherever you sign.
+            </p>
+            <p>What xNotary.digital adds sits around the signature:</p>
+            <ul>
+              <li>
+                <strong>The route.</strong> Whether that signature can stand in for an officially verified
+                one where your document is going, and what to do when it cannot —
+                <a href="/situations/">start from your situation</a>.
+              </li>
+              <li>
+                <strong>An independent proof of time.</strong> A timestamp anchored in Bitcoin that anyone
+                can check without us, and without trusting any provider.
+              </li>
+              <li>
+                <strong>Checking without uploading.</strong> What a signed file claims, read in your
+                browser: the file never leaves your device.
+              </li>
+            </ul>
           </div>
         </details>
 

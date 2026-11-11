@@ -242,6 +242,13 @@ mark.hlm {
 .hub .hero h1 {
   font-size: clamp(36px, 6.4vw, 62px);
 }
+/* The value line (R7): what the site saves people, with its condition in the same breath. */
+.hub .hero > p.hero-value {
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 650;
+}
 .product-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

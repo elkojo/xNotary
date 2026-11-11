@@ -13,6 +13,10 @@
       eyebrow: 'Independent document tools',
       lead: 'What do you need to',
       mark: 'do?',
+      // "where the law allows it" is load-bearing: no copy may suggest the site replaces an
+      // officially verified signature outright (PRODUCT.md; CLAUDE.md, "Notarization is the
+      // product's name, never a legal claim").
+      value: 'Skip the trip to the office — where the law allows it.',
       intro: 'Choose your situation. A few questions lead to the tool that does it — or to what to ask first.',
       tools: 'Or go straight to a tool',
       more: 'More services',
@@ -23,6 +27,7 @@
       eyebrow: 'Nezávislé nástroje pro dokumenty',
       lead: 'Co potřebujete',
       mark: 'vyřídit?',
+      value: 'Bez cesty na úřad — tam, kde to zákon dovolí.',
       intro: 'Vyberte svou situaci. Pár otázek vás dovede k nástroji, který to udělá — nebo k tomu, na co se nejdřív zeptat.',
       tools: 'Nebo rovnou k nástroji',
       more: 'Další služby',
@@ -46,6 +51,7 @@
       <div class="hero">
         <div class="eyebrow">{t.eyebrow}</div>
         <h1>{t.lead} <mark class="hlm">{t.mark}</mark></h1>
+        <p class="hero-value">{t.value}</p>
         <p>{t.intro}</p>
       </div>
 
