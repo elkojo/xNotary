@@ -18,6 +18,8 @@ machine can use.
 | E1 | **Machine-readable rules.** `/situations/rules.json` (format 1) and its JSON Schema, generated at build from `situations.ts`: journeys, questions, outcomes, lights, sources with checked dates, provider examples with their note, tool paths, the "I want to…" keyword table, limits, hand-off links. `/llms.txt` points to them. | `app/src/site/situations-export.ts`, built by `vite.hub.config.ts` |
 | E2 | **Agent Skill** `xnotary`: choose a route from `rules.json` exactly as the page does; hash locally, stamp and verify with the reference `ots` client; when to stop and hand off; the consent rules. | `agent/skills/xnotary/SKILL.md` |
 | E8 | **Hand-off links.** `/situations/#<journey or node>` opens a step; `/situations/?q=<text>` fills the "I want to…" box, matched in the person's browser. | `hub/Situations.svelte`, `src/site/Intake.svelte` |
+| — | **"Ask your own AI"** beside the box: copies the person's words as a question for their own assistant, pointing it at `rules.json` and `llms.txt`, with the limits. Copied, never sent: no assistant is opened and nothing typed goes into an address. | `src/site/ask-ai.ts`, `Intake.svelte` |
+| — | **Install from the repository.** It is a Claude Code plugin marketplace (`/plugin marketplace add elkojo/xNotary`); `agent/` is the plugin, and its skill folder installs in claude.ai, ChatGPT and Codex. | `.claude-plugin/`, `agent/README.md` |
 
 Tests hold them together: the rules validate against their schema, the skill names the fields of
 the format it reads, and `docs/situations-map.md` — the same data for people — fails CI when stale.

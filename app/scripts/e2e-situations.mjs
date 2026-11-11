@@ -106,6 +106,8 @@ try {
   await send('Page.enable');
   await send('Runtime.enable');
   await send('Network.enable');
+  // A headless page is never "focused", and the clipboard refuses an unfocused page.
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true });
 
   // --- R4: Why this route? ---------------------------------------------------------------
   await open('situations/?lang=en#official');
@@ -166,6 +168,22 @@ try {
   sentWhileTyping.push(...requests);
   const none = await text('.intake-none');
   check('a phrase with no match falls back to the cards', Boolean(none) && (await evaluate(`document.querySelectorAll('.situation-card').length`)) > 0, none ?? '');
+
+  // "Ask your own AI" copies a question to the clipboard and sends nothing.
+  await send('Browser.grantPermissions', { origin: baseUrl.origin, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] });
+  await open('/?lang=en');
+  await typeInto('plna moc pro katastr');
+  sentWhileTyping.push(...requests);
+  await click('.intake-ask button', 'Ask your own AI');
+  await sleep(300);
+  sentWhileTyping.push(...requests);
+  check('"Ask your own AI" says it copied', /Copied/.test((await text('.intake-ask')) ?? ''), await text('.intake-ask'));
+  const copied = await evaluate(`navigator.clipboard.readText()`);
+  check(
+    'the copied question carries the words and this site\'s rules',
+    copied.startsWith('I want to: plna moc pro katastr') && copied.includes(`${baseUrl.origin}/situations/rules.json`),
+    copied.split('\n')[0],
+  );
 
   // Typing must send nothing at all — not even to this site.
   check('typing in the box sends nothing', sentWhileTyping.length === 0, sentWhileTyping.join(', '));

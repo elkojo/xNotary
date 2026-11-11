@@ -693,6 +693,28 @@ footer.site .family-links a {
 .intake-suggestions a.lead {
   font-weight: 800;
 }
+.intake-ask {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 13.5px;
+}
+.intake-manual {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.intake-manual textarea {
+  height: auto;
+  padding: 10px 13px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
 .intake-none {
   margin: 12px 0 0;
   color: var(--ink-soft);

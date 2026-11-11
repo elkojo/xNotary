@@ -29,7 +29,8 @@ with the team's feedback) and four decisions taken that day:
   Adobe" and "Is a Bitcoin timestamp evidence in court?". Every court citation was read in the
   primary text, and Italy's effect is conditional on AgID standards, which the entry says.
 - **For agents**: `/situations/rules.json` + schema, `/llms.txt`, the Agent Skill (`agent/`),
-  hand-off links with `?q=`. **For the team**: `docs/situations-map.md`, generated.
+  hand-off links with `?q=`. The repository installs as a Claude Code plugin marketplace, and an
+  "Ask your own AI" button beside the box copies the reader's question for their assistant. **For the team**: `docs/situations-map.md`, generated.
 - **Release**: hashed `assets/` cached immutable; a tag fails on examples older than 180 days; the
   rollback runbook is in the deploy section below.
 
