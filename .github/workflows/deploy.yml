@@ -138,6 +138,11 @@ jobs:
           fi
           echo "trusted lists read on $as_of, $age days before this commit"
 
+      # Provider examples on /situations/ (R3) name the day their site was read. A release may not
+      # carry one older than 180 days; measured from the tagged commit, like the trusted lists.
+      - name: Check the provider examples are recent enough for this release
+        run: npx vite-node scripts/check-dated.ts "$(git log -1 --format=%cI)"
+
       # What "Fetch it" on Check a signed file reads. Collected here rather than committed, so the
       # copies are as new as this release. Every copy is verified against the issuer's key. One
       # authority being down is normal; losing a whole country or most of the copies fails here,

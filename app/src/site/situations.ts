@@ -20,7 +20,7 @@
  */
 import type { Lang } from './lang.svelte';
 import type { ServiceId } from './services';
-import { JOURNEYS_CS, LIGHTS_CS, NODES_CS, SOURCES_CS, type OutcomeCs, type QuestionCs } from './situations.cs';
+import { EXAMPLES_CS, EXAMPLES_NOTE_CS, JOURNEYS_CS, LIGHTS_CS, NODES_CS, SOURCES_CS, type OutcomeCs, type QuestionCs } from './situations.cs';
 
 export type NodeId = string;
 export type JourneyId = 'official' | 'sign' | 'poa' | 'proof' | 'check' | 'copy' | 'company' | 'property' | 'abroad' | 'kyc';
@@ -93,7 +93,42 @@ export interface Outcome {
   /** The rules this rests on, and the day they were read. Required wherever a rule of law is cited. */
   readonly sources?: readonly Source[];
   readonly checked?: string;
+  /**
+   * Providers who do the step this site cannot, named as examples under EXAMPLES_NOTE (owner's
+   * decision D2, 2026-11-11). Never a source, never on an outcome that can be done online, so
+   * an example never reads as the only way.
+   */
+  readonly examples?: readonly Example[];
 }
+
+/** What a provider is, as far as the site is concerned. */
+export type ExampleKind = 'qtsp' | 'remote-notary' | 'identity' | 'other';
+
+export interface Example {
+  readonly name: string;
+  readonly url: string;
+  /** What it does, in the provider's own terms as read on `checked`. */
+  readonly what: string;
+  readonly kind: ExampleKind;
+  /** The day its site was read. A release fails when one is older than EXAMPLE_MAX_AGE_DAYS. */
+  readonly checked: string;
+  /**
+   * For `kind: 'qtsp'`: the trusted list and the provider's name on it, exactly as written there.
+   * The test finds it in the list the site already reads (xsignature/app/public/issuers) — a
+   * provider is called qualified only on that evidence.
+   */
+  readonly trustList?: { readonly country: string; readonly name: string };
+}
+
+/** Shown with every list of examples, with the date filled in: one line, never behind an ⓘ. */
+export const EXAMPLES_NOTE = (checked: string) =>
+  `Examples only, not an endorsement or a partnership. Checked on ${checked}. Check with the recipient that they accept the result.`;
+
+/** The day a list of examples was checked: its oldest entry's, so the note never flatters it. */
+export const examplesChecked = (examples: readonly Example[]) => examples.map((e) => e.checked).sort()[0];
+
+/** How old an example may be at release (scripts/check-dated.ts, run by deploy.yml). */
+export const EXAMPLE_MAX_AGE_DAYS = 180;
 
 export type SituationNode = Question | Outcome;
 
@@ -128,6 +163,37 @@ const S = {
 const CHECKED = '2026-10-28';
 /** The authority-to-act and AML outcomes, added in 0.11.0 from the register and the statute themselves. */
 const CHECKED_R5 = '2026-11-11';
+
+// --- Examples (R3) -------------------------------------------------------------------------
+
+/** Each read on its own site on this day; the qualified ones also found on the Czech trusted list. */
+const EXAMPLES_CHECKED = '2026-11-11';
+
+const E = {
+  postsignum: {
+    name: 'PostSignum (Česká pošta)',
+    url: 'https://www.postsignum.cz/kvalifikovane_certifikaty.html',
+    what: 'Qualified certificates for electronic signatures. The first one is issued at a post office with Czech POINT services, or by a mobile registration authority; a renewal can be requested online.',
+    kind: 'qtsp',
+    checked: EXAMPLES_CHECKED,
+    trustList: { country: 'CZ', name: 'Česká pošta, s.p.' },
+  },
+  ica: {
+    name: 'I.CA (První certifikační autorita)',
+    url: 'https://www.ica.cz/zaciname',
+    what: 'Qualified certificates for electronic signatures. Individuals can apply online, with identity checked through the ZealiD app, or at a registration authority. Remote signing, where the provider keeps the key, is a separate service from the certificate.',
+    kind: 'qtsp',
+    checked: EXAMPLES_CHECKED,
+    trustList: { country: 'CZ', name: 'První certifikační autorita, a.s.' },
+  },
+  bankid: {
+    name: 'Bank iD',
+    url: 'https://bankid.cz/lide/podepisujte/',
+    what: 'Signs with your Czech bank login. Its signature is advanced (zaručený), not qualified: by its own terms, for private matters, while a document for an authority needs a recognised electronic signature.',
+    kind: 'identity',
+    checked: EXAMPLES_CHECKED,
+  },
+} satisfies Record<string, Example>;
 
 // --- Journeys ------------------------------------------------------------------------------
 
@@ -283,6 +349,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     go: [],
     sources: [S.trustList, S.dia],
     checked: CHECKED,
+    examples: [E.postsignum, E.ica],
   },
   'official-eu': {
     kind: 'outcome',
@@ -394,6 +461,7 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     go: [],
     sources: [S.trustList],
     checked: CHECKED,
+    examples: [E.postsignum, E.ica, E.bankid],
   },
   'sign-picture': {
     kind: 'outcome',
@@ -774,8 +842,9 @@ export function situationsIn(lang: Lang): {
   journeys: readonly Journey[];
   nodes: Readonly<Record<NodeId, SituationNode>>;
   lights: typeof LIGHTS;
+  examplesNote: (checked: string) => string;
 } {
-  if (lang === 'en') return { journeys: JOURNEYS, nodes: NODES, lights: LIGHTS };
+  if (lang === 'en') return { journeys: JOURNEYS, nodes: NODES, lights: LIGHTS, examplesNote: EXAMPLES_NOTE };
   const journeys = JOURNEYS.map((j) => ({ ...j, ...JOURNEYS_CS[j.id] }));
   const nodes: Record<NodeId, SituationNode> = {};
   for (const [id, node] of Object.entries(NODES)) {
@@ -792,8 +861,9 @@ export function situationsIn(lang: Lang): {
         steps: o.steps,
         go: node.go.map((g, i) => ({ ...g, label: o.go[i] })),
         sources: node.sources?.map((s) => ({ ...s, label: SOURCES_CS[s.url] ?? s.label })),
+        examples: node.examples?.map((e) => ({ ...e, what: EXAMPLES_CS[e.url] ?? e.what })),
       };
     }
   }
-  return { journeys, nodes, lights: LIGHTS_CS };
+  return { journeys, nodes, lights: LIGHTS_CS, examplesNote: EXAMPLES_NOTE_CS };
 }

@@ -232,3 +232,89 @@ describe('the glossary itself', () => {
       expect(form).toMatch(term.cs);
   });
 });
+
+import { readFileSync, readdirSync } from 'node:fs';
+import { EXAMPLES_NOTE, EXAMPLE_MAX_AGE_DAYS, examplesChecked, type Example } from './situations';
+import { EXAMPLES_CS, EXAMPLES_NOTE_CS } from './situations.cs';
+import { staleExamples } from './situations-dates';
+
+describe('provider examples (R3)', () => {
+  const withExamples = outcomes.filter(([, o]) => o.examples?.length);
+  const all: Example[] = withExamples.flatMap(([, o]) => [...o.examples!]);
+
+  it('names some, as the owner decided (D2)', () => {
+    expect(all.length).toBeGreaterThan(0);
+  });
+
+  it('never makes an example a source, or a source an example', () => {
+    const sources = new Set(outcomes.flatMap(([, o]) => (o.sources ?? []).map((s) => s.url)));
+    for (const e of all) {
+      expect(sources.has(e.url), e.name).toBe(false);
+      expect(OFFICIAL_HOSTS as readonly string[], e.name).not.toContain(new URL(e.url).host);
+      expect(new URL(e.url).protocol, e.name).toBe('https:');
+    }
+  });
+
+  it('never puts one on an outcome that can be done online, where it would read as the only way', () => {
+    for (const [id, o] of withExamples) expect(o.light, id).not.toBe('online');
+  });
+
+  it('carries the disclaimer, with a date, in both languages', () => {
+    expect(EXAMPLES_NOTE('2026-11-11')).toBe(
+      'Examples only, not an endorsement or a partnership. Checked on 2026-11-11. Check with the recipient that they accept the result.',
+    );
+    expect(EXAMPLES_NOTE_CS('2026-11-11')).toBe(
+      'Pouze příklady, nejde o doporučení ani partnerství. Ověřeno 2026-11-11. Ověřte u příjemce, že výsledek přijme.',
+    );
+    for (const [id, o] of withExamples) expect(examplesChecked(o.examples!), id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('describes every example in Czech too', () => {
+    for (const e of all) expect(EXAMPLES_CS[e.url], e.name).toBeTruthy();
+    const cs = situationsIn('cs');
+    for (const [id] of withExamples) {
+      const c = cs.nodes[id];
+      if (c.kind === 'outcome') for (const e of c.examples!) expect(e.what, id).toBe(EXAMPLES_CS[e.url]);
+    }
+  });
+
+  it('calls a provider qualified only when the trusted list the site reads says so', () => {
+    const dir = new URL('../../../xsignature/app/public/issuers/', import.meta.url);
+    const shards = readdirSync(dir).filter((f) => /^[0-9a-f]{2}\.json$/.test(f));
+    expect(shards.length).toBeGreaterThan(0);
+    // Every provider on the lists, with what it is currently granted, keyed by list and name.
+    const granted = new Set<string>();
+    for (const f of shards) {
+      const shard = JSON.parse(readFileSync(new URL(f, dir), 'utf8')) as {
+        entries: Record<string, { tl: string; s?: { n: string[]; h: { s: string; a?: string[] }[] }[] }[]>;
+      };
+      for (const entries of Object.values(shard.entries))
+        for (const entry of entries)
+          for (const service of entry.s ?? []) {
+            const current = service.h[0];
+            if (current?.s === 'granted' && current.a?.includes('ForeSignatures'))
+              for (const n of service.n) granted.add(`${entry.tl}/${n}`);
+          }
+    }
+    for (const e of all) {
+      if (e.kind !== 'qtsp') continue;
+      expect(e.trustList, e.name).toBeDefined();
+      expect(granted.has(`${e.trustList!.country}/${e.trustList!.name}`), `${e.name} on the ${e.trustList!.country} list`).toBe(true);
+    }
+  });
+
+  it('never calls an identity service qualified', () => {
+    for (const e of all.filter((x) => x.kind === 'identity')) {
+      expect(e.what, e.name).not.toMatch(/\bis qualified|a qualified (electronic )?signature\b/i);
+      expect(EXAMPLES_CS[e.url], e.name).toMatch(/ne kvalifikovaný/);
+    }
+  });
+
+  it('fails a release once an example is too old to trust', () => {
+    expect(EXAMPLE_MAX_AGE_DAYS).toBe(180);
+    expect(staleExamples(new Date('2026-11-11T00:00:00Z'))).toEqual([]);
+    const later = staleExamples(new Date('2027-06-01T00:00:00Z'));
+    expect(later.length).toBeGreaterThan(0);
+    expect(later[0]).toMatchObject({ checked: '2026-11-11' });
+  });
+});

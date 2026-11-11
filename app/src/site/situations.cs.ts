@@ -104,6 +104,19 @@ export const SOURCES_CS: Readonly<Record<string, string>> = {
   'https://www.zakonyprolidi.cz/cs/2008-253': 'Zákon č. 253/2008 Sb. (AML zákon), § 8, § 8a, § 10 a § 11',
 };
 
+/** What each example provider does, by URL (situations.ts, E). Names stay as the provider writes them. */
+export const EXAMPLES_CS: Readonly<Record<string, string>> = {
+  'https://www.postsignum.cz/kvalifikovane_certifikaty.html':
+    'Kvalifikované certifikáty pro elektronický podpis. První vydá pošta se službami Czech POINT nebo mobilní registrační autorita; o následný certifikát lze požádat online.',
+  'https://www.ica.cz/zaciname':
+    'Kvalifikované certifikáty pro elektronický podpis. Fyzické osoby mohou žádat online, s ověřením totožnosti přes aplikaci ZealiD, nebo na registrační autoritě. Vzdálené podepisování, kdy klíč drží poskytovatel, je samostatná služba, ne součást certifikátu.',
+  'https://bankid.cz/lide/podepisujte/':
+    'Podepisuje přes vaše přihlášení do české banky. Jeho podpis je zaručený, ne kvalifikovaný: podle jeho vlastních podmínek pro soukromé záležitosti, kdežto dokument pro úřad potřebuje uznávaný elektronický podpis.',
+};
+
+export const EXAMPLES_NOTE_CS = (checked: string) =>
+  `Pouze příklady, nejde o doporučení ani partnerství. Ověřeno ${checked}. Ověřte u příjemce, že výsledek přijme.`;
+
 const CZ_ROUTE_STEPS = [
   'Nejdřív zkontrolujte výjimku. Postup neplatí pro plnou moc k právnímu jednání, které vyžaduje formu veřejné listiny, například notářského zápisu (§ 6 odst. 3), a jiný zákon může vyžadovat zvláštní formu.',
   'Zapište svůj kvalifikovaný certifikát do registru obyvatel přes Portál občana (Profil → Certifikáty). Zapisuje se jen jeho veřejná část, nikdy klíč. Některé certifikáty obsahují identifikační údaje, se kterými zápis není nutný: poradí vám váš poskytovatel.',

@@ -13,7 +13,7 @@
   import Stepper from '../src/site/Stepper.svelte';
   import { pick, site } from '../src/site/lang.svelte';
   import { TASKS, pageHref } from '../src/site/services';
-  import { JOURNEYS, NODES, journeyOf, situationsIn, stageOf, type NodeId, type Place } from '../src/site/situations';
+  import { JOURNEYS, NODES, examplesChecked, journeyOf, situationsIn, stageOf, type NodeId, type Place } from '../src/site/situations';
   import HubFooter from './HubFooter.svelte';
 
   let menu = $state<'services' | 'tasks' | null>(null);
@@ -59,6 +59,7 @@
       startOver: 'Start over',
       sources: 'Sources',
       checked: 'checked',
+      examples: 'Examples of providers',
       notAdvice: 'Information, not legal advice. Rules change; the recipient has the last word.',
       foot: 'Document tools and guidance, not notarial services or legal advice. What a recipient accepts depends on the country, the document and the recipient.',
     },
@@ -72,6 +73,7 @@
       startOver: 'Začít znovu',
       sources: 'Zdroje',
       checked: 'ověřeno',
+      examples: 'Příklady poskytovatelů',
       notAdvice: 'Informace, ne právní rada. Pravidla se mění; poslední slovo má příjemce.',
       foot: 'Nástroje pro dokumenty a orientace v nich, ne notářské služby ani právní poradenství. Co příjemce přijme, záleží na zemi, na dokumentu a na příjemci.',
     },
@@ -177,6 +179,23 @@
                   {#each node.go as go, i}
                     <a class="button small {i === 0 ? 'dark' : 'ghost-dark'}" href={pageHref(go.service, go.page)}>{go.label}</a>
                   {/each}
+                </div>
+              {/if}
+              {#if node.examples?.length}
+                <!--
+                  Who does the step this site cannot, as examples (R3). The note is one visible line,
+                  not an ⓘ: without it a list of names reads as a recommendation.
+                -->
+                <div class="situation-examples">
+                  <strong>{t.examples}</strong>
+                  <ul>
+                    {#each node.examples as example}
+                      <li>
+                        <a href={example.url} target="_blank" rel="noopener noreferrer" translate="no">{example.name}</a>: {example.what}
+                      </li>
+                    {/each}
+                  </ul>
+                  <p>{words.examplesNote(examplesChecked(node.examples))}</p>
                 </div>
               {/if}
               {#if node.sources?.length}
