@@ -13,10 +13,16 @@
   import Stepper from '../src/site/Stepper.svelte';
   import { pick, site } from '../src/site/lang.svelte';
   import { TASKS, pageHref } from '../src/site/services';
-  import { JOURNEYS, NODES, journeyOf, situationsIn, stageOf, type NodeId } from '../src/site/situations';
+  import { JOURNEYS, NODES, journeyOf, situationsIn, stageOf, type NodeId, type Place } from '../src/site/situations';
   import HubFooter from './HubFooter.svelte';
 
   let menu = $state<'services' | 'tasks' | null>(null);
+  /** The flag and code drawn beside a destination's name (R2). Outside the EU has no one code. */
+  const PLACES: Record<Place, { flag: string; code: string }> = {
+    CZ: { flag: '🇨🇿', code: 'CZ' },
+    EU: { flag: '🇪🇺', code: 'EU' },
+    WORLD: { flag: '🌍', code: '' },
+  };
   /** The questions answered so far, and where they led; the last is on screen. */
   let path = $state<NodeId[]>(fromHash());
 
@@ -137,7 +143,17 @@
               <div class="answer-list">
                 {#each node.answers as answer}
                   <button class="answer" type="button" onclick={() => (path = [...path, answer.next])}>
-                    <strong>{answer.label}</strong>
+                    <!--
+                      A destination carries its flag and its code beside the name, never instead of it:
+                      Windows draws a flag as two letters. Both are hidden from screen readers, which
+                      read the name.
+                    -->
+                    <strong
+                      >{#if answer.place}<span class="place" aria-hidden="true" translate="no"
+                          ><span class="place-flag">{PLACES[answer.place].flag}</span
+                          >{#if PLACES[answer.place].code}<span class="place-code">{PLACES[answer.place].code}</span>{/if}</span
+                        >{/if}{answer.label}</strong
+                    >
                     {#if answer.hint}<span>{answer.hint}</span>{/if}
                   </button>
                 {/each}

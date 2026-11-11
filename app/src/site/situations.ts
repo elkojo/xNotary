@@ -23,7 +23,7 @@ import type { ServiceId } from './services';
 import { JOURNEYS_CS, LIGHTS_CS, NODES_CS, SOURCES_CS, type OutcomeCs, type QuestionCs } from './situations.cs';
 
 export type NodeId = string;
-export type JourneyId = 'official' | 'sign' | 'poa' | 'proof' | 'check' | 'copy' | 'company' | 'property' | 'abroad';
+export type JourneyId = 'official' | 'sign' | 'poa' | 'proof' | 'check' | 'copy' | 'company' | 'property' | 'abroad' | 'kyc';
 
 /** How the next step is done: by the reader online, with somebody else's step, or in person. */
 export type Light = 'online' | 'assisted' | 'in-person';
@@ -47,6 +47,7 @@ export const OFFICIAL_HOSTS = [
   'eur-lex.europa.eu',
   'eidas.ec.europa.eu',
   'www.hcch.net',
+  'www.justice.gov.sk',
 ] as const;
 
 export interface Journey {
@@ -58,10 +59,17 @@ export interface Journey {
   readonly first: NodeId;
 }
 
+/**
+ * Where a document goes, on the answers that ask it. Shown as a flag, a code and a name — never a
+ * flag alone, since Windows draws a flag as two letters (Situations.svelte).
+ */
+export type Place = 'CZ' | 'EU' | 'WORLD';
+
 export interface Answer {
   readonly label: string;
   readonly hint?: string;
   readonly next: NodeId;
+  readonly place?: Place;
 }
 
 export interface Question {
@@ -109,9 +117,17 @@ const S = {
   conversion: { label: 'Act 300/2008 Coll., authorised conversion', url: 'https://www.zakonyprolidi.cz/cs/2008-300' },
   eidas: { label: 'eIDAS Regulation (EU) 910/2014, art. 25', url: 'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02014R0910-20240520' },
   apostille: { label: 'Hague Apostille Convention: member countries', url: 'https://www.hcch.net/en/instruments/conventions/status-table/?cid=41' },
+  registers: { label: 'Act 304/2013 Coll., on public registers, §§ 3 and 5', url: 'https://www.zakonyprolidi.cz/cs/2013-304' },
+  skExtract: {
+    label: 'Ministry of Justice of the Slovak Republic: a legally usable extract from the commercial register',
+    url: 'https://www.justice.gov.sk/faq/ako-mozem-ziskat-pravne-pouzitelny-vypis-z-obchodneho-registra/',
+  },
+  aml: { label: 'Act 253/2008 Coll. (AML Act), §§ 8, 8a, 10 and 11', url: 'https://www.zakonyprolidi.cz/cs/2008-253' },
 } satisfies Record<string, Source>;
 
 const CHECKED = '2026-10-28';
+/** The authority-to-act and AML outcomes, added in 0.11.0 from the register and the statute themselves. */
+const CHECKED_R5 = '2026-11-11';
 
 // --- Journeys ------------------------------------------------------------------------------
 
@@ -179,6 +195,13 @@ export const JOURNEYS: readonly Journey[] = [
     stages: ['Where it goes', 'What was asked', 'Next step'],
     first: 'abroad-where',
   },
+  {
+    id: 'kyc',
+    title: 'Identify a client remotely',
+    description: 'For firms the anti-money-laundering rules oblige to know their client.',
+    stages: ['Next step'],
+    first: 'kyc-remote',
+  },
 ];
 
 // --- The questions and outcomes ------------------------------------------------------------
@@ -188,7 +211,8 @@ const CZ_ROUTE_STEPS = [
   'Check the exception first. The route does not apply to a power of attorney for an act that needs a public deed, such as a notarial deed (§ 6(3)), and another law may require a particular form.',
   'Register your qualified certificate in the population register through Portál občana (Profile → Certificates). Only its public part goes in, never the key. Some certificates carry identification data that makes this unnecessary: your provider can say.',
   'Sign the document with that certificate: with a key file in Sign a PDF here, or with a card or token in its own software. In Czech law, an advanced signature based on a qualified certificate is a recognised electronic signature.',
-  'Send it the way the authority asks. The authority checks against the register that the certificate is yours; this site does not, and cannot.',
+  'Send it the way the authority asks: through a data box, its electronic filing office, or by e-mail with a recognised electronic signature. The authority checks against the register that the certificate is yours; this site does not, and cannot.',
+  'If the office has not handled this before, point them to the DIA guidance listed under Sources, and ask them to check the signature in their own system.',
 ] as const;
 
 export const NODES: Readonly<Record<NodeId, SituationNode>> = {
@@ -200,9 +224,9 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     title: 'Where will the document be used?',
     lead: 'The rules of the country it goes to apply — not the rules where you are now.',
     answers: [
-      { label: 'Czechia (CZ)', next: 'official-ask' },
-      { label: 'Another EU country', next: 'official-eu' },
-      { label: 'Outside the EU', next: 'abroad-ask-world' },
+      { label: 'Czechia', next: 'official-ask', place: 'CZ' },
+      { label: 'Another EU country', next: 'official-eu', place: 'EU' },
+      { label: 'Outside the EU', next: 'abroad-ask-world', place: 'WORLD' },
     ],
   },
   'official-ask': {
@@ -544,6 +568,11 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
         hint: "For example an owner's consent to a registered office.",
         next: 'company-filing',
       },
+      {
+        label: 'Show that I can act for a company',
+        hint: 'An official extract from the commercial register.',
+        next: 'company-authority',
+      },
     ],
   },
   'company-deed': {
@@ -570,6 +599,22 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     go: [{ service: 'xsignature', page: 'document', label: 'Sign a PDF' }],
     sources: [S.dia, S.act12, S.portal, S.act297],
     checked: CHECKED,
+  },
+
+  'company-authority': {
+    kind: 'outcome',
+    journey: 'company',
+    light: 'assisted',
+    title: 'Get an official extract from the register',
+    lead: 'Who may act for a company is in the commercial register, and the register issues the proof. A printout from its public website is for information only: it is not an official extract.',
+    steps: [
+      'In Czechia: a verified extract from a Czech POINT office, or an officially verified electronic copy from the register (§§ 3 and 5 of Act 304/2013 Coll.).',
+      'In Slovakia: request the electronic extract through the e-service on slovensko.sk. The registry court issues it free of charge, sealed with a qualified electronic seal, as an .asice file.',
+      'Before you send an electronic extract on, check its seal in Check a signed file, and send the file exactly as you received it: the seal is what makes it official.',
+    ],
+    go: [{ service: 'xsignature', page: 'check', label: 'Check a signed file' }],
+    sources: [S.registers, S.skExtract],
+    checked: CHECKED_R5,
   },
 
   // --- Property ------------------------------------------------------------------------
@@ -605,9 +650,9 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     title: 'Where will the document be used?',
     lead: 'The rules of the country it goes to apply.',
     answers: [
-      { label: 'Another EU country', next: 'abroad-ask-eu' },
-      { label: 'Outside the EU', next: 'abroad-ask-world' },
-      { label: 'Czechia (CZ)', next: 'official-ask' },
+      { label: 'Another EU country', next: 'abroad-ask-eu', place: 'EU' },
+      { label: 'Outside the EU', next: 'abroad-ask-world', place: 'WORLD' },
+      { label: 'Czechia', next: 'official-ask', place: 'CZ' },
     ],
   },
   'abroad-ask-eu': {
@@ -691,6 +736,24 @@ export const NODES: Readonly<Record<NodeId, SituationNode>> = {
     go: [],
     sources: [S.apostille, S.notarial],
     checked: CHECKED,
+  },
+
+  // --- Identify a client ---------------------------------------------------------------
+  'kyc-remote': {
+    kind: 'outcome',
+    journey: 'kyc',
+    light: 'assisted',
+    title: 'Use a route the AML Act allows',
+    lead: 'A firm the AML Act obliges — an estate agent, a leasing company, a lender — must identify a client before doing business. The first identification is in person, unless the Act allows a remote route. This site does not identify anyone.',
+    steps: [
+      'Remotely, the Act accepts an electronic identity at the high level, including a bank identity under the conditions the Act sets (§ 8a).',
+      'In lower-risk cases it allows a few other remote methods, such as identification data signed with a qualified electronic signature (§ 11).',
+      'Or a notary or a Czech POINT office identifies the client for you (§ 10).',
+      'Which route fits depends on the client, the product and the risk: your AML policy decides, not this site.',
+    ],
+    go: [],
+    sources: [S.aml],
+    checked: CHECKED_R5,
   },
 };
 

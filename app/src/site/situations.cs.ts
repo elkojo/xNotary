@@ -75,6 +75,11 @@ export const JOURNEYS_CS: Readonly<
     description: 'Podpis, prohlášení nebo kopie pro jinou zemi.',
     stages: ['Kam dokument jde', 'Co se po vás chce', 'Další krok'],
   },
+  kyc: {
+    title: 'Identifikovat klienta na dálku',
+    description: 'Pro firmy, které musí znát svého klienta podle zákona proti praní peněz.',
+    stages: ['Další krok'],
+  },
 };
 
 /** Source labels, by URL. */
@@ -93,13 +98,18 @@ export const SOURCES_CS: Readonly<Record<string, string>> = {
   'https://www.zakonyprolidi.cz/cs/2008-300': 'Zákon č. 300/2008 Sb., autorizovaná konverze dokumentů',
   'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02014R0910-20240520': 'Nařízení eIDAS (EU) č. 910/2014, čl. 25',
   'https://www.hcch.net/en/instruments/conventions/status-table/?cid=41': 'Haagská úmluva o apostile: smluvní státy',
+  'https://www.zakonyprolidi.cz/cs/2013-304': 'Zákon č. 304/2013 Sb., o veřejných rejstřících, § 3 a § 5',
+  'https://www.justice.gov.sk/faq/ako-mozem-ziskat-pravne-pouzitelny-vypis-z-obchodneho-registra/':
+    'Ministerstvo spravedlnosti SR: právně použitelný výpis z obchodního rejstříku',
+  'https://www.zakonyprolidi.cz/cs/2008-253': 'Zákon č. 253/2008 Sb. (AML zákon), § 8, § 8a, § 10 a § 11',
 };
 
 const CZ_ROUTE_STEPS = [
   'Nejdřív zkontrolujte výjimku. Postup neplatí pro plnou moc k právnímu jednání, které vyžaduje formu veřejné listiny, například notářského zápisu (§ 6 odst. 3), a jiný zákon může vyžadovat zvláštní formu.',
   'Zapište svůj kvalifikovaný certifikát do registru obyvatel přes Portál občana (Profil → Certifikáty). Zapisuje se jen jeho veřejná část, nikdy klíč. Některé certifikáty obsahují identifikační údaje, se kterými zápis není nutný: poradí vám váš poskytovatel.',
   'Podepište dokument tímto certifikátem: se souborem s klíčem zde v „Podepsat PDF“, s kartou či tokenem v jejich vlastním programu. Zaručený elektronický podpis založený na kvalifikovaném certifikátu je podle českého práva uznávaný elektronický podpis.',
-  'Odešlete dokument tak, jak úřad požaduje. Úřad ověří v registru, že certifikát je váš; tato stránka to neověřuje a ani nemůže.',
+  'Odešlete dokument tak, jak úřad požaduje: datovou schránkou, přes jeho elektronickou podatelnu nebo e-mailem s uznávaným elektronickým podpisem. Úřad ověří v registru, že certifikát je váš; tato stránka to neověřuje a ani nemůže.',
+  'Pokud se s tím úřad dosud nesetkal, odkažte ho na metodiku DIA uvedenou ve Zdrojích a požádejte ho, ať podpis ověří ve svém vlastním systému.',
 ] as const;
 
 export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
@@ -107,7 +117,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'official-where': {
     title: 'Kde bude dokument použit?',
     lead: 'Platí pravidla země, kam dokument míří — ne té, kde jste právě teď.',
-    answers: [{ label: 'Česko (CZ)' }, { label: 'Jiná země EU' }, { label: 'Mimo EU' }],
+    answers: [{ label: 'Česko' }, { label: 'Jiná země EU' }, { label: 'Mimo EU' }],
   },
   'official-ask': {
     title: 'Co po vás příjemce chce?',
@@ -333,6 +343,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
     answers: [
       { label: 'Založit firmu nebo změnit zakladatelský dokument', hint: 'Například společnost s ručením omezeným (s.r.o.).' },
       { label: 'Podepsat listinu pro obchodní rejstřík', hint: 'Například souhlas vlastníka s umístěním sídla.' },
+      { label: 'Doložit, že smím jednat za firmu', hint: 'Úřední výpis z obchodního rejstříku.' },
     ],
   },
   'company-deed': {
@@ -349,6 +360,17 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
     lead: 'Kde rejstřík na takové listině vyžaduje úředně ověřený podpis, platí český online postup: uznávaný elektronický podpis na kvalifikovaném certifikátu, který lze přes registr obyvatel přiřadit k vám (§ 6 odst. 2 zákona č. 12/2020 Sb.).',
     steps: CZ_ROUTE_STEPS,
     go: ['Podepsat PDF'],
+  },
+
+  'company-authority': {
+    title: 'Opatřete si úřední výpis z rejstříku',
+    lead: 'Kdo smí za firmu jednat, je zapsáno v obchodním rejstříku, a doklad o tom vydává rejstřík. Výtisk z jeho veřejných webových stránek je jen informativní: úřední výpis to není.',
+    steps: [
+      'V Česku: ověřený výstup z pracoviště Czech POINT, nebo úředně ověřený elektronický opis z rejstříku (§ 3 a § 5 zákona č. 304/2013 Sb.).',
+      'Na Slovensku: požádejte o elektronický výpis přes e-službu na slovensko.sk. Rejstříkový soud ho vydá bezplatně, opatřený kvalifikovanou elektronickou pečetí, jako soubor .asice.',
+      'Než elektronický výpis pošlete dál, zkontrolujte jeho pečeť v „Zkontrolovat podepsaný soubor“ a odešlete soubor přesně tak, jak jste ho dostali: úředním ho dělá právě pečeť.',
+    ],
+    go: ['Zkontrolovat podepsaný soubor'],
   },
 
   // --- Nemovitost -----------------------------------------------------------------------
@@ -371,7 +393,7 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
   'abroad-where': {
     title: 'Kde bude dokument použit?',
     lead: 'Platí pravidla země, kam dokument míří.',
-    answers: [{ label: 'Jiná země EU' }, { label: 'Mimo EU' }, { label: 'Česko (CZ)' }],
+    answers: [{ label: 'Jiná země EU' }, { label: 'Mimo EU' }, { label: 'Česko' }],
   },
   'abroad-ask-eu': {
     title: 'Co po vás příjemce chce?',
@@ -424,6 +446,19 @@ export const NODES_CS: Readonly<Record<NodeId, QuestionCs | OutcomeCs>> = {
     steps: [
       'Nechte si podpis ověřit u notáře.',
       'Zeptejte se příjemce, zda potřebuje apostilu, superlegalizaci nebo překlad, a ověřte si zemi v seznamu smluvních států úmluvy.',
+    ],
+    go: [],
+  },
+
+  // --- Identifikace klienta -------------------------------------------------------------
+  'kyc-remote': {
+    title: 'Zvolte postup, který AML zákon dovoluje',
+    lead: 'Povinná osoba podle AML zákona — realitní zprostředkovatel, leasingová společnost, poskytovatel úvěru — musí klienta identifikovat dřív, než s ním uzavře obchod. První identifikace probíhá za fyzické přítomnosti, pokud zákon nedovoluje postup na dálku. Tato stránka nikoho neidentifikuje.',
+    steps: [
+      'Na dálku zákon přijímá prostředek pro elektronickou identifikaci s vysokou úrovní záruky, včetně bankovní identity za podmínek, které zákon stanoví (§ 8a).',
+      'V případech s nižším rizikem dovoluje i některé další způsoby na dálku, například identifikační údaje podepsané kvalifikovaným elektronickým podpisem (§ 11).',
+      'Nebo za vás klienta identifikuje notář či pracoviště Czech POINT (§ 10).',
+      'Který postup se hodí, záleží na klientovi, produktu a riziku: rozhoduje vaše AML politika, ne tato stránka.',
     ],
     go: [],
   },

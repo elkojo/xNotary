@@ -117,6 +117,30 @@ describe('what it may say', () => {
     }
   });
 
+  it('marks every destination answer with its place, so it can carry a flag and a code', () => {
+    for (const [id, node] of Object.entries(NODES)) {
+      if (node.kind !== 'question' || !/Where will the document be used/.test(node.title)) continue;
+      expect(node.answers.map((a) => a.place).sort(), id).toEqual(['CZ', 'EU', 'WORLD']);
+      expect(node.answers.find((a) => a.place === 'CZ')?.next, id).toBe('official-ask');
+    }
+  });
+
+  it('says how to deliver, and what to do if the office is unsure, wherever the Czech route is offered', () => {
+    for (const id of ['official-cz', 'company-filing']) {
+      expect(textOf(NODES[id]), id).toMatch(/data box, its electronic filing office, or by e-mail with a recognised electronic signature/);
+      expect(textOf(NODES[id]), id).toMatch(/If the office has not handled this before/);
+      expect((NODES[id] as Outcome).sources?.map((s) => s.url), id).toContain(
+        'https://www.dia.gov.cz/cs/legislativa/eidas-sluzby-vytvarejici-duveru-a-elektronicka-identifikace/informace-pro-uzivatele/pravo-na-nahrazeni-uredne-overeneho-podpisu-dle-ss-6-odst-2-zakona-c-12-2020-sb',
+      );
+    }
+  });
+
+  it('tells an official extract from an informative printout, and leaves identifying clients to the firm', () => {
+    expect(textOf(NODES['company-authority'])).toMatch(/not an official extract/);
+    expect(textOf(NODES['kyc-remote'])).toMatch(/This site does not identify anyone/);
+    expect((NODES['kyc-remote'] as Outcome).light).toBe('assisted');
+  });
+
   it('keeps the picture apart from a signature, and a timestamp apart from a certified copy', () => {
     expect(textOf(NODES['sign-picture'])).toMatch(/proves nothing/);
     expect(textOf(NODES['copy-what'])).toMatch(/not a certified copy/);
@@ -186,6 +210,9 @@ describe('the Czech', () => {
     expect(textCs('abroad-esig-eu')).toMatch(/zaručený, ne kvalifikovaný/);
     expect(textCs('sign-picture')).toMatch(/nic nedokazuje/);
     expect(textCs('copy-what')).toMatch(/nejsou ověřená kopie/);
+    expect(textCs('company-authority')).toMatch(/úřední výpis to není/);
+    expect(textCs('kyc-remote')).toMatch(/Tato stránka nikoho neidentifikuje/);
+    for (const id of ['official-cz', 'company-filing']) expect(textCs(id), id).toMatch(/Pokud se s tím úřad dosud nesetkal/);
   });
 });
 

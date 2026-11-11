@@ -675,6 +675,30 @@ a.situation-card {
   color: var(--ink-soft);
   font-size: 13px;
 }
+/* A destination: its flag and code before the name (R2). The code is what Windows users see,
+   since it draws the flag as two letters; the name is what a screen reader reads. */
+.answer .place {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-right: 8px;
+  vertical-align: 1px;
+}
+.answer .place span {
+  color: var(--ink);
+}
+.answer .place-flag {
+  font-size: 15px;
+  line-height: 1;
+}
+.answer .place-code {
+  padding: 1px 5px;
+  border: 1px solid var(--line-dark);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
 /* The first is the one the menu leads with: set apart the way a selection is. */
 .situation-card.lead {
   border-color: var(--selected-line);
