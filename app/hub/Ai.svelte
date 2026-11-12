@@ -54,8 +54,8 @@
       skillWho: 'For the skill in every conversation, not one project.',
       skillDownload: 'Download the skill (.zip)',
       skillSteps: [
-        'Claude: in Settings, turn on code execution or file creation, then in Customize → Skills choose Add and pick the zip.',
-        'ChatGPT: in Plugins → Skills choose Upload and pick the zip, or the folder inside it if the zip is refused.',
+        'Claude: in Customize → Skills choose Add and pick the zip.',
+        'ChatGPT (not on the free plan): in Plugins → Skills choose Upload and pick the zip, or the folder inside it if the zip is refused.',
         'Menus move between versions. On a Team or Enterprise plan an administrator may have to allow skills first.',
       ],
       skillFile: 'The skill file itself',
@@ -87,8 +87,8 @@
       skillWho: 'Aby byl skill k dispozici v každé konverzaci, ne jen v jednom projektu.',
       skillDownload: 'Stáhnout skill (.zip)',
       skillSteps: [
-        'Claude: v Settings zapněte spouštění kódu nebo vytváření souborů, pak v Customize → Skills zvolte Add a vyberte zip.',
-        'ChatGPT: v Plugins → Skills zvolte Upload a vyberte zip, nebo složku v něm, pokud zip odmítne.',
+        'Claude: v Customize → Skills zvolte Add a vyberte zip.',
+        'ChatGPT (ne v bezplatné verzi): v Plugins → Skills zvolte Upload a vyberte zip, nebo složku v něm, pokud zip odmítne.',
         'Nabídky se mezi verzemi mění. V tarifu Team nebo Enterprise může být nutné, aby skilly nejdřív povolil správce.',
       ],
       skillFile: 'Samotný soubor skillu',
