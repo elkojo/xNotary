@@ -246,6 +246,7 @@ jobs:
           test -f dist/ai/index.html || { echo '::error::dist/ai/ is missing — /ai/ and the Help page point to it'; exit 1; }
           cmp -s dist/ai/xnotary/SKILL.md ../agent/skills/xnotary/SKILL.md || { echo '::error::dist/ai/xnotary/SKILL.md is missing or differs from agent/skills/xnotary/SKILL.md'; exit 1; }
           unzip -p dist/ai/xnotary-skill.zip xnotary/SKILL.md | cmp -s - ../agent/skills/xnotary/SKILL.md || { echo '::error::dist/ai/xnotary-skill.zip does not hold the current skill as xnotary/SKILL.md'; exit 1; }
+          unzip -p dist/ai/xnotary-skill.zip xnotary/rules.json | cmp -s - dist/situations/rules.json || { echo '::error::dist/ai/xnotary-skill.zip does not hold this build'"'"'s rules as xnotary/rules.json'; exit 1; }
           grep -A1 '^/version.json' dist/_headers | grep -q 'no-store' || { echo '::error::/version.json is not served no-store'; exit 1; }
           grep -q 'registration.unregister' dist/sw.js || { echo '::error::dist/sw.js, which retires the pre-0.5.0 worker, is missing'; exit 1; }
 

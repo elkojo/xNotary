@@ -9,9 +9,8 @@ import { buildId } from './scripts/build-id';
 import { revision } from './scripts/revision';
 import { siteVersion } from './scripts/site-version';
 import { SERVICES } from './src/site/services';
-import { RULES_SCHEMA, llmsTxt, rules } from './src/site/situations-export';
-import { SKILL_PATH, SKILL_ZIP_PATH } from './src/site/ai-install';
-import { zip } from './src/site/zip';
+import { RULES_SCHEMA, llmsTxt } from './src/site/situations-export';
+import { rulesJson, skillFiles } from './src/site/skill-files';
 import { LIGHTNING, lightningUri } from './src/site/support';
 
 /**
@@ -115,23 +114,21 @@ function agentFiles(): Plugin {
     apply: 'build',
     generateBundle() {
       const meta = { version: siteVersion(), build: buildId() };
-      this.emitFile({ type: 'asset', fileName: 'situations/rules.json', source: JSON.stringify(rules(meta), null, 1) + '\n' });
+      this.emitFile({ type: 'asset', fileName: 'situations/rules.json', source: rulesJson(meta) });
       this.emitFile({ type: 'asset', fileName: 'situations/rules.schema.json', source: JSON.stringify(RULES_SCHEMA, null, 1) + '\n' });
       this.emitFile({ type: 'asset', fileName: 'llms.txt', source: llmsTxt(meta) });
-      for (const [path, bytes] of Object.entries(skillFiles())) this.emitFile({ type: 'asset', fileName: path.slice(1), source: bytes });
+      for (const [path, bytes] of Object.entries(skill(meta))) this.emitFile({ type: 'asset', fileName: path.slice(1), source: bytes });
     },
   };
 }
 
 /**
- * The Agent Skill, served from the site (/ai/): the SKILL.md itself, which Hermes installs from a
- * URL and Codex or any agent can save into its skills folder, and the same as a zip with one
- * `xnotary/` folder, which claude.ai and ChatGPT take as an upload. Read from agent/skills/, the
- * one copy, so the site and the repository can never offer different skills.
+ * The Agent Skill, served from the site (/ai/), with the rules of this build in its zip: see
+ * src/site/skill-files.ts. Read from agent/skills/, the one copy, so the site and the repository
+ * can never offer different skills.
  */
-function skillFiles(): Record<string, Uint8Array> {
-  const skill = readFileSync(fileURLToPath(new URL('../agent/skills/xnotary/SKILL.md', import.meta.url)));
-  return { [SKILL_PATH]: new Uint8Array(skill), [SKILL_ZIP_PATH]: zip([{ path: 'xnotary/SKILL.md', data: new Uint8Array(skill) }]) };
+function skill(meta: { version: string; build: string }): Record<string, Uint8Array> {
+  return skillFiles(new Uint8Array(readFileSync(fileURLToPath(new URL('../agent/skills/xnotary/SKILL.md', import.meta.url)))), meta);
 }
 
 /** The same two files on the dev server, so /ai/ works there too. */
@@ -142,7 +139,7 @@ function skillFilesInDev(): Plugin {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const path = (req.url ?? '').split('?')[0];
-        const files = skillFiles();
+        const files = skill({ version: siteVersion(), build: buildId() });
         if (!(path in files)) return next();
         res.setHeader('Content-Type', path.endsWith('.zip') ? 'application/zip' : 'text/markdown; charset=utf-8');
         res.end(Buffer.from(files[path]));

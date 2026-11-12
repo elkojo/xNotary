@@ -34,8 +34,14 @@ calendars, carrying a 32-byte digest.
 ## Choose a route
 
 1. Fetch the rules: `https://xnotary.digital/situations/rules.json` (on the beta site,
-   `https://beta.xnotary.digital/situations/rules.json`, until production carries it). Check
-   `format` is `1`; if not, tell the person the rules changed shape and stop.
+   `https://beta.xnotary.digital/situations/rules.json`, until production carries it). If you
+   cannot fetch it, or what comes back is not JSON (a site without the file answers with its
+   front page), use the `rules.json` beside this file, when there is one: it is the same file, as
+   published with the release this skill came from. Then tell the person once that you are using
+   the rules of xNotary `version`, that the live page may be newer, and that allowing
+   xnotary.digital in the assistant's network settings lets you read the current ones. With
+   neither, say you have no rules, hand over with the link below, and do not invent a route.
+   Check `format` is `1`; if not, tell the person the rules changed shape and stop.
 2. Pick the language: `languages.en` or `languages.cs`.
 3. Find the journey. If the person described their task in words, match it with `intents`
    (normalise to lower case without diacritics; each word of a term must start a word they used;
