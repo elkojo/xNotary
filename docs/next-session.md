@@ -1,9 +1,10 @@
 # Where things stand — handoff
 
-## Pick up here (2026-11-11): the v0.11.0 revision
+## Pick up here (2026-11-12): v0.11.0 to beta
 
-Branch `revision-0.11.0`, one commit per item, not yet pushed. Baseline v0.10.0 (beta); production
-still v0.8.1. The scope came from the owner's revision basis of 2026-11-11 (kept outside the repo
+**v0.11.0 goes to beta only** (`beta.xnotary.digital`), from PR #34 (branch `revision-0.11.0`, one
+commit per item). Baseline v0.10.0 on beta. **Before production: the lawyer's review (R12).** The
+owner reviewed and approved all new Czech on 2026-11-11 and 2026-11-12. The scope came from the owner's revision basis of 2026-11-11 (kept outside the repo
 with the team's feedback) and four decisions taken that day:
 
 - **D1** A hosted agent, REST API, cases and accounts are post-MVP strategy. Agentic routes that
@@ -32,21 +33,21 @@ with the team's feedback) and four decisions taken that day:
   hand-off links with `?q=`. The repository installs as a Claude Code plugin marketplace, and an
   "Ask your own AI" button beside the box copies the reader's question for their assistant.
   `/ai/` explains the three ways to use xNotary from an assistant, and serves the skill as a file
-  and a zip. The menu paths it names in claude.ai and ChatGPT were read on 2026-11-11 from
-  third-party guides: check them in the real apps before the release. **For the team**: `docs/situations-map.md`, generated.
+  and a zip, which also carries this build's `rules.json`: chat assistants' sandboxes usually cannot
+  reach the site. The owner checked the menu paths in claude.ai (Customize → Skills → Add, upload
+  tested end to end) and ChatGPT (Plugins → Skills → Upload, paid plans only) on 2026-11-12.
+  Left for beta: whether ChatGPT takes the zip or only the folder, and the instructions field
+  names in Claude and ChatGPT projects and Gemini Gems. **For the team**: `docs/situations-map.md`, generated.
 - **Release**: hashed `assets/` cached immutable; a tag fails on examples older than 180 days; the
   rollback runbook is in the deploy section below.
 
-### Before tagging
+### Before production
 
-- **The new Czech needs the owner's review** (R5 outcomes, examples, "why" sentences, the box, the
-  value line). Czech browsers start in Czech, so untranslated or unreviewed text shows. Produce the
-  sheet with `npm run i18n:review`.
-- **Legal review package (R12)**, before production: the provider examples, the authority-to-act and
+- **Legal review package (R12)**: the provider examples, the authority-to-act and
   AML outcomes, "If the office is unsure", the value line, the court FAQ. Of those, the Czech
   register extract step is the least certain: Act 304/2013 §§ 3 and 5 were read, but whether the
   public website's PDF counts as an official electronic extract was not settled by any official page.
-- Refresh trusted lists (PR #33 from 2026-11-09 is open), bump to 0.11.0, PR, tag, beta-only zip.
+- Trusted lists are those read on 2026-11-09 (PR #33, merged into this release).
 
 ### After the beta deploy
 
