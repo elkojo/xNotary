@@ -201,6 +201,20 @@ institutions that matter in law. They fail in unrelated ways, which is what redu
 supposed to mean. Two chains fail the same way — a rewritten history — and only differ in how
 much it costs to do.
 
+## Use it from an AI assistant
+
+Claude, ChatGPT, Gemini, Claude Code, Codex, Hermes and others can answer from the same rules as
+the site and timestamp files the same way, without ever signing or approving anything for you. See
+<https://xnotary.digital/ai/>, or in Claude Code:
+
+```
+/plugin marketplace add elkojo/xNotary
+/plugin install xnotary@xnotary-digital
+```
+
+The plugin and its skill are in [`agent/`](agent/); the design behind them is in
+[`docs/agents.md`](docs/agents.md).
+
 ## Getting started
 
 Requires Node 18.17+.

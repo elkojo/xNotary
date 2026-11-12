@@ -138,6 +138,11 @@ jobs:
           fi
           echo "trusted lists read on $as_of, $age days before this commit"
 
+      # Provider examples on /situations/ (R3) name the day their site was read. A release may not
+      # carry one older than 180 days; measured from the tagged commit, like the trusted lists.
+      - name: Check the provider examples are recent enough for this release
+        run: npx vite-node scripts/check-dated.ts "$(git log -1 --format=%cI)"
+
       # What "Fetch it" on Check a signed file reads. Collected here rather than committed, so the
       # copies are as new as this release. Every copy is verified against the issuer's key. One
       # authority being down is normal; losing a whole country or most of the copies fails here,
@@ -235,6 +240,13 @@ jobs:
           test -s dist/xsignature/issuers/index.json || { echo '::error::the issuer directory is missing from dist/xsignature/issuers/'; exit 1; }
           test "$(ls dist/xsignature/issuers/ | wc -l)" -gt 200 || { echo '::error::the issuer directory has too few shards'; exit 1; }
           grep -q '"build":' dist/version.json || { echo '::error::dist/version.json is missing — open pages could never learn of a new release'; exit 1; }
+          grep -q '"format":' dist/situations/rules.json || { echo '::error::dist/situations/rules.json is missing — agents and llms.txt point to it'; exit 1; }
+          test -f dist/situations/rules.schema.json || { echo '::error::dist/situations/rules.schema.json is missing'; exit 1; }
+          grep -q 'situations/rules.json' dist/llms.txt || { echo '::error::dist/llms.txt is missing or does not point to the rules'; exit 1; }
+          test -f dist/ai/index.html || { echo '::error::dist/ai/ is missing — /ai/ and the Help page point to it'; exit 1; }
+          cmp -s dist/ai/xnotary/SKILL.md ../agent/skills/xnotary/SKILL.md || { echo '::error::dist/ai/xnotary/SKILL.md is missing or differs from agent/skills/xnotary/SKILL.md'; exit 1; }
+          unzip -p dist/ai/xnotary-skill.zip xnotary/SKILL.md | cmp -s - ../agent/skills/xnotary/SKILL.md || { echo '::error::dist/ai/xnotary-skill.zip does not hold the current skill as xnotary/SKILL.md'; exit 1; }
+          unzip -p dist/ai/xnotary-skill.zip xnotary/rules.json | cmp -s - dist/situations/rules.json || { echo '::error::dist/ai/xnotary-skill.zip does not hold this build'"'"'s rules as xnotary/rules.json'; exit 1; }
           grep -A1 '^/version.json' dist/_headers | grep -q 'no-store' || { echo '::error::/version.json is not served no-store'; exit 1; }
           grep -q 'registration.unregister' dist/sw.js || { echo '::error::dist/sw.js, which retires the pre-0.5.0 worker, is missing'; exit 1; }
 

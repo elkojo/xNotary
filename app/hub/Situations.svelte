@@ -9,14 +9,21 @@
 -->
 <script lang="ts">
   import Info from '../src/site/Info.svelte';
+  import Intake from '../src/site/Intake.svelte';
   import SiteBar from '../src/site/SiteBar.svelte';
   import Stepper from '../src/site/Stepper.svelte';
   import { pick, site } from '../src/site/lang.svelte';
   import { TASKS, pageHref } from '../src/site/services';
-  import { JOURNEYS, NODES, journeyOf, situationsIn, stageOf, type NodeId } from '../src/site/situations';
+  import { JOURNEYS, NODES, examplesChecked, journeyOf, situationsIn, stageOf, trail, type NodeId, type Place } from '../src/site/situations';
   import HubFooter from './HubFooter.svelte';
 
   let menu = $state<'services' | 'tasks' | null>(null);
+  /** The flag and code drawn beside a destination's name (R2). Outside the EU has no one code. */
+  const PLACES: Record<Place, { flag: string; code: string }> = {
+    CZ: { flag: '🇨🇿', code: 'CZ' },
+    EU: { flag: '🇪🇺', code: 'EU' },
+    WORLD: { flag: '🌍', code: '' },
+  };
   /** The questions answered so far, and where they led; the last is on screen. */
   let path = $state<NodeId[]>(fromHash());
 
@@ -41,6 +48,8 @@
   const here = $derived(path.at(-1) ?? null);
   const node = $derived(here ? words.nodes[here] : null);
   const journey = $derived(here ? words.journeys.find((j) => j.id === journeyOf(here).id)! : null);
+  /** The answers that led here, in the chosen language (R4). */
+  const answered = $derived(trail(path, words.nodes));
 
   const TEXT = {
     en: {
@@ -53,6 +62,12 @@
       startOver: 'Start over',
       sources: 'Sources',
       checked: 'checked',
+      examples: 'Examples of providers',
+      why: 'Why this route?',
+      youSaid: 'You said:',
+      change: 'Change an answer',
+      direct: 'You opened this step directly, so no answers led here.',
+      fromStart: 'Answer the questions from the start',
       notAdvice: 'Information, not legal advice. Rules change; the recipient has the last word.',
       foot: 'Document tools and guidance, not notarial services or legal advice. What a recipient accepts depends on the country, the document and the recipient.',
     },
@@ -66,6 +81,12 @@
       startOver: 'Začít znovu',
       sources: 'Zdroje',
       checked: 'ověřeno',
+      examples: 'Příklady poskytovatelů',
+      why: 'Proč právě tento postup?',
+      youSaid: 'Odpověděli jste:',
+      change: 'Změnit odpověď',
+      direct: 'Tento krok jste otevřeli přímo, takže sem nevedly žádné odpovědi.',
+      fromStart: 'Projít otázky od začátku',
       notAdvice: 'Informace, ne právní rada. Pravidla se mění; poslední slovo má příjemce.',
       foot: 'Nástroje pro dokumenty a orientace v nich, ne notářské služby ani právní poradenství. Co příjemce přijme, záleží na zemi, na dokumentu a na příjemci.',
     },
@@ -99,6 +120,8 @@
     </div>
 
     {#if !node || !journey}
+      <Intake onpick={(id) => (path = [id])} />
+
       <div class="situation-grid">
         {#each words.journeys as j, i}
           <button class="situation-card" class:lead={i === 0} type="button" onclick={() => begin(j.first)}>
@@ -137,7 +160,17 @@
               <div class="answer-list">
                 {#each node.answers as answer}
                   <button class="answer" type="button" onclick={() => (path = [...path, answer.next])}>
-                    <strong>{answer.label}</strong>
+                    <!--
+                      A destination carries its flag and its code beside the name, never instead of it:
+                      Windows draws a flag as two letters. Both are hidden from screen readers, which
+                      read the name.
+                    -->
+                    <strong
+                      >{#if answer.place}<span class="place" aria-hidden="true" translate="no"
+                          ><span class="place-flag">{PLACES[answer.place].flag}</span
+                          >{#if PLACES[answer.place].code}<span class="place-code">{PLACES[answer.place].code}</span>{/if}</span
+                        >{/if}{answer.label}</strong
+                    >
                     {#if answer.hint}<span>{answer.hint}</span>{/if}
                   </button>
                 {/each}
@@ -161,6 +194,52 @@
                   {#each node.go as go, i}
                     <a class="button small {i === 0 ? 'dark' : 'ghost-dark'}" href={pageHref(go.service, go.page)}>{go.label}</a>
                   {/each}
+                </div>
+              {/if}
+              <!--
+                Why this route? (R4) The answers that led here, each with a way back to its question,
+                and the one sentence that decides the route. Folded: the outcome comes first.
+              -->
+              <details class="situation-why">
+                <summary>{t.why}</summary>
+                {#if answered.length}
+                  <p>{t.youSaid}</p>
+                  <ol>
+                    {#each answered as step}
+                      <li>
+                        <span>{step.question.title}</span>
+                        <strong
+                          >{#if step.answer.place && PLACES[step.answer.place].code}<span class="place-code" translate="no"
+                              >{PLACES[step.answer.place].code}</span
+                            >{' '}{/if}{step.answer.label}</strong
+                        >
+                        <button class="link-button" type="button" onclick={() => (path = path.slice(0, step.at + 1))}>{t.change}</button>
+                      </li>
+                    {/each}
+                  </ol>
+                {:else}
+                  <p>
+                    {t.direct}
+                    <button class="link-button" type="button" onclick={() => begin(journeyOf(here!).first)}>{t.fromStart}</button>
+                  </p>
+                {/if}
+                <p class="situation-why-reason">{node.why}</p>
+              </details>
+              {#if node.examples?.length}
+                <!--
+                  Who does the step this site cannot, as examples (R3). The note is one visible line,
+                  not an ⓘ: without it a list of names reads as a recommendation.
+                -->
+                <div class="situation-examples">
+                  <strong>{t.examples}</strong>
+                  <ul>
+                    {#each node.examples as example}
+                      <li>
+                        <a href={example.url} target="_blank" rel="noopener noreferrer" translate="no">{example.name}</a>: {example.what}
+                      </li>
+                    {/each}
+                  </ul>
+                  <p>{words.examplesNote(examplesChecked(node.examples))}</p>
                 </div>
               {/if}
               {#if node.sources?.length}

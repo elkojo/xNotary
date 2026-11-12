@@ -57,6 +57,21 @@
 /version.json
   Cache-Control: no-store
 
+# Every file under an assets/ folder is named by its content hash, so a given URL never changes
+# content: let browsers keep it for a year without asking again. Before 0.11.0 Pages sent
+# `max-age=14400, must-revalidate`, so a returning visitor revalidated every asset every four
+# hours. Only assets/: pages, workers, /version.json and xNotary's unhashed vendor/ build of the
+# OpenTimestamps library (docs/relinking.md) must stay revalidated. One rule per service, as a
+# splat in the middle of a path is not something to rely on.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/xnotary/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/xsignature/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/xconvert/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
 /xnotary/*
   ! Content-Security-Policy
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://alice.btc.calendar.opentimestamps.org https://bob.btc.calendar.opentimestamps.org https://finney.calendar.eternitywall.com https://blockstream.info https://blockchain.info https://*.blockstream.info; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'

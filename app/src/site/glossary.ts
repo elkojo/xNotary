@@ -30,6 +30,11 @@ export const GLOSSARY_CS: readonly { readonly en: RegExp; readonly cs: RegExp; r
   { en: /§ 6\(2\)/u, cs: /§ 6 odst\. 2/u, note: '§ 6 odst. 2' },
   { en: /§ 6\(3\)/u, cs: /§ 6 odst\. 3/u, note: '§ 6 odst. 3' },
   { en: /Notarial Code/u, cs: /notářsk\p{L}* řád/iu, note: 'notářský řád' },
+  { en: /qualified electronic seal/iu, cs: /kvalifikovan\p{L}* elektronick\p{L}* pečet/iu, note: 'kvalifikovaná elektronická pečeť' },
+  { en: /AML Act/u, cs: /AML zákon/u, note: 'AML zákon (zákon č. 253/2008 Sb.)' },
+  { en: /AML Act obliges/u, cs: /povinn\p{L}* osob/iu, note: 'povinná osoba (253/2008, § 2)' },
+  { en: /electronic identity at the high level/iu, cs: /vysokou úrovní záruky/iu, note: 'prostředek pro elektronickou identifikaci s vysokou úrovní záruky' },
+  { en: /data box/iu, cs: /datov\p{L}* schránk/iu, note: 'datová schránka' },
 ];
 
 /** Never in the site's Czech: near misses with a different meaning, and claims it may not make. */

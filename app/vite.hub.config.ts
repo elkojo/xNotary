@@ -9,6 +9,8 @@ import { buildId } from './scripts/build-id';
 import { revision } from './scripts/revision';
 import { siteVersion } from './scripts/site-version';
 import { SERVICES } from './src/site/services';
+import { RULES_SCHEMA, llmsTxt } from './src/site/situations-export';
+import { rulesJson, skillFiles } from './src/site/skill-files';
 import { LIGHTNING, lightningUri } from './src/site/support';
 
 /**
@@ -101,10 +103,55 @@ function versionFile(): Plugin {
   };
 }
 
+/**
+ * What /situations/ decides, for agents (E1): /situations/rules.json and its schema, and /llms.txt
+ * pointing to them. Generated from the same data as the page (src/site/situations-export.ts), so
+ * they cannot say something the page does not. Static and same-origin: no CSP change.
+ */
+function agentFiles(): Plugin {
+  return {
+    name: 'hub-agent-files',
+    apply: 'build',
+    generateBundle() {
+      const meta = { version: siteVersion(), build: buildId() };
+      this.emitFile({ type: 'asset', fileName: 'situations/rules.json', source: rulesJson(meta) });
+      this.emitFile({ type: 'asset', fileName: 'situations/rules.schema.json', source: JSON.stringify(RULES_SCHEMA, null, 1) + '\n' });
+      this.emitFile({ type: 'asset', fileName: 'llms.txt', source: llmsTxt(meta) });
+      for (const [path, bytes] of Object.entries(skill(meta))) this.emitFile({ type: 'asset', fileName: path.slice(1), source: bytes });
+    },
+  };
+}
+
+/**
+ * The Agent Skill, served from the site (/ai/), with the rules of this build in its zip: see
+ * src/site/skill-files.ts. Read from agent/skills/, the one copy, so the site and the repository
+ * can never offer different skills.
+ */
+function skill(meta: { version: string; build: string }): Record<string, Uint8Array> {
+  return skillFiles(new Uint8Array(readFileSync(fileURLToPath(new URL('../agent/skills/xnotary/SKILL.md', import.meta.url)))), meta);
+}
+
+/** The same two files on the dev server, so /ai/ works there too. */
+function skillFilesInDev(): Plugin {
+  return {
+    name: 'hub-skill-files-dev',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const path = (req.url ?? '').split('?')[0];
+        const files = skill({ version: siteVersion(), build: buildId() });
+        if (!(path in files)) return next();
+        res.setHeader('Content-Type', path.endsWith('.zip') ? 'application/zip' : 'text/markdown; charset=utf-8');
+        res.end(Buffer.from(files[path]));
+      });
+    },
+  };
+}
+
 export default defineConfig({
   root: fileURLToPath(new URL('./hub/', import.meta.url)),
   base: '/',
-  plugins: [svelte(), noticesIndex(), versionFile()],
+  plugins: [svelte(), noticesIndex(), versionFile(), agentFiles(), skillFilesInDev()],
   define: {
     __APP_REVISION__: JSON.stringify(REVISION.label),
     __APP_COMMIT__: JSON.stringify(REVISION.commit),
@@ -112,12 +159,13 @@ export default defineConfig({
     __LIGHTNING_QR__: JSON.stringify(LIGHTNING_QR),
   },
   build: {
-    // Three pages: the front page at /, /support/ and /situations/.
+    // Four pages: the front page at /, /support/, /situations/ and /ai/.
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./hub/index.html', import.meta.url)),
         support: fileURLToPath(new URL('./hub/support/index.html', import.meta.url)),
         situations: fileURLToPath(new URL('./hub/situations/index.html', import.meta.url)),
+        ai: fileURLToPath(new URL('./hub/ai/index.html', import.meta.url)),
       },
     },
     outDir: fileURLToPath(new URL('./dist/', import.meta.url)),

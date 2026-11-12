@@ -7,7 +7,8 @@
 import { GLOSSARY_CS } from '../src/site/glossary';
 import { SERVICES, TABS_CS, TASKS } from '../src/site/services';
 import { JOURNEYS, LIGHTS, NODES } from '../src/site/situations';
-import { JOURNEYS_CS, LIGHTS_CS, NODES_CS, SOURCES_CS } from '../src/site/situations.cs';
+import { EXAMPLES_NOTE } from '../src/site/situations';
+import { EXAMPLES_CS, EXAMPLES_NOTE_CS, JOURNEYS_CS, LIGHTS_CS, NODES_CS, SOURCES_CS } from '../src/site/situations.cs';
 
 const out: string[] = [];
 const row = (where: string, en: string, cs: string) => out.push(`| ${where} | ${en.replace(/\|/g, '\\|')} | ${cs.replace(/\|/g, '\\|')} |`);
@@ -58,11 +59,19 @@ for (const [id, node] of Object.entries(NODES)) {
     const answers = (c as unknown as { answers: { label: string; hint?: string }[] }).answers;
     node.answers.forEach((a, i) => row(`${id}: answer ${i + 1}`, a.hint ? `${a.label} — ${a.hint}` : a.label, answers[i].hint ? `${answers[i].label} — ${answers[i].hint}` : answers[i].label));
   } else {
-    const o = c as unknown as { steps: string[]; go: string[] };
+    const o = c as unknown as { why: string; steps: string[]; go: string[] };
+    row(`${id}: why this route`, node.why, o.why);
     node.steps.forEach((s, i) => row(`${id}: step ${i + 1}`, s, o.steps[i]));
     node.go.forEach((g, i) => row(`${id}: button`, g.label, o.go[i]));
     for (const s of node.sources ?? []) row(`${id}: source`, s.label, SOURCES_CS[s.url]);
   }
 }
+
+table('Life situations: provider examples');
+row('the note under every list', EXAMPLES_NOTE('<date>'), EXAMPLES_NOTE_CS('<date>'));
+const seen = new Set<string>();
+for (const node of Object.values(NODES))
+  if (node.kind === 'outcome')
+    for (const e of node.examples ?? []) if (!seen.has(e.url) && seen.add(e.url)) row(`example: ${e.name}`, e.what, EXAMPLES_CS[e.url]);
 
 console.log(out.join('\n'));

@@ -1,0 +1,12 @@
+{
+  "name": "xnotary-digital",
+  "description": "xNotary.digital: document tasks and Bitcoin timestamps, without uploading the document.",
+  "owner": { "name": "xNotary.digital" },
+  "plugins": [
+    {
+      "name": "xnotary",
+      "source": "./agent",
+      "description": "Find the right route for an official or signed-document task, and timestamp or verify a file on Bitcoin. Never signs or consents for you."
+    }
+  ]
+}

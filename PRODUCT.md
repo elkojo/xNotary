@@ -56,6 +56,11 @@ cannot leak it, lose it or be compelled to hand it over.
   officially verified signature (in Czech, *úřední ověření*).
 - The site reports claims, never verdicts: it does not decide whether a signature is legally
   qualified.
+- Providers are named only as examples, with one visible line saying they are not an endorsement
+  or a partnership and when they were checked (owner's decision, 2026-11-11). An example is never
+  a source: sources stay the law and the authorities. A competitor is never named.
+- The "I want to…" box matches words in the page. Nothing typed is sent or stored, and there is
+  no AI behind it.
 - Public beta: no security review and no legal review yet. The site says so.
 
 ## Brand Commitments

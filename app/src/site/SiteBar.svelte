@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { SERVICES, SITUATIONS_HREF, TASKS, pageHref, service, type ServiceId } from './services';
+  import { AI_HREF } from './ai-install';
   import { LANGUAGES, offeredLangs, pick, setLang, site } from './lang.svelte';
   import { SUPPORT_HREF } from './support';
   import UpdateNotice from './UpdateNotice.svelte';
@@ -40,6 +41,8 @@
       what: 'What do you need to do?',
       start: 'Start from your situation',
       startLine: 'A few questions, then the right tool — or what to ask first.',
+      ai: 'Use your AI assistant',
+      aiLine: 'Claude, ChatGPT, Gemini, Codex, Hermes — answering from xNotary’s rules.',
       support: 'Support',
       supportLine: 'Support the work with a payment.',
       browse: 'Browse services instead',
@@ -52,6 +55,8 @@
       what: 'Co potřebujete vyřídit?',
       start: 'Začít od své situace',
       startLine: 'Pár otázek a pak správný nástroj — nebo na co se nejdřív zeptat.',
+      ai: 'Použít svého AI asistenta',
+      aiLine: 'Claude, ChatGPT, Gemini, Codex, Hermes — s odpověďmi podle pravidel xNotary.',
       support: 'Podpora',
       supportLine: 'Podpořte práci platbou.',
       browse: 'Raději procházet služby',
@@ -157,6 +162,12 @@
             <a class="task-item lead" href={SITUATIONS_HREF}>
               <strong>{t.start}</strong>
               <span class="d">{t.startLine}</span>
+              <span class="tag"><span class="brand-mark"><span>x</span></span><span translate="no">xNotary.digital</span></span>
+            </a>
+            <!-- The same knowledge, from the reader's own assistant (/ai/). The site's page: the site's x. -->
+            <a class="task-item" href={AI_HREF}>
+              <strong>{t.ai}</strong>
+              <span class="d">{t.aiLine}</span>
               <span class="tag"><span class="brand-mark"><span>x</span></span><span translate="no">xNotary.digital</span></span>
             </a>
             {#each TASKS as task}

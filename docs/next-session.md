@@ -1,6 +1,73 @@
 # Where things stand — handoff
 
-## Pick up here (2026-11-06): v0.10.0 to beta
+## Pick up here (2026-11-12): v0.11.0 to beta
+
+**v0.11.0 goes to beta only** (`beta.xnotary.digital`), from PR #34 (branch `revision-0.11.0`, one
+commit per item). Baseline v0.10.0 on beta. **Before production: the lawyer's review (R12).** The
+owner reviewed and approved all new Czech on 2026-11-11 and 2026-11-12. The scope came from the owner's revision basis of 2026-11-11 (kept outside the repo
+with the team's feedback) and four decisions taken that day:
+
+- **D1** A hosted agent, REST API, cases and accounts are post-MVP strategy. Agentic routes that
+  need no backend are in scope: see `docs/agents.md`.
+- **D2** `/situations/` may name providers, as examples under a visible disclaimer. This replaces
+  "outcomes name no provider". `OFFICIAL_HOSTS` still limits *sources* to the law and the authorities.
+- **D3** A free-text "I want to…" box, matched locally only: nothing sent, no AI.
+- **D4** Which single act is the wedge is open for the team. The card order is unchanged.
+
+### What changed
+
+- **"I want to…"** on the front page and `/situations/` (`src/site/intents.ts`, `Intake.svelte`).
+- **"Why this route?"** under every outcome, with "Change an answer".
+- **Destinations** carry a flag, a code and the name.
+- **Provider examples**: PostSignum and I.CA (both found granted on the Czech trusted list) and Bank
+  iD (advanced, never qualified). Read on their own sites on 2026-11-11. No example names a
+  competitor (owner, 2026-11-11), so the remote-notarisation platform the revision basis proposed is
+  not listed, and the "verified abroad" outcomes carry no examples.
+- **New outcomes**: proof of authority to act (official register extract, CZ and SK) and remote
+  client identification under the AML Act. The Czech § 6(2) steps now say how to deliver and what
+  to do when an office has not seen this before.
+- **Front page value line** ("where the law allows it" is load-bearing). **Help**: "I already sign in
+  Adobe" and "Is a Bitcoin timestamp evidence in court?". Every court citation was read in the
+  primary text, and Italy's effect is conditional on AgID standards, which the entry says.
+- **For agents**: `/situations/rules.json` + schema, `/llms.txt`, the Agent Skill (`agent/`),
+  hand-off links with `?q=`. The repository installs as a Claude Code plugin marketplace, and an
+  "Ask your own AI" button beside the box copies the reader's question for their assistant.
+  `/ai/` explains the three ways to use xNotary from an assistant, and serves the skill as a file
+  and a zip, which also carries this build's `rules.json`: chat assistants' sandboxes usually cannot
+  reach the site. The owner checked the menu paths in claude.ai (Customize → Skills → Add, upload
+  tested end to end) and ChatGPT (Plugins → Skills → Upload, paid plans only) on 2026-11-12.
+  Left for beta: whether ChatGPT takes the zip or only the folder, and the instructions field
+  names in Claude and ChatGPT projects and Gemini Gems. **For the team**: `docs/situations-map.md`, generated.
+- **Release**: hashed `assets/` cached immutable; a tag fails on examples older than 180 days; the
+  rollback runbook is in the deploy section below.
+
+### Before production
+
+- **Legal review package (R12)**: the provider examples, the authority-to-act and
+  AML outcomes, "If the office is unsure", the value line, the court FAQ. Of those, the Czech
+  register extract step is the least certain: Act 304/2013 §§ 3 and 5 were read, but whether the
+  public website's PDF counts as an official electronic extract was not settled by any official page.
+- Trusted lists are those read on 2026-11-09 (PR #33, merged into this release).
+
+### After the beta deploy
+
+- **R10 A→B test** on the real beta: a returning visitor gets the new release without clearing
+  anything (T2), an open tab gets the prompt (T3/T4) and never reloads mid-task (T5), two tabs (T6),
+  an old tab opening a lazy chunk after the new release ships (T9), a pre-0.9.1 visitor (T12).
+  Confirm the new `immutable` header on `/xnotary/assets/*` and that `/situations/rules.json` and
+  `/llms.txt` are served as themselves, not the front page's fallback.
+- `npm run e2e:situations https://beta.xnotary.digital/` against the deployed site.
+
+### Asked of the team (R11, E6)
+
+- A real Bank iD-signed PDF, with the signer's consent, to measure in Check a signed file and record
+  in `docs/qtsp-findings.md` (open evidence item 2). Never commit it.
+- What the notary accepted in the remote power of attorney case (video under § 64a, remote
+  legalisation under § 74a, or paper). It settles the POA journey's wording.
+- Add to the questions for I.CA: CORS for this origin and a public OAuth client with PKCE for
+  remote signing (`docs/agents.md`, E6).
+
+## Earlier (2026-11-06): v0.10.0 to beta
 
 **v0.10.0 goes to beta only** (`beta.xnotary.digital`). Production stays on v0.8.1 until the owner
 says otherwise. **Before production: a lawyer checks the legal parts of the Czech** (owner's decision,
@@ -228,6 +295,14 @@ after 90 days and the release does not. There are no Cloudflare credentials in t
 GitHub; wiring that up needs the operator to ask for it, and until they do, this split is the
 whole mechanism. Do not add a Worker, a Function or a `_redirects` rule that needs one — the
 no-backend principle is not scoped to the app code.
+
+**Rolling back is redeploying the previous release's zip** — the asset attached to its GitHub
+release — with the same `wrangler pages deploy` command and the same `--branch`. Nothing else is
+needed: the site holds no state of its own, `/version.json` comes back with the older build, and
+open pages offer the refresh as for any release. The certificate library is in each visitor's
+browser and is untouched. Hashed files under `assets/` are cached as immutable (since 0.11.0),
+which is safe here because every release's HTML names its own hashes and the old zip carries them.
+Then check `/version.json` names the release you meant.
 
 ## If you are picking this up cold
 
@@ -518,6 +593,13 @@ reference client without xNotary at all.
 needs a Worker or a Function. All three need someone to ask for them first.
 
 ## Decisions already made — don't relitigate
+
+- **Agents without a backend (2026-11-11, D1).** A hosted xNotary Agent, an API, cases and accounts
+  wait for a separate origin and product (strategy, not code). What ships is static: rules.json,
+  llms.txt, the Agent Skill; a local MCP server and CLI come after the shared core package.
+- **Providers as examples (2026-11-11, D2)** — never sources, always with the dated disclaimer, and
+  never a competitor: a provider that does what this site does, or plans to, is not named.
+- **The "I want to…" box matches locally (2026-11-11, D3).** No AI, no request, ever.
 
 - **Bitcoin, and no other chain.** Litecoin and Bitcoin SV have both been investigated and
   rejected, and a *user-selectable chain* was considered and dropped with them. Full findings,

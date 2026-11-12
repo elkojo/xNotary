@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Intake from '../src/site/Intake.svelte';
   import SiteBar from '../src/site/SiteBar.svelte';
   import { pick, site } from '../src/site/lang.svelte';
   import { SERVICES, SITUATIONS_HREF, TABS_CS } from '../src/site/services';
@@ -12,6 +13,10 @@
       eyebrow: 'Independent document tools',
       lead: 'What do you need to',
       mark: 'do?',
+      // "where the law allows it" is load-bearing: no copy may suggest the site replaces an
+      // officially verified signature outright (PRODUCT.md; CLAUDE.md, "Notarization is the
+      // product's name, never a legal claim").
+      value: 'Skip the trip to the office — where the law allows it.',
       intro: 'Choose your situation. A few questions lead to the tool that does it — or to what to ask first.',
       tools: 'Or go straight to a tool',
       more: 'More services',
@@ -22,6 +27,7 @@
       eyebrow: 'Nezávislé nástroje pro dokumenty',
       lead: 'Co potřebujete',
       mark: 'vyřídit?',
+      value: 'Bez cesty na úřad — tam, kde to zákon dovolí.',
       intro: 'Vyberte svou situaci. Pár otázek vás dovede k nástroji, který to udělá — nebo k tomu, na co se nejdřív zeptat.',
       tools: 'Nebo rovnou k nástroji',
       more: 'Další služby',
@@ -45,8 +51,12 @@
       <div class="hero">
         <div class="eyebrow">{t.eyebrow}</div>
         <h1>{t.lead} <mark class="hlm">{t.mark}</mark></h1>
+        <p class="hero-value">{t.value}</p>
         <p>{t.intro}</p>
       </div>
+
+      <!-- A few words instead of a card, matched in this page (R1). The cards stay below either way. -->
+      <Intake />
 
       <!--
         Situations first, tools second: a first-time visitor should not have to know which of

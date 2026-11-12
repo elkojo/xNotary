@@ -1,0 +1,19 @@
+{
+  "name": "xnotary",
+  "version": "0.11.0",
+  "description": "Find the right route for an official or signed-document task from xNotary.digital's published rules, and timestamp or verify a file on Bitcoin, hashing locally. Never signs or consents for you.",
+  "author": {
+    "name": "xNotary.digital"
+  },
+  "homepage": "https://xnotary.digital/",
+  "repository": "https://github.com/elkojo/xNotary",
+  "license": "AGPL-3.0-or-later",
+  "keywords": [
+    "signature",
+    "notary",
+    "eidas",
+    "timestamp",
+    "opentimestamps",
+    "power-of-attorney"
+  ]
+}
