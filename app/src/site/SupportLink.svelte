@@ -12,6 +12,7 @@
   import { onMount } from 'svelte';
 
   import SupportCard from './SupportCard.svelte';
+  import { site } from './lang.svelte';
   import { OFFER_DELAY_MS, SUPPORT_HREF, claimSupportOffer } from './support';
 
   let dialog = $state<HTMLDialogElement>();
@@ -59,7 +60,7 @@
     onclick={onBackdrop}
   >
     <!-- First in the dialog, so it takes the focus: Enter or Space closes, never pays. -->
-    <button type="button" class="support-dialog-close" aria-label="Close" onclick={() => dialog?.close()}>
+    <button type="button" class="support-dialog-close" aria-label={site.lang === 'cs' ? 'Zavřít' : 'Close'} onclick={() => dialog?.close()}>
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" /></svg>
     </button>
     <!-- Fills the dialog, so a click that lands on the dialog itself came from the backdrop. -->

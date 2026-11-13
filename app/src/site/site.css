@@ -606,19 +606,18 @@ footer.site .family-links a {
 /* The account written out, for a banking app that cannot scan, or a payment from abroad. */
 .pay-account {
   display: grid;
-  gap: 4px;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
   margin: 12px 0 0;
   font-size: 14px;
 }
 
+/* Each row is a <div> for the markup's sake; the grid aligns the columns across rows. */
 .pay-account div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 10px;
+  display: contents;
 }
 
 .pay-account dt {
-  min-width: 5.5em;
   color: var(--ink-soft);
 }
 
@@ -704,14 +703,12 @@ footer.site .family-links a {
     justify-content: center;
   }
   .pay-account {
-    gap: 8px;
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
-  .pay-account div {
-    flex-direction: column;
-    align-items: center;
-  }
-  .pay-account dt {
-    min-width: 0;
+  .pay-account dd + dt,
+  .pay-account div + div dt {
+    margin-top: 8px;
   }
 }
 

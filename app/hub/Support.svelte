@@ -4,10 +4,15 @@
 -->
 <script lang="ts">
   import SiteBar from '../src/site/SiteBar.svelte';
+  import { site } from '../src/site/lang.svelte';
   import SupportCard from '../src/site/SupportCard.svelte';
   import HubFooter from './HubFooter.svelte';
 
   let menu = $state<'services' | 'tasks' | null>(null);
+  /** This page is wholly in the chosen language, so it says so: a translator then leaves it alone. */
+  $effect(() => {
+    document.documentElement.lang = site.lang;
+  });
 </script>
 
 <SiteBar bind:menu />

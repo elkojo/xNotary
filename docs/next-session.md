@@ -168,7 +168,9 @@ Agents never touch the Cloudflare account.
 - Bank QR (CZK), since 2026-11-13: a QR Platba record built from `BANK_IBAN` (MONETA,
   284531128/0600). The owner's own PNG carried `DT:20261113`, a due date that would have been in
   the past from the next day; the site's code drops it, by the owner's decision, and a test keeps
-  it out. No amount, deliberately.
+  it out. No amount, deliberately. The message `xNotary support` (MSG) tells the recipient what
+  the payment is.
+- `/support/` and the dialog are in Czech too (`SupportCard`'s `TEXT`), following the switcher.
 - `SupportLink` sits under finished tasks on every service (xConvert too, since 2026-11-13: the
   owner's decision). The first time a tab finishes a task, it also opens `/support/`'s content
   (`SupportCard`) in a dialog over the page, 1.2 s after the save, once per browser session

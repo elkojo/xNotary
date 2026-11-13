@@ -23,13 +23,17 @@ export const LIGHTNING = 'lnurl1dp68gurn8ghj7cmpddjjucmpwd5z7tnhv4kxctttdehhwm30
  */
 export const BANK_IBAN = 'CZ0306000000000284531128';
 
+/** What the recipient sees with each transfer, so a gift is told apart from other payments. */
+export const BANK_MESSAGE = 'xNotary support';
+
 /**
  * What the bank QR carries: a QR Platba record (SPD 1.0, Czech Banking Association), the format
- * every Czech banking app reads. The account, the currency and an instant payment — deliberately
- * no amount (the supporter chooses it) and no due date (a fixed date would be in the past the
- * day after the build, which some banking apps refuse). `support.test.ts` pins both.
+ * every Czech banking app reads. The account, the currency, the message for the recipient and an
+ * instant payment — deliberately no amount (the supporter chooses it) and no due date (it must
+ * work on any day; a fixed date is in the past the day after the build). `support.test.ts` pins
+ * all of it.
  */
-export const BANK_SPD = `SPD*1.0*ACC:${BANK_IBAN}*CC:CZK*PT:IP`;
+export const BANK_SPD = `SPD*1.0*ACC:${BANK_IBAN}*CC:CZK*MSG:${BANK_MESSAGE}*PT:IP`;
 
 /** ISO 13616: move the country and check digits to the end, letters to numbers, mod 97 is 1. */
 export function ibanValid(iban: string): boolean {

@@ -302,13 +302,16 @@ marks are diamonds (rotated squares) with a letter or two inside.
   and Bank QR (CZK) live and switch the panel below; Card disabled, with an ⓘ saying "Under
   development"), the payment panel, and a share row (also under development). It fits one desktop
   screen. The content is `app/src/site/SupportCard.svelte`, so the page and the dialog cannot drift.
+  Its text is ours in English and Czech (`docs/i18n.md`) and follows the bar's switcher, in the
+  dialog on a service screen too; the account, IBAN, message and "Lightning" are `translate="no"`.
 - Both panels are one layout (`.pay-panel`): the QR on white, then a title, one line ending in an
   ⓘ, and the actions. Lightning: Open in wallet, Copy code. Bank: the account written out
   (Czech format and IBAN, monospace, `translate="no"`) for an app that cannot scan or a payment
   from abroad, with Copy account and Copy IBAN. On a phone the text comes before the code, which
   the phone showing it cannot scan.
-- The bank QR is a QR Platba record (SPD 1.0): account, CZK, instant payment, and nothing else.
-  No amount, the supporter chooses it; and no due date, so it works on any day.
+- The bank QR is a QR Platba record (SPD 1.0): account, CZK, the message "xNotary support" for
+  the recipient (also shown under the account), instant payment, and nothing else. No amount, the
+  supporter chooses it; and no due date, so it works on any day.
   `support.test.ts` pins both, and checks the IBAN.
 - The page never says a payment is required, secure or received: it cannot know. Both QR codes are
   drawn at build time in ink (`app/scripts/support-qr.ts`), and the page sends nothing.

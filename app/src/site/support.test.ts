@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   BANK_IBAN,
+  BANK_MESSAGE,
   BANK_SPD,
   LIGHTNING,
   OFFERED_KEY,
@@ -89,8 +90,16 @@ describe('the bank QR', () => {
     expect(BANK_SPD).not.toMatch(/\*DT:/);
   });
 
-  it('is upper case, so the QR can use its compact alphanumeric mode', () => {
-    expect(BANK_SPD).toMatch(/^[0-9A-Z $%*+\-./:]+$/);
+  it('tells the recipient what the payment is for', () => {
+    expect(BANK_MESSAGE).toBe('xNotary support');
+    expect(BANK_SPD).toContain(`*MSG:${BANK_MESSAGE}*`);
+  });
+
+  it('keeps to what the SPD format allows', () => {
+    // A field value may not contain the separator, and a message is at most 60 characters.
+    const fields = BANK_SPD.split('*').slice(2);
+    for (const f of fields) expect(f).toMatch(/^[A-Z]+:[^*]+$/);
+    expect(BANK_MESSAGE.length).toBeLessThanOrEqual(60);
   });
 
   it('checks IBANs the way banks do', () => {
