@@ -7,6 +7,7 @@ import { defineConfig, type Plugin } from 'vite';
 
 import { revision } from './scripts/revision';
 import { buildId } from './scripts/build-id';
+import { bankQr, lightningQr } from './scripts/support-qr';
 import { siteVersion } from './scripts/site-version';
 
 // xNotary lives at /xnotary/ on xnotary.digital since 0.5.0; the front page
@@ -376,6 +377,9 @@ export default defineConfig({
     __APP_REVISION__: JSON.stringify(REVISION.label),
     __APP_COMMIT__: JSON.stringify(REVISION.commit),
     __BUILD_ID__: JSON.stringify(buildId()),
+    // The support dialog's QR codes (src/site/SupportLink.svelte), drawn here, not in the browser.
+    __LIGHTNING_QR__: JSON.stringify(await lightningQr()),
+    __BANK_QR__: JSON.stringify(await bankQr()),
   },
   build: {
     // dist/ is the whole site: the front page at its root (vite.hub.config.ts)

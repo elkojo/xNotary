@@ -296,17 +296,37 @@ marks are diamonds (rotated squares) with a letter or two inside.
 - Where it appears: xSignature's Sign a document (step 4) and Check a PDF, and xNotary's Certify
   signers.
 
-### Support (one page, every service but xConvert)
+### Support (one page and one dialog, every service)
 - `/support/` (`app/hub/Support.svelte`) is a thank-you and a voluntary payment. A thank-you
   line, then one card: the serif question with its one highlighted word, method chips (Lightning
-  live; Card and Bank QR disabled, each with an ⓘ saying "Under development"), the Lightning
-  panel, and a share row (also under development). It fits one desktop screen.
-- The page never says a payment is required, secure or received: it cannot know. The Lightning
-  QR is drawn at build time in ink, and the page sends nothing.
-- `app/src/site/SupportLink.svelte` is the line under a finished task in xNotary and xSignature:
+  and Bank QR (CZK) live and switch the panel below; Card disabled, with an ⓘ saying "Under
+  development"), the payment panel, and a share row (also under development). It fits one desktop
+  screen. The content is `app/src/site/SupportCard.svelte`, so the page and the dialog cannot drift.
+  Its text is ours in English and Czech (`docs/i18n.md`) and follows the bar's switcher, in the
+  dialog on a service screen too; the account, IBAN, message and "Lightning" are `translate="no"`.
+- Both panels are one layout (`.pay-panel`): the QR on white, then a title, one line ending in an
+  ⓘ, and the actions. Lightning: Open in wallet, Copy code. Bank: the account written out
+  (Czech format and IBAN, monospace, `translate="no"`) for an app that cannot scan or a payment
+  from abroad, with Copy account and Copy IBAN. On a phone the text comes before the code, which
+  the phone showing it cannot scan.
+- The bank QR is a QR Platba record (SPD 1.0): account, CZK, the message "xNotary support" for
+  the recipient (also shown under the account), instant payment, and nothing else. No amount, the
+  supporter chooses it; and no due date, so it works on any day.
+  `support.test.ts` pins both, and checks the IBAN.
+- The page never says a payment is required, secure or received: it cannot know. Both QR codes are
+  drawn at build time in ink (`app/scripts/support-qr.ts`), and the page sends nothing.
+- `app/src/site/SupportLink.svelte` is the line under a finished task on every service:
   a light card with an ink heart on a wash circle, "Success! If xNotary.digital saved you time, you can
   support the project." It opens in a new tab, because the page it sits on may hold the only
   copy of a result.
+- The first time in a browser session that the line appears, it also opens `SupportCard` in a
+  modal `<dialog>` over the page, 1.2 s after the save so the browser's download UI is seen
+  first: paper on a dimmed backdrop, the card unshadowed, the title an `h2`. A round close button
+  sits top right and takes the focus, so a stray Enter closes rather than pays; Esc and a click on
+  the backdrop close it too. Never more than once per session, never instead of the result, never
+  a new tab or a navigation (a pop-up opened after an async signing is blocked, and navigating
+  would lose a Certificate 2 not yet saved). The dialog is moved to `<body>` so the host screen's
+  styles cannot reach into it.
 - The site does not advertise itself as free of charge. "Free and open source" in a footer is the
   licence (AGPL-3.0), not a price.
 - `/support/` is also in the front-page footer's family links and at the end of the "I want to…"

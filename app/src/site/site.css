@@ -424,6 +424,68 @@ footer.site .family-links a {
   text-underline-offset: 3px;
 }
 
+/* The dialog SupportLink opens once per session: /support/'s content on paper, over the page.
+   The close button comes first, so it is what takes the focus. */
+.support-dialog {
+  width: min(760px, calc(100% - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: auto;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--paper);
+  box-shadow: 0 16px 44px rgba(40, 32, 0, 0.22);
+}
+
+.support-dialog::backdrop {
+  background: rgba(17, 17, 17, 0.55);
+}
+
+.support-dialog-body {
+  padding: 26px 24px 24px;
+}
+
+.support-dialog .support-card {
+  box-shadow: none;
+}
+
+.support-dialog-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line-dark);
+  border-radius: 50%;
+  color: var(--ink);
+  background: var(--card);
+  cursor: pointer;
+}
+
+.support-dialog-close svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.support-dialog-close:hover {
+  background: var(--selected-bg);
+}
+
+@media (max-width: 720px) {
+  .support-dialog-body {
+    padding: 56px 12px 16px;
+  }
+}
+
 /* --------------------------------------------------------------- support -- */
 /* /support/ (app/hub/Support.svelte): a thank-you and a voluntary payment, on one screen. */
 
@@ -463,7 +525,7 @@ footer.site .family-links a {
   text-align: center;
 }
 
-.support-card h1 {
+.support-title {
   margin: 0;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: clamp(32px, 5.4vw, 50px);
@@ -496,7 +558,7 @@ footer.site .family-links a {
   align-items: center;
 }
 
-.lightning {
+.pay-panel {
   display: grid;
   grid-template-columns: 200px 1fr;
   gap: 28px;
@@ -510,38 +572,62 @@ footer.site .family-links a {
 }
 
 /* White behind the code, with a quiet zone wallets need to find it. */
-.lightning-qr {
+.pay-qr {
   padding: 14px;
   border-radius: 10px;
   color: var(--ink);
   background: var(--card);
 }
 
-.lightning-qr svg {
+.pay-qr svg {
   display: block;
   width: 100%;
   height: auto;
 }
 
-.lightning-text h2 {
+.pay-text h2 {
   margin: 0 0 6px;
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.03em;
 }
 
-.lightning-text p {
+.pay-text p {
   margin: 0;
   color: var(--ink-soft);
   font-size: 14px;
   line-height: 1.55;
 }
 
-.lightning-text .action-group {
+.pay-text .action-group {
   margin-top: 16px;
 }
 
-.lightning-code {
+/* The account written out, for a banking app that cannot scan, or a payment from abroad. */
+.pay-account {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
+  margin: 12px 0 0;
+  font-size: 14px;
+}
+
+/* Each row is a <div> for the markup's sake; the grid aligns the columns across rows. */
+.pay-account div {
+  display: contents;
+}
+
+.pay-account dt {
+  color: var(--ink-soft);
+}
+
+.pay-account dd {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 600;
+}
+
+.pay-code {
   display: grid;
   gap: 6px;
   margin-top: 12px;
@@ -549,7 +635,7 @@ footer.site .family-links a {
   font-size: 12px;
 }
 
-.lightning-code .input {
+.pay-code .input {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
 }
@@ -599,22 +685,30 @@ footer.site .family-links a {
   .support-card {
     padding: 28px 20px 24px;
   }
-  .lightning {
+  .pay-panel {
     grid-template-columns: 1fr;
     gap: 18px;
     justify-items: center;
     padding: 18px;
     text-align: center;
   }
-  .lightning-qr {
+  .pay-qr {
     width: min(230px, 100%);
   }
   /* On a phone the QR cannot be scanned by the phone showing it: the button comes first. */
-  .lightning-text {
+  .pay-text {
     order: -1;
   }
-  .lightning-text .action-group {
+  .pay-text .action-group {
     justify-content: center;
+  }
+  .pay-account {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .pay-account dd + dt,
+  .pay-account div + div dt {
+    margin-top: 8px;
   }
 }
 

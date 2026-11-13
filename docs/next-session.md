@@ -164,14 +164,28 @@ Agents never touch the Cloudflare account.
 **3. Support.**
 - `/support/` is a second page of the front-page build. It holds a thank-you and a voluntary
   Lightning payment. The QR is drawn at build time from `LIGHTNING` in `app/src/site/support.ts`
-  (it decodes to milan@cake.cash). Card, Bank QR and Share are marked "Under development".
-- `SupportLink` sits under finished tasks in xNotary and xSignature, never in xConvert.
+  (it decodes to milan@cake.cash). Card and Share are marked "Under development".
+- Bank QR (CZK), since 2026-11-13: a QR Platba record built from `BANK_IBAN` (MONETA,
+  284531128/0600). The owner's own PNG carried `DT:20261113`, a due date that would have been in
+  the past from the next day; the site's code drops it, by the owner's decision, and a test keeps
+  it out. No amount, deliberately. The message `xNotary support` (MSG) tells the recipient what
+  the payment is.
+- `/support/` and the dialog are in Czech too (`SupportCard`'s `TEXT`), following the switcher.
+- `SupportLink` sits under finished tasks on every service (xConvert too, since 2026-11-13: the
+  owner's decision). The first time a tab finishes a task, it also opens `/support/`'s content
+  (`SupportCard`) in a dialog over the page, 1.2 s after the save, once per browser session
+  (`claimSupportOffer`, sessionStorage). The QR codes are drawn by `app/scripts/support-qr.ts` in
+  every service's build. xConvert's e2e pins the dialog.
 - Support is also in the front-page footer and the "I want to…" menu.
 - The site no longer calls itself free of charge. "Free and open source" in the footers is the
   licence, not a price.
 
 ### Check after the deploy
 - `/support/` returns 200. Scan its QR with a real Lightning wallet: that has not been done yet.
+- Scan the Bank QR (CZK) with a real Czech banking app: it should fill in the account and CZK,
+  leave the amount empty and take today's date.
+- The support dialog opens once after a save on each service, and not again in that tab. On
+  iOS Safari, check it does not fight the download sheet.
 - Keep the layout in Brave and Firefox with the owner's real 18-page Word document, which stays
   outside the repository.
 - Safari still needs someone with a Mac.
