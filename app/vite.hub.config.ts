@@ -2,16 +2,15 @@ import { fontNoticeText } from './src/site/fonts/notice';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import QRCode from 'qrcode';
 import { defineConfig, type Plugin } from 'vite';
 
 import { buildId } from './scripts/build-id';
+import { lightningQr } from './scripts/lightning-qr';
 import { revision } from './scripts/revision';
 import { siteVersion } from './scripts/site-version';
 import { SERVICES } from './src/site/services';
 import { RULES_SCHEMA, llmsTxt } from './src/site/situations-export';
 import { rulesJson, skillFiles } from './src/site/skill-files';
-import { LIGHTNING, lightningUri } from './src/site/support';
 
 /**
  * The xNotary.digital front page, served at `/`.
@@ -26,22 +25,8 @@ import { LIGHTNING, lightningUri } from './src/site/support';
  */
 const REVISION = revision();
 
-/**
- * The Lightning QR on /support/, drawn here rather than in the browser so the page ships no QR
- * library. An LNURL goes in upper case, which QR codes store more compactly (LUD-01); the
- * modules are painted in `currentColor`, so the page's ink colours them and no colour is
- * written outside app.css.
- */
-const LIGHTNING_QR = (
-  await QRCode.toString(/^lnurl/i.test(LIGHTNING) ? LIGHTNING.toUpperCase() : lightningUri(LIGHTNING), {
-    type: 'svg',
-    margin: 0,
-    errorCorrectionLevel: 'M',
-    color: { dark: '#000000ff', light: '#00000000' },
-  })
-)
-  .replace(/<path fill="#00000000"[^>]*\/>/g, '')
-  .replace(/stroke="#000000"/g, 'stroke="currentColor"');
+/** The Lightning QR on /support/ (scripts/lightning-qr.ts). */
+const LIGHTNING_QR = await lightningQr();
 
 /**
  * /THIRD-PARTY.txt: an index of every service's third-party notices, read from the

@@ -165,13 +165,19 @@ Agents never touch the Cloudflare account.
 - `/support/` is a second page of the front-page build. It holds a thank-you and a voluntary
   Lightning payment. The QR is drawn at build time from `LIGHTNING` in `app/src/site/support.ts`
   (it decodes to milan@cake.cash). Card, Bank QR and Share are marked "Under development".
-- `SupportLink` sits under finished tasks in xNotary and xSignature, never in xConvert.
+- `SupportLink` sits under finished tasks on every service (xConvert too, since 2026-11-13: the
+  owner's decision). The first time a tab finishes a task, it also opens `/support/`'s content
+  (`SupportCard`) in a dialog over the page, 1.2 s after the save, once per browser session
+  (`claimSupportOffer`, sessionStorage). The QR is drawn by `app/scripts/lightning-qr.ts` in
+  every service's build. xConvert's e2e pins the dialog.
 - Support is also in the front-page footer and the "I want to…" menu.
 - The site no longer calls itself free of charge. "Free and open source" in the footers is the
   licence, not a price.
 
 ### Check after the deploy
 - `/support/` returns 200. Scan its QR with a real Lightning wallet: that has not been done yet.
+- The support dialog opens once after a save on each service, and not again in that tab. On
+  iOS Safari, check it does not fight the download sheet.
 - Keep the layout in Brave and Firefox with the owner's real 18-page Word document, which stays
   outside the repository.
 - Safari still needs someone with a Mac.

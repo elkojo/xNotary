@@ -10,6 +10,7 @@
   import type { Progress as Download } from '../lib/protocol';
   import { canRunPandoc } from '../lib/support';
   import Fresh from '../../../../app/src/site/Fresh.svelte';
+  import SupportLink from '../../../../app/src/site/SupportLink.svelte';
   import {
     DOWNLOAD_MB,
     LayoutCancelled,
@@ -51,6 +52,8 @@
   /** LibreOffice is running: it can take minutes, so it can be cancelled. */
   let laying = $state(false);
   let result = $state<ConvertResult | null>(null);
+  /** The result that was saved, so the support line follows it and goes when it does. */
+  let saved = $state<ConvertResult | null>(null);
   let failure = $state<{ message: string; detail: string } | null>(null);
 
   const step = $derived(result ? 3 : main && from ? 2 : 1);
@@ -139,6 +142,7 @@
     link.download = r.fileName;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    saved = r;
   }
 
   function reset() {
@@ -366,6 +370,7 @@
                 <button class="button dark" onclick={() => result && save(result)}>Save <span translate="no">{result.fileName}</span></button>
               </div>
             </div>
+            {#if saved === result}<SupportLink />{/if}
 
             {#if result.warnings.length}
               <div class="notice warn">

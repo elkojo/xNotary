@@ -223,6 +223,13 @@ try {
   await click('Save ');
   let file = await nextDownload(before);
   check('the PDF is saved under the document’s name', file?.endsWith('smlouva.pdf'), file ?? 'no download');
+  // The first save in a session offers support in a dialog over the page — once, and
+  // dismissible with the button that has the focus.
+  check('the first save offers support in a dialog', await waitFor(`!!document.querySelector('dialog.support-dialog[open]')`, 5000));
+  check('…focused on its close button, so a stray Enter pays nothing', await ev(`document.activeElement?.matches('.support-dialog-close') ?? false`));
+  check('…with the Lightning QR drawn at build time', await ev(`!!document.querySelector('.support-dialog .lightning-qr svg')`));
+  await ev(`document.querySelector('.support-dialog-close').click()`);
+  check('…which closes it', await waitFor(`!document.querySelector('dialog.support-dialog[open]')`, 2000));
   if (file) {
     const pdf = readFileSync(file).toString('latin1');
     check('it is a PDF declaring PDF/A-2b', pdf.startsWith('%PDF-') && pdf.includes('<pdfaid:part>2</pdfaid:part>') && pdf.includes('<pdfaid:conformance>B</pdfaid:conformance>'));
@@ -252,6 +259,8 @@ try {
   await click('Save ');
   file = await nextDownload(before);
   check('the ODT is an OpenDocument package', !!file && readFileSync(file).toString('latin1').includes('application/vnd.oasis.opendocument.text'), file ?? 'no download');
+  await sleep(1500); // longer than the dialog's delay
+  check('a later save does not offer it again', !(await ev(`!!document.querySelector('dialog.support-dialog[open]')`)));
 
   // 3. Markdown with the image it refers to → DOCX
   await click('Convert another document');
