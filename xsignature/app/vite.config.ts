@@ -5,7 +5,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig, type Plugin } from 'vite';
 
 import { buildId } from '../../app/scripts/build-id';
-import { lightningQr } from '../../app/scripts/lightning-qr';
+import { bankQr, lightningQr } from '../../app/scripts/support-qr';
 import { siteVersion } from '../../app/scripts/site-version';
 
 /**
@@ -53,8 +53,9 @@ export default defineConfig({
     // A literal, so it is in the bundle rather than fetched from anywhere.
     __APP_VERSION__: JSON.stringify(version),
     __BUILD_ID__: JSON.stringify(buildId()),
-    // The support dialog's QR (app/src/site/SupportLink.svelte), drawn here, not in the browser.
+    // The support dialog's QR codes (app/src/site/SupportLink.svelte), drawn here, not in the browser.
     __LIGHTNING_QR__: JSON.stringify(await lightningQr()),
+    __BANK_QR__: JSON.stringify(await bankQr()),
   },
   plugins: [svelte(), publishNotices()],
   build: {

@@ -17,6 +17,46 @@ export const SUPPORT_HREF = '/support/';
  */
 export const LIGHTNING = 'lnurl1dp68gurn8ghj7cmpddjjucmpwd5z7tnhv4kxctttdehhwm30d3h82unvwqhk66tvv9hq3pvvk9';
 
+/**
+ * The project's Czech-crown account, as an IBAN. A payment in another currency is converted by
+ * the sender's bank; the code and the page say CZK so nobody is surprised by that.
+ */
+export const BANK_IBAN = 'CZ0306000000000284531128';
+
+/**
+ * What the bank QR carries: a QR Platba record (SPD 1.0, Czech Banking Association), the format
+ * every Czech banking app reads. The account, the currency and an instant payment — deliberately
+ * no amount (the supporter chooses it) and no due date (a fixed date would be in the past the
+ * day after the build, which some banking apps refuse). `support.test.ts` pins both.
+ */
+export const BANK_SPD = `SPD*1.0*ACC:${BANK_IBAN}*CC:CZK*PT:IP`;
+
+/** ISO 13616: move the country and check digits to the end, letters to numbers, mod 97 is 1. */
+export function ibanValid(iban: string): boolean {
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(iban)) return false;
+  const digits = (iban.slice(4) + iban.slice(0, 4)).replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
+  let rest = 0;
+  for (const d of digits) rest = (rest * 10 + Number(d)) % 97;
+  return rest === 1;
+}
+
+/** `CZ03 0600 0000 0002 8453 1128`: an IBAN as it is printed, in groups of four. */
+export function groupIban(iban: string): string {
+  return iban.replace(/(.{4})(?=.)/g, '$1 ');
+}
+
+/**
+ * A Czech IBAN as Czechs write the account: `prefix-number/bank`, leading zeros dropped, the
+ * prefix only when there is one. `CZ0306000000000284531128` → `284531128/0600`.
+ */
+export function czechAccount(iban: string): string {
+  const m = /^CZ\d{2}(\d{4})(\d{6})(\d{10})$/.exec(iban);
+  if (!m) throw new Error(`Not a Czech IBAN: ${iban}`);
+  const [, bank, prefix, number] = m;
+  const p = prefix.replace(/^0+/, '');
+  return `${p ? `${p}-` : ''}${number.replace(/^0+/, '')}/${bank}`;
+}
+
 /** What a `lightning:` link or a QR carries: the code itself, upper-cased if it is an LNURL. */
 export function lightningUri(code: string): string {
   return /^lnurl/i.test(code) ? `lightning:${code.toUpperCase()}` : `lightning:${code}`;

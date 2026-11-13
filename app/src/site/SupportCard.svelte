@@ -2,14 +2,14 @@
   The thank-you and the voluntary payment: the whole of /support/ (app/hub/Support.svelte), and
   the dialog every service opens once a task is finished (SupportLink.svelte). One component, so
   the two cannot drift. Voluntary, always — nothing on the site waits for it, and it cannot know
-  whether anyone paid. It asks nobody: the Lightning QR was drawn at build time
-  (app/scripts/lightning-qr.ts), and a wallet that scans it talks to the payment service
-  directly. Card, bank QR and sharing are shown, and say they are not built yet.
+  whether anyone paid. It asks nobody: both QR codes were drawn at build time
+  (app/scripts/support-qr.ts), and a wallet or banking app that scans one talks to its own
+  service directly. Card and sharing are shown, and say they are not built yet.
 -->
 <script lang="ts">
   import Fresh from './Fresh.svelte';
   import Info from './Info.svelte';
-  import { LIGHTNING, lightningUri } from './support';
+  import { BANK_IBAN, LIGHTNING, czechAccount, groupIban, lightningUri } from './support';
 
   let {
     heading = 'h1',
@@ -20,16 +20,28 @@
     titleId?: string;
   } = $props();
 
-  let copy = $state<'idle' | 'copied' | 'failed'>('idle');
+  type Method = 'lightning' | 'bank';
+  let method = $state<Method>('lightning');
 
-  async function copyCode() {
+  const ACCOUNT = czechAccount(BANK_IBAN);
+  /** What each copy button copies. The IBAN goes without spaces: some banking apps refuse them. */
+  const COPIES = { code: LIGHTNING, account: ACCOUNT, iban: BANK_IBAN } as const;
+  type Copyable = keyof typeof COPIES;
+
+  let copied = $state<Copyable | null>(null);
+  let failed = $state<Copyable | null>(null);
+
+  async function copy(what: Copyable) {
     try {
-      await navigator.clipboard.writeText(LIGHTNING);
-      copy = 'copied';
-      setTimeout(() => (copy = 'idle'), 2500);
+      await navigator.clipboard.writeText(COPIES[what]);
+      copied = what;
+      failed = null;
+      setTimeout(() => {
+        if (copied === what) copied = null;
+      }, 2500);
     } catch {
-      // No clipboard (an older browser, a refused permission): show the code to select instead.
-      copy = 'failed';
+      // No clipboard (an older browser, a refused permission): show the text to select instead.
+      failed = what;
     }
   }
 
@@ -71,49 +83,97 @@
   <p class="support-lede">You can support the work with a payment.</p>
 
   <div class="choice-row support-methods" role="group" aria-label="Payment method">
-    <button type="button" class="choice selected" aria-pressed="true">
+    <button
+      type="button"
+      class="choice"
+      class:selected={method === 'lightning'}
+      aria-pressed={method === 'lightning'}
+      onclick={() => (method = 'lightning')}
+    >
       {@render icon('lightning')} Lightning
+    </button>
+    <button
+      type="button"
+      class="choice"
+      class:selected={method === 'bank'}
+      aria-pressed={method === 'bank'}
+      onclick={() => (method = 'bank')}
+    >
+      {@render icon('bank')} Bank QR (CZK)
     </button>
     <span class="method-soon">
       <button type="button" class="choice" disabled>{@render icon('card')} Card</button><Info
         label="About card payment">Under development.</Info
       >
     </span>
-    <span class="method-soon">
-      <button type="button" class="choice" disabled>{@render icon('bank')} Bank QR</button><Info
-        label="About bank QR payment">Under development.</Info
-      >
-    </span>
   </div>
 
-  <div class="lightning">
-    <div class="lightning-qr" role="img" aria-label="QR code for a Lightning payment">
-      <!-- An SVG this build drew from a constant, never input. -->
-      {@html __LIGHTNING_QR__}
-    </div>
-    <div class="lightning-text">
-      <h2>Pay with Lightning</h2>
-      <p>
-        Scan the code with a Lightning wallet and choose the amount there.<Info
-          label="About Lightning payment"
-          >The code points your wallet at the project's Lightning address, and your wallet
-          talks to it directly. This page sends nothing, and cannot see whether you paid.</Info
-        >
-      </p>
-      <div class="action-group">
-        <a class="button dark" href={lightningUri(LIGHTNING)}>Open in wallet</a>
-        <button type="button" class="button secondary" onclick={() => void copyCode()}>
-          <Fresh text={copy === 'copied' ? 'Copied' : 'Copy code'} />
-        </button>
+  {#snippet selectable(what: Copyable)}
+    {#if failed === what}
+      <label class="pay-code">
+        <span>Copying is not available here. Select it:</span>
+        <input class="input" readonly value={COPIES[what]} onfocus={(e) => e.currentTarget.select()} />
+      </label>
+    {/if}
+  {/snippet}
+
+  {#if method === 'lightning'}
+    <div class="pay-panel">
+      <div class="pay-qr" role="img" aria-label="QR code for a Lightning payment">
+        <!-- An SVG this build drew from a constant, never input. -->
+        {@html __LIGHTNING_QR__}
       </div>
-      {#if copy === 'failed'}
-        <label class="lightning-code">
-          <span>Copying is not available here. Select the code:</span>
-          <input class="input" readonly value={LIGHTNING} onfocus={(e) => e.currentTarget.select()} />
-        </label>
-      {/if}
+      <div class="pay-text">
+        <h2>Pay with Lightning</h2>
+        <p>
+          Scan the code with a Lightning wallet and choose the amount there.<Info
+            label="About Lightning payment"
+            >The code points your wallet at the project's Lightning address, and your wallet
+            talks to it directly. This page sends nothing, and cannot see whether you paid.</Info
+          >
+        </p>
+        <div class="action-group">
+          <a class="button dark" href={lightningUri(LIGHTNING)}>Open in wallet</a>
+          <button type="button" class="button secondary" onclick={() => void copy('code')}>
+            <Fresh text={copied === 'code' ? 'Copied' : 'Copy code'} />
+          </button>
+        </div>
+        {@render selectable('code')}
+      </div>
     </div>
-  </div>
+  {:else}
+    <div class="pay-panel">
+      <div class="pay-qr" role="img" aria-label="QR code for a bank transfer in Czech crowns">
+        <!-- An SVG this build drew from a constant, never input. -->
+        {@html __BANK_QR__}
+      </div>
+      <div class="pay-text">
+        <h2>Pay by bank transfer</h2>
+        <p>
+          Scan the code with your banking app and choose the amount there.<Info
+            label="About bank QR payment"
+            >A QR Platba code, which Czech banking apps read. It holds the project's account and
+            the currency, Czech crowns (CZK), and nothing else: no amount and no date. This page
+            sends nothing, and cannot see whether you paid.</Info
+          >
+        </p>
+        <dl class="pay-account">
+          <div><dt>Account</dt><dd translate="no">{ACCOUNT}</dd></div>
+          <div><dt>IBAN</dt><dd translate="no">{groupIban(BANK_IBAN)}</dd></div>
+        </dl>
+        <div class="action-group">
+          <button type="button" class="button secondary" onclick={() => void copy('account')}>
+            <Fresh text={copied === 'account' ? 'Copied' : 'Copy account'} />
+          </button>
+          <button type="button" class="button secondary" onclick={() => void copy('iban')}>
+            <Fresh text={copied === 'iban' ? 'Copied' : 'Copy IBAN'} />
+          </button>
+        </div>
+        {@render selectable('account')}
+        {@render selectable('iban')}
+      </div>
+    </div>
+  {/if}
 </section>
 
 <div class="support-share">

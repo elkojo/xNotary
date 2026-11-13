@@ -5,7 +5,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig, type Plugin } from 'vite';
 
 import { buildId } from './scripts/build-id';
-import { lightningQr } from './scripts/lightning-qr';
+import { bankQr, lightningQr } from './scripts/support-qr';
 import { revision } from './scripts/revision';
 import { siteVersion } from './scripts/site-version';
 import { SERVICES } from './src/site/services';
@@ -25,8 +25,9 @@ import { rulesJson, skillFiles } from './src/site/skill-files';
  */
 const REVISION = revision();
 
-/** The Lightning QR on /support/ (scripts/lightning-qr.ts). */
+/** The payment QR codes on /support/ (scripts/support-qr.ts). */
 const LIGHTNING_QR = await lightningQr();
+const BANK_QR = await bankQr();
 
 /**
  * /THIRD-PARTY.txt: an index of every service's third-party notices, read from the
@@ -142,6 +143,7 @@ export default defineConfig({
     __APP_COMMIT__: JSON.stringify(REVISION.commit),
     __BUILD_ID__: JSON.stringify(buildId()),
     __LIGHTNING_QR__: JSON.stringify(LIGHTNING_QR),
+    __BANK_QR__: JSON.stringify(BANK_QR),
   },
   build: {
     // Four pages: the front page at /, /support/, /situations/ and /ai/.

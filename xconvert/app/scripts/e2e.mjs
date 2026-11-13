@@ -227,7 +227,9 @@ try {
   // dismissible with the button that has the focus.
   check('the first save offers support in a dialog', await waitFor(`!!document.querySelector('dialog.support-dialog[open]')`, 5000));
   check('…focused on its close button, so a stray Enter pays nothing', await ev(`document.activeElement?.matches('.support-dialog-close') ?? false`));
-  check('…with the Lightning QR drawn at build time', await ev(`!!document.querySelector('.support-dialog .lightning-qr svg')`));
+  check('…with the Lightning QR drawn at build time', await ev(`!!document.querySelector('.support-dialog .pay-qr svg')`));
+  await ev(`[...document.querySelectorAll('.support-dialog .choice')].find((b) => b.textContent.includes('Bank QR')).click()`);
+  check('…and a bank QR in CZK one click away', await waitFor(`document.querySelector('.support-dialog .pay-qr')?.getAttribute('aria-label')?.includes('Czech crowns') && document.querySelector('.support-dialog .pay-account')?.textContent.includes('/0600')`, 2000));
   await ev(`document.querySelector('.support-dialog-close').click()`);
   check('…which closes it', await waitFor(`!document.querySelector('dialog.support-dialog[open]')`, 2000));
   if (file) {
