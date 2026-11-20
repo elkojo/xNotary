@@ -3,7 +3,8 @@
  * layer the browser chooses, with no server involved: `?lang=cs`, then the reader's last choice
  * (remembered in this browser only), then — for a reviewed language — the browser's preference.
  *
- * Only some text is ours to translate (docs/i18n.md): the bar, the front page and /situations/,
+ * Only some text is ours to translate (docs/i18n.md): the bar, the front page, /situations/ and
+ * /support/ (with the support dialog),
  * where a wrong word would be a wrong legal claim. The service screens stay English and may be
  * translated by the browser, which is why everything this layer translates is also marked
  * translate="no" with its own lang — so a browser translator leaves it alone.
