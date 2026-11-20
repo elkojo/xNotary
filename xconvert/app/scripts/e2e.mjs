@@ -172,7 +172,12 @@ try {
     const end = Date.now() + 15000;
     while (Date.now() < end) {
       const now = readdirSync(downloads).filter((f) => !f.endsWith('.crdownload') && !before.includes(f));
-      if (now.length) { await sleep(300); return join(downloads, now[0]); }
+      // Chrome can show a download under a passing name before renaming it (seen on CI:
+      // a `downloads.html` gone by the time it was read), so take a name only once it stays.
+      if (now.length) {
+        await sleep(300);
+        if (existsSync(join(downloads, now[0]))) return join(downloads, now[0]);
+      }
       await sleep(200);
     }
     return null;
