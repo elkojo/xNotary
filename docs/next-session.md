@@ -1,6 +1,31 @@
 # Where things stand — handoff
 
-## Pick up here (2026-11-12): v0.11.0 to beta
+## Pick up here (2026-11-20): v0.12.0 to beta
+
+**v0.12.0 goes to beta only** (`beta.xnotary.digital`). Baseline: v0.11.0 on beta, v0.10.0 on
+production (both read from `/version.json` on 2026-11-20). The lawyer has approved going ahead for
+now (owner, 2026-11-20); the R12 package below stays the record of what was put to them.
+
+### What changed since 0.11.0
+
+- **Support, once a task is finished, on every service** (PR #35): the line under a finished task
+  and, the first time a tab finishes one, `/support/`'s content in a dialog over the page, once
+  per browser session. xConvert included, by the owner's decision of 2026-11-13. Details in the
+  deploy section's "3. Support" below.
+- **Bank transfer in CZK** (QR Platba) beside Lightning: no amount and no due date, by the owner's
+  decision; the message `xNotary support`. The owner tested it with a real banking app.
+- **`/support/` and the dialog in Czech**, approved by the owner on 2026-11-13.
+- **Trusted lists as read on 2026-11-16** (PR #36).
+- xConvert's e2e takes a download's name only once it stays (it flaked on CI).
+
+### After the beta deploy
+
+- The support dialog opens once after a save on each service, not again in that tab, and its
+  close button has the focus. On iOS Safari, check it does not fight the download sheet.
+- Still open from 0.11.0: the R10 A→B test, ChatGPT's zip-or-folder question, and the instruction
+  field names in Claude/ChatGPT projects and Gemini Gems (listed below).
+
+## Earlier (2026-11-12): v0.11.0 to beta
 
 **v0.11.0 goes to beta only** (`beta.xnotary.digital`), from PR #34 (branch `revision-0.11.0`, one
 commit per item). Baseline v0.10.0 on beta. **Before production: the lawyer's review (R12).** The
